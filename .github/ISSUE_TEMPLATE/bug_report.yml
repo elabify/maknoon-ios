@@ -1,0 +1,87 @@
+name: Bug report
+description: Report a problem with the Maknoon iOS app
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. **Never include your recovery phrase, passphrase,
+        private keys, or personal credential data.** Maknoon is self-custodial: we never
+        need them to help, and you should treat anyone who asks for them as an attacker.
+  - type: checkboxes
+    id: prechecks
+    attributes:
+      label: Before you start
+      options:
+        - label: I searched existing issues and this is not a duplicate.
+          required: true
+        - label: This is not a security vulnerability (those go through SECURITY.md, privately), and I have not pasted any secret material.
+          required: true
+  - type: input
+    id: app-version
+    attributes:
+      label: App version
+      description: Shown in the app's About screen, e.g. "0.4.0 (159)".
+      placeholder: "0.4.0 (159)"
+    validations:
+      required: true
+  - type: input
+    id: ios-version
+    attributes:
+      label: iOS version
+      placeholder: "iOS 26.0"
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device
+      placeholder: "iPhone 16 Pro"
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Identity / credentials
+        - Verification / presentation (QR, drop link)
+        - Bitcoin
+        - Ethereum
+        - Solana
+        - Tron
+        - Ledger device (Bluetooth)
+        - Backup / iCloud
+        - Other / not sure
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Go to ...
+        2. Tap ...
+        3. See ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What actually happened
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / screenshots
+      description: If the app offers a log export, attach it. Redact anything sensitive. Screenshots help.
+    validations:
+      required: false

@@ -136,9 +136,9 @@ struct AboutView: View {
             component("SwiftProtobuf", version: "Bundled with TWC", license: "Apache 2.0",
                       url: "https://github.com/apple/swift-protobuf")
             component("ElabifyCore", version: "In-tree", license: "Apache 2.0 / MIT",
-                      url: "https://github.com/elabify/maknoon-ios/tree/main/elabify-core")
+                      url: "https://github.com/elabify/elabify-core")
             component("Ledger device SDKs (BTC/ETH/SOL/TRON)", version: "In-tree", license: "Apache 2.0",
-                      url: "https://github.com/elabify/maknoon-ios/tree/main/code")
+                      url: "https://github.com/elabify/maknoon-ios")
             component("YubiKit", version: "4.7.0", license: "Apache 2.0",
                       url: "https://github.com/Yubico/yubikit-ios")
             component("NFCPassportReader", version: "2.3.0", license: "MIT",

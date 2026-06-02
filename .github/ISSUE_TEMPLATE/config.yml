@@ -1,0 +1,10 @@
+# Force contributors through the structured templates above; route security and
+# privacy elsewhere so they don't land as public bug reports.
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/elabify/maknoon-ios/security/policy
+    about: Report security issues privately. Please do not open a public issue.
+  - name: Privacy policy
+    url: https://musnad.elabify.com/privacy
+    about: How Maknoon handles your data (no analytics, no telemetry).
