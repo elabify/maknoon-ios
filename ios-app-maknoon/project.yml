@@ -111,13 +111,14 @@ packages:
   URKit:
     url: https://github.com/BlockchainCommons/URKit.git
     from: 14.0.0
-  # YubiKit: Yubico's official Swift SDK for talking to YubiKeys
-  # over USB-C (External Accessory framework) and, on paid teams,
-  # NFC and Lightning. We use USB-C only for the Personal Team
-  # build: iPhone 15+ has a USB-C port and the YubiKey 5C plugs in
-  # directly. Wired here so the YubiKeyClient under
-  # Maknoon/YubiKey/* can run a real FIDO2 makeCredential +
-  # getAssertion(hmac-secret) for the Identity Sandwich wrap.
+  # YubiKit: Yubico's official Swift SDK for talking to YubiKeys.
+  # Maknoon uses two transports: NFC (primary; all FIDO2 makeCredential
+  # + getAssertion(hmac-secret) for the Identity Sandwich wrap, plus
+  # serial read) and the USB-C smart-card transport (serial-read
+  # fallback on iPhone 15+). The Lightning 5Ci accessory path
+  # (com.yubico.ylp / YKFAccessoryConnection) is intentionally unused;
+  # see the Info.plist note above for why it's not declared. Wired here
+  # so the YubiKeyClient under Maknoon/YubiKey/* can drive those flows.
   YubiKit:
     url: https://github.com/Yubico/yubikit-ios.git
     from: 4.6.0
@@ -197,12 +198,18 @@ targets:
         NSFaceIDUsageDescription: Maknoon uses Face ID to unlock the app and authorize signing with your wallet and credential keys.
         NSCameraUsageDescription: Maknoon needs camera access to scan QR codes from issuers when you receive a credential.
         NSBluetoothAlwaysUsageDescription: Maknoon uses Bluetooth to share a signed credential directly with another phone in the room. No data is sent to a server.
-        # External Accessory protocols Maknoon is allowed to talk to.
-        # Required for YubiKey 5C / 5C NFC plugged into the iPhone
-        # USB-C port; iOS prompts the user to allow the accessory
-        # the first time a key is connected.
-        UISupportedExternalAccessoryProtocols:
-          - com.yubico.ylp
+        # NOTE: we intentionally do NOT declare
+        # UISupportedExternalAccessoryProtocols / com.yubico.ylp. That
+        # protocol is the YubiKey 5Ci *Lightning* (iAP2) accessory path,
+        # which Maknoon never uses (it never calls startAccessoryConnection
+        # and the YKFAccessoryConnection delegates are no-ops). Declaring it
+        # triggers Apple's MFi authorization check (guideline 2.1.0) and gets
+        # the app rejected unless Yubico whitelists it on their Product Plan.
+        # Maknoon talks to YubiKeys only over NFC (primary, all FIDO2 +
+        # serial) and the USB-C smart-card transport (serial-read fallback,
+        # gated by com.apple.security.smartcard). Per Yubico, neither NFC nor
+        # USB-C requires MFi approval. If 5Ci Lightning is ever added, re-add
+        # com.yubico.ylp here AND supply the PPID in App Review notes.
         NFCReaderUsageDescription: Maknoon uses NFC to read your YubiKey when you tap it to the top of the iPhone, and to read ID documents when you tap your phone to the photo page.
         # AIDs Maknoon's NFC reader sessions may SELECT:
         #   A0000002471001 - ICAO 9303 ePassport MRTD applet (passports,
