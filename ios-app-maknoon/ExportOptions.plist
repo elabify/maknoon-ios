@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Maknoon App Store / TestFlight export options. Consumed by:
+
+      xcodebuild -exportArchive
+                 -archivePath build/Maknoon.xcarchive
+                 -exportOptionsPlist ExportOptions.plist
+                 -exportPath build/Maknoon-ipa
+
+  Driven from scripts/ship-testflight.sh.
+
+  Key choices:
+    method = app-store-connect           — uploads target App Store Connect
+                                            (Xcode 15.3+ name; the older
+                                            value 'app-store' is still
+                                            accepted as an alias).
+    teamID = PQ34VD5384                  — Elabify LLC paid team. MUST match
+                                            the team that owns the bundle id
+                                            and the App Store Connect record.
+    signingStyle = automatic             — Xcode manages the distribution cert
+                                            and provisioning profile. Pairs
+                                            with -allowProvisioningUpdates on
+                                            xcodebuild so the first ship can
+                                            mint the App Store profile.
+    uploadSymbols = true                 — ship the dSYMs to App Store Connect
+                                            so the crash logs in Xcode are
+                                            symbolicated.
+    uploadBitcode = false                — Bitcode is deprecated since Xcode
+                                            14; keep this false.
+    stripSwiftSymbols = true             — smaller IPA, slightly faster
+                                            launch (Swift stdlib symbols are
+                                            re-linked at install time).
+    destination = export                 — write the IPA locally; uploading
+                                            is done by xcrun altool in the
+                                            ship script, separately, so we
+                                            can stage an inspection between
+                                            the two.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>method</key>
+    <string>app-store-connect</string>
+    <key>teamID</key>
+    <string>PQ34VD5384</string>
+    <key>signingStyle</key>
+    <string>automatic</string>
+    <key>destination</key>
+    <string>export</string>
+    <key>uploadSymbols</key>
+    <true/>
+    <key>uploadBitcode</key>
+    <false/>
+    <key>stripSwiftSymbols</key>
+    <true/>
+    <key>generateAppStoreInformation</key>
+    <false/>
+</dict>
+</plist>

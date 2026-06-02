@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Maknoon privacy manifest. Apple requires this for apps that touch
+  "Required Reason APIs" (Spring 2024+). Submitting a build without
+  declaring the reasons for the listed APIs will surface a warning
+  in App Store Connect; for some APIs an outright reject.
+
+  Maknoon's posture, in plain English:
+    - We do not track users across apps or websites.
+    - We do not transmit user data off-device except to issuers /
+      verifiers the user explicitly chose, and even then only the
+      specific signed claims the user opted to disclose.
+    - We do NOT use third-party analytics, ad networks, crash
+      reporters, or A/B testing SDKs.
+
+  Required Reason APIs we DO use (with Apple's reason codes):
+    - UserDefaults: CA92.1 — read/write to this app's own
+      UserDefaults (no app group, no shared keychain).
+    - File timestamp: C617.1 — read the timestamp of files inside
+      the app's own container (e.g. iCloud Drive backup listings
+      sorted by date).
+    - System boot time: 35F9.1 — measure how long the app has been
+      running, used by the auto-lock idle timer.
+    - Disk space: E174.1 — check disk space before writing the
+      encrypted backup blob so we fail early with a clean error
+      instead of partway through.
+
+  No "Active keyboard" usage. No "Pasteboard" usage outside explicit
+  copy actions the user triggered (those don't require declaration).
+  No "Screen recording" detection.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>NSPrivacyTracking</key>
+    <false/>
+    <key>NSPrivacyTrackingDomains</key>
+    <array/>
+    <key>NSPrivacyCollectedDataTypes</key>
+    <array/>
+    <key>NSPrivacyAccessedAPITypes</key>
+    <array>
+        <dict>
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <string>CA92.1</string>
+            </array>
+        </dict>
+        <dict>
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <string>C617.1</string>
+            </array>
+        </dict>
+        <dict>
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategorySystemBootTime</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <string>35F9.1</string>
+            </array>
+        </dict>
+        <dict>
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategoryDiskSpace</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <string>E174.1</string>
+            </array>
+        </dict>
+    </array>
+</dict>
+</plist>

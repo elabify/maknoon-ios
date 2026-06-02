@@ -1,0 +1,15 @@
+[submodule "elabify-core"]
+	path = elabify-core
+	url = https://github.com/elabify/elabify-core.git
+[submodule "ledger-btc-rs"]
+	path = ledger-btc-rs
+	url = https://github.com/elabify/maknoon-ledger-btc-rs.git
+[submodule "ledger-eth-rs"]
+	path = ledger-eth-rs
+	url = https://github.com/elabify/maknoon-ledger-eth-rs.git
+[submodule "ledger-sol-rs"]
+	path = ledger-sol-rs
+	url = https://github.com/elabify/maknoon-ledger-sol-rs.git
+[submodule "ledger-tron-rs"]
+	path = ledger-tron-rs
+	url = https://github.com/elabify/maknoon-ledger-tron-rs.git

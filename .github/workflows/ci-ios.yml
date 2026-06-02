@@ -1,0 +1,65 @@
+# iOS build check for the Maknoon app. The app links four Ledger SDK
+# xcframeworks that are build artifacts, so CI builds them from the crate
+# submodules with `make ios` first; elabify-core resolves as a local
+# SwiftPM package. Unsigned simulator build: it verifies the app compiles,
+# holds no secrets, and never uploads.
+#
+# MANUAL-ONLY (workflow_dispatch): a full run builds four Rust xcframeworks
+# plus the app on a macOS runner (~45 min). Trigger before an iOS release.
+name: ci-ios
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: unsigned simulator build
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - name: Select newest available Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Install Rust toolchain + iOS targets
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios
+
+      - name: Cache cargo registry + build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            ledger-btc-rs
+            ledger-eth-rs
+            ledger-sol-rs
+            ledger-tron-rs
+
+      - name: Build Ledger xcframeworks (btc, eth, sol, tron)
+        run: |
+          set -euo pipefail
+          for crate in ledger-btc-rs ledger-eth-rs ledger-sol-rs ledger-tron-rs; do
+            echo "::group::make ios ($crate)"
+            make -C "$crate" ios
+            echo "::endgroup::"
+          done
+
+      - name: Install xcodegen
+        run: brew install xcodegen
+
+      - name: Generate project + build (unsigned, simulator)
+        working-directory: ios-app-maknoon
+        run: |
+          set -euo pipefail
+          xcodegen generate
+          xcodebuild build \
+            -project Maknoon.xcodeproj \
+            -scheme Maknoon \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO

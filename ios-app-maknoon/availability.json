@@ -1,0 +1,154 @@
+{
+  "$comment": "Machine-readable App Store territory availability policy for Maknoon. This is NOT an Apple Routing App Coverage File (that GeoJSON format applies only to Navigation-category apps and does not gate downloads). This file records which App Store Connect territories to EXCLUDE under Pricing and Availability. Apply it manually in App Store Connect, or via the App Store Connect API (appAvailabilities / territoryAvailabilities). territory_id values are ISO 3166-1 alpha-3, matching the App Store Connect API Territory resource id.",
+  "schema_version": 1,
+  "app": "Maknoon",
+  "owner": "Elabify LLC",
+  "generated": "2026-06-01",
+  "app_profile": {
+    "self_custodial": true,
+    "custodial_holdings": false,
+    "fiat_handling": false,
+    "money_transmission": false,
+    "note": "Keys are generated and held on device; no Elabify-side accounts or balances. See REVIEW_NOTES.md and PRIVACY.md."
+  },
+  "default_policy": "available_in_all_territories_except_excluded",
+  "exclusion_rationale": "Exclude territories that criminalize individual possession or use of cryptocurrency (which a self-custodial wallet enables), plus territories where Apple Developer Program distribution is legally prohibited. Banking-only bans that target financial institutions or exchanges are tracked under 'review' rather than excluded, because they do not clearly reach a non-custodial, no-fiat wallet.",
+  "excluded": [
+    {
+      "name": "Algeria",
+      "iso_alpha2": "DZ",
+      "territory_id": "DZA",
+      "basis": "absolute_ban",
+      "detail": "Law explicitly prohibits the purchase, sale, use, and holding of virtual currency by individuals.",
+      "source": "https://en.wikipedia.org/wiki/Legality_of_cryptocurrency_by_country_or_territory"
+    },
+    {
+      "name": "Nepal",
+      "iso_alpha2": "NP",
+      "territory_id": "NPL",
+      "basis": "absolute_ban",
+      "detail": "Use of any cryptocurrency, including holding and mining, is illegal; enforced by Nepal Rastra Bank.",
+      "source": "https://en.wikipedia.org/wiki/Legality_of_cryptocurrency_by_country_or_territory"
+    },
+    {
+      "name": "China (mainland)",
+      "iso_alpha2": "CN",
+      "territory_id": "CHN",
+      "basis": "comprehensive_ban",
+      "detail": "Comprehensive 2021 ban extended in 2025 to suspend transactions, with asset-seizure and enforcement measures. Individual ownership is a legal gray area but all transacting is illegal.",
+      "source": "https://www.cloudwards.net/where-is-crypto-illegal/"
+    },
+    {
+      "name": "Bangladesh",
+      "iso_alpha2": "BD",
+      "territory_id": "BGD",
+      "basis": "comprehensive_ban",
+      "detail": "All crypto-related activity declared illegal; users can face prosecution under money-laundering and foreign-exchange law.",
+      "source": "https://www.cloudwards.net/where-is-crypto-illegal/"
+    },
+    {
+      "name": "Afghanistan",
+      "iso_alpha2": "AF",
+      "territory_id": "AFG",
+      "basis": "comprehensive_ban",
+      "detail": "Crypto prohibited since 2022 with users and traders harshly penalized.",
+      "source": "https://www.cloudwards.net/where-is-crypto-illegal/"
+    },
+    {
+      "name": "Egypt",
+      "iso_alpha2": "EG",
+      "territory_id": "EGY",
+      "basis": "comprehensive_ban",
+      "detail": "Banking law and a Dar al-Ifta religious edict prohibit crypto activity; central-bank licensing required for any crypto dealing, effectively banning it.",
+      "source": "https://www.cloudwards.net/where-is-crypto-illegal/"
+    },
+    {
+      "name": "Morocco",
+      "iso_alpha2": "MA",
+      "territory_id": "MAR",
+      "basis": "comprehensive_ban",
+      "detail": "Total ban in force since 2017. A draft law to legalize and regulate crypto is pending as of 2026; revisit if it passes.",
+      "source": "https://www.cloudwards.net/where-is-crypto-illegal/"
+    },
+    {
+      "name": "Cuba",
+      "iso_alpha2": "CU",
+      "territory_id": "CUB",
+      "basis": "sanctions_no_distribution",
+      "detail": "OFAC comprehensively sanctioned. Apple Developer Program prohibits distribution; no App Store storefront. Cannot be selected for availability.",
+      "source": "https://developer.apple.com/support/terms/"
+    },
+    {
+      "name": "Iran",
+      "iso_alpha2": "IR",
+      "territory_id": "IRN",
+      "basis": "sanctions_no_distribution",
+      "detail": "OFAC comprehensively sanctioned. Apple Developer Program prohibits distribution; no App Store storefront.",
+      "source": "https://developer.apple.com/support/terms/"
+    },
+    {
+      "name": "North Korea",
+      "iso_alpha2": "KP",
+      "territory_id": "PRK",
+      "basis": "sanctions_no_distribution",
+      "detail": "OFAC comprehensively sanctioned. Apple Developer Program prohibits distribution; no App Store storefront.",
+      "source": "https://developer.apple.com/support/terms/"
+    },
+    {
+      "name": "Syria",
+      "iso_alpha2": "SY",
+      "territory_id": "SYR",
+      "basis": "sanctions_no_distribution",
+      "detail": "OFAC comprehensively sanctioned. Apple Developer Program prohibits distribution; no App Store storefront.",
+      "source": "https://developer.apple.com/support/terms/"
+    }
+  ],
+  "review": [
+    {
+      "name": "Qatar",
+      "iso_alpha2": "QA",
+      "territory_id": "QAT",
+      "basis": "banking_ban",
+      "decision": "available",
+      "detail": "QFC and central bank banned crypto services and trading by institutions. Comprehensive toward intermediaries but does not clearly criminalize individual self-custody. Conservative teams may choose to exclude.",
+      "source": "https://en.wikipedia.org/wiki/Legality_of_cryptocurrency_by_country_or_territory"
+    },
+    {
+      "name": "Iraq",
+      "iso_alpha2": "IQ",
+      "territory_id": "IRQ",
+      "basis": "banking_ban",
+      "decision": "available",
+      "detail": "Central bank prohibited the use of cryptocurrency, but the directive targets financial institutions; reach to individual self-custody is unsettled.",
+      "source": "https://en.wikipedia.org/wiki/Legality_of_cryptocurrency_by_country_or_territory"
+    },
+    {
+      "name": "Tunisia",
+      "iso_alpha2": "TN",
+      "territory_id": "TUN",
+      "basis": "banking_ban",
+      "decision": "available",
+      "detail": "Central bank rules ban crypto for payments. Targets payment use rather than possession; revisit if criminal penalties for holding are introduced.",
+      "source": "https://www.ccn.com/education/crypto/10-countries-where-crypto-remains-banned/"
+    },
+    {
+      "name": "Bolivia",
+      "iso_alpha2": "BO",
+      "territory_id": "BOL",
+      "basis": "ban_lifted",
+      "decision": "available",
+      "detail": "Long-standing ban was LIFTED by the central bank in June 2024. Older sources still list Bolivia as banned; do not exclude it.",
+      "source": "https://www.cloudwards.net/where-is-crypto-illegal/"
+    },
+    {
+      "name": "European Union (all member states)",
+      "iso_alpha2": "EU",
+      "territory_id": "EUR",
+      "basis": "regulated_not_banned",
+      "decision": "available",
+      "detail": "AMLR / MiCA regulate custodial intermediaries and anonymous custodial accounts. Self-hosted software and hardware wallets and P2P transfers are explicitly excluded, so self-custody is not banned. Keep available.",
+      "source": "https://www.theblock.co/post/284442/no-the-eu-is-not-banning-self-custodial-crypto-transactions-or-wallets"
+    }
+  ],
+  "occupied_regions_note": "The Crimea, Donetsk, and Luhansk regions of Ukraine are OFAC-sanctioned but have no separate App Store territory code (they fall under UKR). Distribution there is prohibited by the Apple Developer Program; there is no per-region toggle to set."
+}

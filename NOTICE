@@ -1,0 +1,19 @@
+# NOTICE: third-party attributions
+
+This app (Apache-2.0; see LICENSE) depends on third-party software under
+permissive licenses (Apache-2.0 / MIT / MPL-2.0 / BSD). The native cores are
+git submodules and carry their own licenses.
+
+## Swift packages (pinned in Package.resolved)
+
+- **bcswiftdcbor** 1.0.7 (https://github.com/BlockchainCommons/BCSwiftDCBOR)
+- **bcswiftfloat16** 1.0.0 (https://github.com/blockchaincommons/BCSwiftFloat16)
+- **bcswifttags** 0.2.3 (https://github.com/BlockchainCommons/BCSwiftTags)
+- **bdk-swift** 2.3.1 (https://github.com/bitcoindevkit/bdk-swift.git)
+- **nfcpassportreader** 2.3.0 (https://github.com/AndyQ/NFCPassportReader.git)
+- **openssl-package** 3.3.3001 (https://github.com/krzyzanowskim/OpenSSL-Package.git)
+- **swift-collections** 1.1.4 (https://github.com/wolfmcnally/swift-collections)
+- **swift-numberkit** 2.4.3 (https://github.com/wolfmcnally/swift-numberkit.git)
+- **urkit** 14.0.2 (https://github.com/BlockchainCommons/URKit.git)
+- **wallet-core** 4.6.9 (https://github.com/trustwallet/wallet-core.git)
+- **yubikit-ios** 4.7.0 (https://github.com/Yubico/yubikit-ios.git)

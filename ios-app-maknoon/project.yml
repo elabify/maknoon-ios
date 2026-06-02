@@ -1,0 +1,323 @@
+# xcodegen spec for the Maknoon iOS app (Phase C demo cut).
+#
+# Generate the .xcodeproj with:
+#     xcodegen generate
+#
+# Then open Maknoon.xcodeproj in Xcode and hit Run.
+#
+# Naming convention:
+#   - Elabify     = parent company / org / build provenance.
+#   - Musnad      = identity verified-credential product (issuer + verifier).
+#   - Maknoon     = custody product: holder app + wallet (this target).
+
+name: Maknoon
+options:
+  # Bundle id namespace for Elabify LLC.
+  bundleIdPrefix: com.elabify.app
+  deploymentTarget:
+    iOS: "26.0"
+  developmentLanguage: en
+  # Locales that ship as part of the binary. xcodegen sets the
+  # project-level knownRegions from this list; Info.plist gets
+  # CFBundleLocalizations to match below. Adding a new language
+  # means: (1) add it here, (2) populate the .xcstrings catalog
+  # with translations, (3) update DisplaySettings.AppLanguage to
+  # surface it in the picker.
+  knownRegions:
+    - en
+    - ar
+    - zh-Hans
+    - Base
+  groupSortPosition: top
+settings:
+  base:
+    # Held at 5.10 (one step below Swift 6) so the UniFFI 0.31.1
+    # generated bindings for ledger-btc-core compile cleanly.
+    # Swift 6 language mode enforces `sending` semantics and
+    # static-let-Sendable in ways the bindings don't satisfy yet.
+    # 5.10 keeps nearly every Swift 6 surface (concurrency,
+    # macros, opt-in upcoming features) available, just without
+    # the strictest language-mode-6 checks. Bump to 6.0 when
+    # UniFFI ships Swift-6-clean bindings, or once ledger-btc-core
+    # is wrapped in its own Swift Package that can carry an
+    # isolated SWIFT_VERSION.
+    SWIFT_VERSION: "5.10"
+    IPHONEOS_DEPLOYMENT_TARGET: "26.0"
+    MARKETING_VERSION: "0.4.0"
+    CURRENT_PROJECT_VERSION: "1"
+    # MAKNOON_NFC gates NFC code paths (ID document scanning via
+    # NFCPassportReader, YubiKey FIDO2 hmac-secret over NFC).
+    # Requires the NFC reader entitlement (paid team).
+    #
+    # MAKNOON_CLOUDKIT gates the iCloud encrypted-backup upload /
+    # download path. Requires the iCloud container entitlement
+    # (paid team + provisioned container).
+    SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) MAKNOON_NFC MAKNOON_CLOUDKIT"
+    # Default for local builds. Override at Xcode-build time via:
+    #   xcodebuild ... ELABIFY_BUILD_COMMIT=$(git rev-parse --short HEAD)
+    # The key stays ELABIFY_BUILD_COMMIT because the build provenance is
+    # company-level, not product-level.
+    ELABIFY_BUILD_COMMIT: dev
+    # Signing team: Elabify LLC (paid Apple Developer Program organization).
+    DEVELOPMENT_TEAM: PQ34VD5384
+    CODE_SIGN_STYLE: Automatic
+    # Maknoon is iPhone + iPad only. Vision (XR) is intentionally
+    # disabled so "Designed for iPad" stays the only path Vision Pro
+    # users can run the app today; no separate visionOS target.
+    SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD: NO
+    SUPPORTED_PLATFORMS: "iphoneos iphonesimulator"
+packages:
+  ElabifyCore:
+    path: ../elabify-core/bindings/swift
+  # BitcoinDevKit Swift bindings. Provides BDK's Wallet, Descriptor,
+  # TxBuilder, Electrum/Esplora clients, PSBT, fee estimation, coin
+  # control, RBF, and Bump-Fee. Used by every Bitcoin/* file under
+  # Maknoon/Bitcoin/. Pinned to a tagged release so we control API
+  # drift.
+  BitcoinDevKit:
+    url: https://github.com/bitcoindevkit/bdk-swift.git
+    exactVersion: 2.3.1
+  # Trust Wallet Core. C++ core with Swift bindings; provides BIP39
+  # HDWallet, BIP44 address derivation, EIP-55 checksums, Keccak-256,
+  # RLP encoder, and signing for Ethereum + EVM chains, Tron, Solana,
+  # and 100+ others. Same source compiled for iOS Swift + Kotlin/
+  # Android so signatures match byte-for-byte across platforms.
+  # Used by Maknoon/Ethereum/* (and future Tron / Solana modules).
+  # BDK stays as the Bitcoin library; TWC covers everything else.
+  WalletCore:
+    url: https://github.com/trustwallet/wallet-core.git
+    exactVersion: 4.6.9
+  # NFCPassportReader: MIT-licensed Swift Package that talks
+  # ICAO 9303 over Core NFC. Used by Maknoon/IDDocument/* when the
+  # user taps "Tap ID document" on the Identity tab. Requires the
+  # NFC reader entitlement.
+  NFCPassportReader:
+    url: https://github.com/AndyQ/NFCPassportReader.git
+    # Explicit version pin. A previous attempt to downgrade to
+    # 2.0.2 silently wrote a stale entry into Package.resolved
+    # even though the overall SPM resolution errored on the
+    # OpenSSL transitive dep. Every build afterwards came up on
+    # 2.0.2 instead of the intended latest, and passport scanning
+    # stopped detecting tags. Lock this so the slot can't drift
+    # again. Bump deliberately.
+    exactVersion: 2.3.0
+
+  # URKit: Blockchain Commons' Swift implementation of Uniform
+  # Resources (UR). Required for SeedSigner interop because
+  # SeedSigner round-trips PSBTs as animated UR-PSBT QR sequences
+  # (fountain-encoded, multi-frame). URKit handles the UR string
+  # format, fountain encoding (UREncoder), and reassembly
+  # (URDecoder). MIT-licensed. Used by Maknoon/SeedSigner/* only.
+  URKit:
+    url: https://github.com/BlockchainCommons/URKit.git
+    from: 14.0.0
+  # YubiKit: Yubico's official Swift SDK for talking to YubiKeys
+  # over USB-C (External Accessory framework) and, on paid teams,
+  # NFC and Lightning. We use USB-C only for the Personal Team
+  # build: iPhone 15+ has a USB-C port and the YubiKey 5C plugs in
+  # directly. Wired here so the YubiKeyClient under
+  # Maknoon/YubiKey/* can run a real FIDO2 makeCredential +
+  # getAssertion(hmac-secret) for the Identity Sandwich wrap.
+  YubiKit:
+    url: https://github.com/Yubico/yubikit-ios.git
+    from: 4.6.0
+  # NOTE: the App Attest peer verifier (parked in ../appattest-wip) needs
+  # swift-certificates + swift-asn1 for cert-chain validation and nonce-
+  # extension parsing. Adding them pulls in swift-crypto, whose dynamic
+  # `Crypto_*_PackageProduct.framework` fails to build in this Xcode/SPM
+  # setup (unresolved by clean / DerivedData wipe / explicit product). Until
+  # that is fixed (or the verifier is reworked onto SecTrust + SwiftASN1-only),
+  # the packages are intentionally not declared here.
+targets:
+  Maknoon:
+    type: application
+    platform: iOS
+    # Shared scheme so `xcodebuild -scheme Maknoon test` runs the
+    # MaknoonTests bundle (XcodeGen otherwise emits no shared scheme).
+    scheme:
+      testTargets:
+        - MaknoonTests
+    sources:
+      - path: Maknoon
+      # UniFFI-generated Swift glue for ledger-btc-core (Rust core
+      # + LedgerHQ's bitcoin_client_rs). Referenced in-place from
+      # the sibling ledger-btc-rs workspace; regenerated via
+      # `make ios` over there. The .xcframework that the glue
+      # talks to is declared as a framework dependency below.
+      #
+      # `-strict-concurrency=minimal` because UniFFI 0.31's
+      # generated Swift uses static vtable pointers that don't
+      # satisfy Swift 6's full strict-concurrency check. Maknoon
+      # itself stays on the default strict checking; only this
+      # one upstream-generated file gets the relaxation.
+      - path: ../ledger-btc-rs/ios/bindings/ledger_btc_core.swift
+        type: file
+      # Same in-place UniFFI glue for the Solana / Ethereum / Tron
+      # Ledger SDKs (sibling rust workspaces). Their xcframeworks are
+      # declared as framework dependencies below. Without these the
+      # xcodegen-regenerated project drops hardware Solana/Eth/Tron
+      # support and the archive fails on EthTransportError /
+      # TronTransportError / Solana glue not being in scope.
+      - path: ../ledger-sol-rs/ios/bindings/ledger_sol_core.swift
+        type: file
+      - path: ../ledger-eth-rs/ios/bindings/ledger_eth_core.swift
+        type: file
+      - path: ../ledger-tron-rs/ios/bindings/ledger_tron_core.swift
+        type: file
+    info:
+      path: Maknoon/Info.plist
+      properties:
+        CFBundleDisplayName: Maknoon
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        # Apple export-compliance declaration. Maknoon's crypto is
+        # AES-256-GCM, PBKDF2-SHA256, ML-DSA-65, all used for
+        # authentication / digital signatures / encrypted backup of
+        # the user's own data. That falls under the "limited use"
+        # exemption (US Export Administration Regs §740.17 + the
+        # 5D002 ENC exception note 4). Declaring false means we do
+        # NOT need to upload an export-compliance document; setting
+        # this avoids the manual annual export-compliance dialog in
+        # App Store Connect. If the app ever ships a custom cipher,
+        # encrypted P2P streaming, or DRM, flip to true and file CCATS.
+        ITSAppUsesNonExemptEncryption: false
+        # Locales the runtime exposes via Bundle.main.preferredLocalizations.
+        # Must match the knownRegions list at project level + the
+        # locales populated in Localizable.xcstrings.
+        CFBundleLocalizations:
+          - en
+          - ar
+          - zh-Hans
+        CFBundleDevelopmentRegion: en
+        # Surfaced in Settings → About so the user can compare against the
+        # verifier server's /healthz buildCommit. Stays "dev" for local
+        # builds; CI overrides via xcconfig or environment.
+        ELABIFY_BUILD_COMMIT: $(ELABIFY_BUILD_COMMIT)
+        LSRequiresIPhoneOS: true
+        NSFaceIDUsageDescription: Maknoon uses Face ID to unlock the app and authorize signing with your wallet and credential keys.
+        NSCameraUsageDescription: Maknoon needs camera access to scan QR codes from issuers when you receive a credential.
+        NSBluetoothAlwaysUsageDescription: Maknoon uses Bluetooth to share a signed credential directly with another phone in the room. No data is sent to a server.
+        # External Accessory protocols Maknoon is allowed to talk to.
+        # Required for YubiKey 5C / 5C NFC plugged into the iPhone
+        # USB-C port; iOS prompts the user to allow the accessory
+        # the first time a key is connected.
+        UISupportedExternalAccessoryProtocols:
+          - com.yubico.ylp
+        NFCReaderUsageDescription: Maknoon uses NFC to read your YubiKey when you tap it to the top of the iPhone, and to read ID documents when you tap your phone to the photo page.
+        # AIDs Maknoon's NFC reader sessions may SELECT:
+        #   A0000002471001 - ICAO 9303 ePassport MRTD applet (passports,
+        #                    residence permits)
+        #   A0000002472001 - ICAO 9303 eID applet (some national ID cards)
+        #   A0000006472F0001 - FIDO U2F / FIDO2 (YubiKey NFC tap)
+        com.apple.developer.nfc.readersession.iso7816.select-identifiers:
+          # eMRTD passport applets (used by future ID-document scanning).
+          - A0000002471001
+          - A0000002472001
+          # YubiKey applets. Management AID is required for serial
+          # reads via identifySerialOverNFC; FIDO2 AID is required
+          # for Identity Sandwich enroll / unlock. The OATH / OTP /
+          # PIV AIDs are defensive: YubiKit's session-open path can
+          # probe them, and iOS surfaces a "missing required
+          # entitlement" error for any AID not declared here.
+          - A000000527471117
+          - A0000006472F0001
+          - A000000527200101
+          - A000000527210101
+          - A000000308
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        # NSUbiquitousContainers: surfaces the iCloud-backed container
+        # in the user's iCloud Drive under the "Maknoon" name so
+        # encrypted backups written by
+        # EncryptedBackup.writeToICloudDriveIfAvailable land in a
+        # folder the user can browse to in the Files app. Pairs with
+        # the CloudDocuments entitlement in Maknoon.entitlements;
+        # without that entitlement (and the matching "iCloud Documents"
+        # capability on the App ID in the dev portal), the runtime
+        # ubiquity-container lookup returns nil and the backup flow
+        # falls back to the standard file picker.
+        NSUbiquitousContainers:
+          iCloud.com.elabify.app.maknoon:
+            NSUbiquitousContainerName: Maknoon
+            NSUbiquitousContainerIsDocumentScopePublic: true
+            NSUbiquitousContainerSupportedFolderLevels: Any
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.elabify.app.maknoon
+        TARGETED_DEVICE_FAMILY: "1,2"
+        CODE_SIGN_ENTITLEMENTS: Maknoon/Maknoon.entitlements
+        # Downgrade strict concurrency from `complete` (Swift 6
+        # default) to `minimal` because UniFFI 0.31.1's generated
+        # Swift uses helper functions that take @Sendable closures
+        # without the `sending` annotation Swift 6 now demands.
+        # Maknoon's own code continues to use Sendable annotations
+        # where appropriate; this just relaxes whole-target
+        # checking back to "explicit violations only", which is
+        # roughly what Swift 5.10 + strict-concurrency=targeted
+        # gave us. Revisit when UniFFI ships Swift-6-clean
+        # bindings or when we wrap the SDK in its own Swift Package.
+        SWIFT_STRICT_CONCURRENCY: minimal
+    dependencies:
+      # Ledger Bitcoin SDK (Rust core + UniFFI Swift bindings).
+      # Static lib + headers + modulemap inside the xcframework;
+      # the matched Swift glue file is added under `sources:`.
+      # Built from ../../ledger-btc-rs via `make ios`.
+      - framework: ../ledger-btc-rs/ios/LedgerBtcCore.xcframework
+        embed: false
+      # Ledger Solana / Ethereum / Tron SDKs. Each wraps its static
+      # lib + headers + namespaced modulemap; matched Swift glue is
+      # under `sources:` above. Built from the sibling rust workspaces
+      # via each repo's ios/build-xcframework.sh.
+      - framework: ../ledger-sol-rs/ios/LedgerSolCore.xcframework
+        embed: false
+      - framework: ../ledger-eth-rs/ios/LedgerEthCore.xcframework
+        embed: false
+      - framework: ../ledger-tron-rs/ios/LedgerTronCore.xcframework
+        embed: false
+      - package: ElabifyCore
+        product: ElabifyCore
+      - package: BitcoinDevKit
+        product: BitcoinDevKit
+      - package: WalletCore
+        product: WalletCore
+      # TWC ships a matched dynamic SwiftProtobuf.xcframework alongside
+      # WalletCore. WalletCore's binary hard-links @rpath/SwiftProtobuf
+      # .framework/SwiftProtobuf, so this product MUST be embedded; using
+      # apple/swift-protobuf instead produces a static lib that satisfies
+      # the swiftinterface module import but leaves dyld unable to resolve
+      # the framework at launch (SIGABRT).
+      - package: WalletCore
+        product: WalletCoreSwiftProtobuf
+      - package: NFCPassportReader
+        product: NFCPassportReader
+      - package: URKit
+        product: URKit
+      - package: YubiKit
+        product: YubiKit
+  # Unit tests. Hosted by the Maknoon app (XcodeGen wires TEST_HOST +
+  # the app's test scheme from the target dependency) so the test
+  # bundle resolves the app's embedded WalletCore / SwiftProtobuf
+  # frameworks. `@testable import Maknoon` reaches BitcoinMessageSigning.
+  MaknoonTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: MaknoonTests
+    dependencies:
+      - target: Maknoon
+      - package: ElabifyCore
+        product: ElabifyCore
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.elabify.app.maknoon.tests

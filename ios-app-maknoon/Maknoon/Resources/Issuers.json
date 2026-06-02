@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "_comment": "Default-trusted issuer hosts seeded into Known Issuers on first run (deployment data, not code). Ships with only the production Musnad registrar; the demo bank/corp and the dev issuers are intentionally left out so adding them is a manual exercise from Settings > Identity > Known issuers. Update this list per deployment instead of editing Swift.",
+  "defaultTrustedHosts": [
+    "musnad-issuer.elabify.com"
+  ]
+}

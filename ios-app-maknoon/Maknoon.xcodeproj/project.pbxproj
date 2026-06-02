@@ -1,0 +1,1763 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		00A251904BC05A646BF721F7 /* BitcoinAddressesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7EA9A5F164B297CEF625CF2 /* BitcoinAddressesView.swift */; };
+		00D48D15F2CD48EA59C96CAB /* LogStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FFB5A467ABC1703419DABB2 /* LogStore.swift */; };
+		0147D819AB4FB97283016DBD /* YubiKeyClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B910864655CBB0A9A7E48EA4 /* YubiKeyClient.swift */; };
+		01B5198E09130EE913D48383 /* AddressBookStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A5D428804039F539355E87E /* AddressBookStore.swift */; };
+		029BDDC86E63DA5AB68F24C7 /* SolanaTokenCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D3EE0CD1B8BE5EC0FAD6056 /* SolanaTokenCatalog.swift */; };
+		02C941AE8035A4DC675CA35C /* Bech32.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB19E3D01620F179DD1818F1 /* Bech32.swift */; };
+		05A8878CEAC1CFA46330D614 /* SettingsBackup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 845B82CEF80A601CF7358F01 /* SettingsBackup.swift */; };
+		05B4F738223BC3E3DB2D67CD /* PINProtocolV1.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0E808D78473ED732634C0BF /* PINProtocolV1.swift */; };
+		06506A7A55E09C61E5601898 /* LedgerEthCore.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3B86778BB5B9C1D79EF1A9BE /* LedgerEthCore.xcframework */; };
+		06F960265F6CB044680355EB /* HardwareWalletManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDE37BF5EBEB999A0EDE0DF9 /* HardwareWalletManager.swift */; };
+		0796845CD1E5A552D60AAB5B /* SolanaSPLToken.swift in Sources */ = {isa = PBXBuildFile; fileRef = D032B09F940618C922548214 /* SolanaSPLToken.swift */; };
+		07CFFCE2DC713E4C5AB7F94A /* BitcoinPriceCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C36A3F05AD86FD67781A7ED /* BitcoinPriceCache.swift */; };
+		07E4CA316E85104A6EEF60D6 /* AppStoreRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B83D5DAF1D32F913EC37BBD /* AppStoreRegistry.swift */; };
+		0845E0B4C3905477F2794243 /* PresentationVerifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3FC0E538D85E64C6F3CDF00 /* PresentationVerifier.swift */; };
+		08A513A9193CE9654E5B896E /* AccountAddressBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BDCDB28E5B98987CBB3F047 /* AccountAddressBadge.swift */; };
+		09BF9744FD16D3CBCE0E9915 /* KnownIssuersStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 149C9525D487AD16139C228E /* KnownIssuersStore.swift */; };
+		0A2790E37E07ACE4318E25C9 /* EthereumWalletDiscovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66DC96D7144A2BF3519734AB /* EthereumWalletDiscovery.swift */; };
+		0ACFB4ACA3835B1B5B1CDCB1 /* SeedSignerSignFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DE46BBFD5FD4B83D69F89AF /* SeedSignerSignFlow.swift */; };
+		0B50330C1027E58CB1A6014F /* LedgerTronCore.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = FE0B3C966F1066EC5B15829D /* LedgerTronCore.xcframework */; };
+		0FF6448F58C391AE52793B5C /* PendingPickupsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EA467B33F3A6E3077615D90 /* PendingPickupsStore.swift */; };
+		100EBC95F73DCE32A26BF315 /* ledger_tron_core.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D9B30C450B3852D0146221C /* ledger_tron_core.swift */; };
+		11F8124DFA80D02EDFEE6083 /* RegisteredDevice.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E80C8572CBF8B911614E7BB /* RegisteredDevice.swift */; };
+		12A629BB9600B7E661ADCEFE /* BitcoinWalletStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E92900A319F58CD7FCFE1127 /* BitcoinWalletStore.swift */; };
+		14E6E252913C2A345A40098E /* MockHardwareWallet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 448C77471A8896830BAA6871 /* MockHardwareWallet.swift */; };
+		19486D81CDBA06517158CDD8 /* BitcoinMessageSigningTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68A62F4E88FABB776EBC9640 /* BitcoinMessageSigningTests.swift */; };
+		1B44F8758505FDEB27970BD1 /* AppAttestVerifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7731704DB7EF3249B51DAC3 /* AppAttestVerifier.swift */; };
+		1BC662600CC4C011B909BE60 /* IDDocumentCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD727F20C7D3E99123272BA8 /* IDDocumentCard.swift */; };
+		1D62C327CF2D60AE5DAC8598 /* LocalPassportCredentialTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05C1D115C59094CAEA05FDA1 /* LocalPassportCredentialTests.swift */; };
+		1F431B4D55497500D86F57DE /* TronReceiveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 238725740C17047D9618C4F5 /* TronReceiveView.swift */; };
+		219E3154C0BC894AA013BF74 /* HardwareUnlockView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 274CB5300CF94A36DC590B34 /* HardwareUnlockView.swift */; };
+		23007971E171747E00BA2F00 /* LockScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC64F2BA18F4E17047518E7C /* LockScreen.swift */; };
+		26373649BC18A20370239138 /* AddLightningAccountSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E29C53F5B7D656B08F44532 /* AddLightningAccountSheet.swift */; };
+		264DE284CDF0AAAAEDA7C5E9 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 25F7F84C14EFE18929BEB078 /* PrivacyInfo.xcprivacy */; };
+		266B0D5F53B887A6F1D654BF /* TronTokenDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD446F6895AEC3266F8358AB /* TronTokenDetailView.swift */; };
+		26D2E083DD039E2AD456B67E /* BitcoinOfflinePSBTSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B367AE9A8D4C4762FB831345 /* BitcoinOfflinePSBTSheet.swift */; };
+		27268BA57C14EF7830B5C6E6 /* AppAttestRootCA.pem in Resources */ = {isa = PBXBuildFile; fileRef = 6AE0FE07923652FF93A4ADB7 /* AppAttestRootCA.pem */; };
+		27B41CD0375BCB942B1629A5 /* BrowseAppStoreView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44BCDDAE2AE557E3EF301CE5 /* BrowseAppStoreView.swift */; };
+		2982FF6810D452502A130857 /* CameraPermission.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA0AC3DD42FFE26C26733200 /* CameraPermission.swift */; };
+		2ABA0D33A10D094978F71098 /* BitcoinDescriptors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E55D7002BC841D55A4646A1 /* BitcoinDescriptors.swift */; };
+		2ADCA446F93548AAD0509242 /* EthereumTransactionListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71402AA84744709149C20245 /* EthereumTransactionListView.swift */; };
+		2B80CD8755E8AAB6393715F1 /* SolanaSPLTokenRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEBD8E4610A32B0087EEF8A8 /* SolanaSPLTokenRow.swift */; };
+		2BA77B964126BACD5E6C5912 /* LocalCredentialFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = F61937B94D18DFDC3AB3B2BA /* LocalCredentialFactory.swift */; };
+		2E14AECC5CC0C148B1D9C5A7 /* TronWalletStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B431975A8CBE6BC4702EA3E5 /* TronWalletStore.swift */; };
+		2EB9CF48EF0A94D42EF3D58D /* PassportPassiveAuthVerifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0C094977DB720F5C670FC9E /* PassportPassiveAuthVerifier.swift */; };
+		2EDB01D26C26A185756C5C53 /* SeedSignerPairingSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 439A785FCEAD59A4CA6049DF /* SeedSignerPairingSheet.swift */; };
+		2FD105123424CD314CDFFD48 /* TronSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77193A9D9342A6A6C7447A9D /* TronSettings.swift */; };
+		2FE704BF480AE1EDE810F5F6 /* EthereumSendView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F7E585C99041CE81A2D54A6 /* EthereumSendView.swift */; };
+		30F8707AC0AFA49B4C868EEF /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D08CC1B0A8548C6A25754CD6 /* OnboardingView.swift */; };
+		3123FC799F53EA8D7E226173 /* BitcoinNetwork.swift in Sources */ = {isa = PBXBuildFile; fileRef = 922FD7EA58A7C538FA8B43BE /* BitcoinNetwork.swift */; };
+		3170D0D5409AF503F73673D4 /* BitcoinWalletView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29AD69C41F3B2B9E29239FC8 /* BitcoinWalletView.swift */; };
+		31794028361EE6547A49F130 /* KeyStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BDA476AC3BC8E238F1E8475 /* KeyStore.swift */; };
+		3234BCAB9FA7139126427565 /* PrivacyCurtain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F39342E0F8BEB1937D85DBC /* PrivacyCurtain.swift */; };
+		33B3715D31B13B8161C5BFC3 /* EthereumWalletDescriptor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85624876D5FE049B79AA2EE9 /* EthereumWalletDescriptor.swift */; };
+		34ECA05B8B06493D8C84C5EE /* EthereumTokenRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C74D9DD0AC28C9BEA335D30 /* EthereumTokenRegistry.swift */; };
+		354FEC489C5764AA2FFFFA9F /* CTAP2Client.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6975D8BD21AAD12980984922 /* CTAP2Client.swift */; };
+		35A348725E80A765F4FF5006 /* CredentialFolderStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 791950425261053C9DC4EB29 /* CredentialFolderStore.swift */; };
+		3629AED87ED7056C5D159507 /* SolanaSPLTransferBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD83F549B7F16E9F885D87D8 /* SolanaSPLTransferBuilder.swift */; };
+		373E4955E78D61B84274FD04 /* FiatCurrencyCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A9694FEFCA6CAF655B1D00A /* FiatCurrencyCatalog.swift */; };
+		3761B29926856B06B2147B48 /* BitcoinReceiveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D2F635005C49F930D6EC465 /* BitcoinReceiveView.swift */; };
+		380EF89E7E555A95BFE1D476 /* RegisterDeviceSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7DD7AB288FECCD075C0767D /* RegisterDeviceSheet.swift */; };
+		389447317FC8F611DD64C0A4 /* BLEShareSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40BE5B7A4CE335B15D143AAD /* BLEShareSheet.swift */; };
+		3976B0009696E05BA31182DE /* EthereumTokenCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6755D91A5ACB2F92104ECCAE /* EthereumTokenCatalog.swift */; };
+		399E434C9C628D7F14884090 /* BitcoinWallet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12ADE212F4ACD5E87A2EC1D0 /* BitcoinWallet.swift */; };
+		3A9129AD995CBC4E8472FF12 /* LNURL.swift in Sources */ = {isa = PBXBuildFile; fileRef = 407AA819EC8CA153DE52AE0F /* LNURL.swift */; };
+		3B001372DF08E86CA467BD86 /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7130AC2217E02A0EEF502490 /* AboutView.swift */; };
+		3CD124068273BA487F94D108 /* AddressBookPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1711296BC2B99CC6229CAD6F /* AddressBookPicker.swift */; };
+		3D1768614CC73470CA5F1D6E /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4D7E0B8A791A0E5C57EE873 /* Models.swift */; };
+		3FEAD09893E62A3241A21F9E /* DiscoverSolanaWalletsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6029C11246370C9FC973A58F /* DiscoverSolanaWalletsView.swift */; };
+		406F754D8FC0BED2EF8D9B09 /* TronWallet.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD7D11A8B1FF116189BAD1D1 /* TronWallet.swift */; };
+		418C3D99C1E3A44D335F9F87 /* LedgerBtcCore.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0429CAD2D40DEF6452BB4348 /* LedgerBtcCore.xcframework */; };
+		41E0468A32A408065681675B /* LightningAccountsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62F9278BFC039C35C7058E4B /* LightningAccountsView.swift */; };
+		41F04959B6F2CB17CE5CF28E /* EthereumRPCClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE8A965D6C61B1A7DDEEBDBD /* EthereumRPCClient.swift */; };
+		42BC51ACC24A45B4EA246CBC /* EthereumWalletView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58B2520CFB319E9F5802132B /* EthereumWalletView.swift */; };
+		43475EB4EB56E82C3B5DB5C7 /* PBKDF2.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3CE2A9AF57176BEE841C3EE /* PBKDF2.swift */; };
+		43BFB231048C6DA3BC7FFA2A /* HolderStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29C81B84BD472BD42B318254 /* HolderStore.swift */; };
+		471A760192643A75A389ABA8 /* BitcoinFeeEstimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 575A16560F25F5CE1B0CA812 /* BitcoinFeeEstimator.swift */; };
+		480AC49291149EC0A8F71396 /* MatchingEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABACF72979216EB86C67B1B4 /* MatchingEngine.swift */; };
+		48DFEA847274C384624191BE /* SolanaTokenLookup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81FDBB0527EA618D857A9018 /* SolanaTokenLookup.swift */; };
+		49A601FA8924C89090AC1EFA /* ReceiveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2439E298CE25EF2B8BAEA253 /* ReceiveView.swift */; };
+		49C0E1CDE1A05308276BDCE5 /* TokenListParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 086C839C7BFA0809977C27CE /* TokenListParser.swift */; };
+		4A498E3E7D20D5AD65386041 /* iCloudBackup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CAAD3AA895C97261C6E0AA7 /* iCloudBackup.swift */; };
+		4A8C783128650728C43D2362 /* TronAddTokenSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9120BE0E29B90C66AFCF84A /* TronAddTokenSheet.swift */; };
+		4ED4F1E457763E3DD3C349A4 /* SeedSignerAccount.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85FEF33EDD25528BA49744DB /* SeedSignerAccount.swift */; };
+		4FD30B838B1AECEBAA1B1CF4 /* COSEKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = 933DE395F418890C579E687B /* COSEKey.swift */; };
+		53819E3C52B382D0018FEEA4 /* EthereumWalletKind.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8483D27FCB9ACFCE953DBC87 /* EthereumWalletKind.swift */; };
+		545F7E8A3FBB3FC6EDEEE837 /* DevicesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F404B6DD9B63557EAF16B248 /* DevicesView.swift */; };
+		55F28A24272D591E9FCCF9C0 /* VerifyPhraseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2246A720D5A53E89A6A0113E /* VerifyPhraseView.swift */; };
+		5615BE5580F1D1ED1CC6ADC5 /* EthereumGasEstimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5154E6E2E6A7BE6286B38BAB /* EthereumGasEstimator.swift */; };
+		57161F1B900194F09975DB01 /* IdentityWrap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84BB9146DDD5B0D39A96E539 /* IdentityWrap.swift */; };
+		5792A961B6D9792EC22F2EF9 /* AutoLockManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A668AC9E8453698E90B8677 /* AutoLockManager.swift */; };
+		58AD6D99935480DA398987CA /* EthereumTokenRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43F9A1C0B4B24E8C75E42591 /* EthereumTokenRow.swift */; };
+		5A9A8D6E5F53C0AA2AF02386 /* VerifierHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7339C03CE5A9DAAAA502341D /* VerifierHistory.swift */; };
+		5AB0B3E1B8D1C7C04C58C801 /* EthereumDescriptors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FC81DD155EE07C3BB52FC27 /* EthereumDescriptors.swift */; };
+		5B316E1677F1693CB3F08AB3 /* AppStoreCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4E25C493329E05C67A668DC /* AppStoreCatalog.swift */; };
+		5DEE34B432830C0AD2E6390C /* LocalFramesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13DDE4AC20C980973E6C4CF5 /* LocalFramesTests.swift */; };
+		5E655E9F6BFFC489624F21F3 /* TronTransactionListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1C5DE9E02D39F38885580D8 /* TronTransactionListView.swift */; };
+		5ED14AF7DECE6FC917A897B3 /* RecoveryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2F7AC09291DA964D61A1A1A /* RecoveryView.swift */; };
+		60D9DCCF5EA7961C9CCC0214 /* UTXOPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CED2641148BD13334093B49 /* UTXOPickerView.swift */; };
+		60F3AD170B288A9EFA1F6CDD /* URKit in Frameworks */ = {isa = PBXBuildFile; productRef = 37239310A4A6F98C3BD8CD01 /* URKit */; };
+		6194ADE2FDFA10706FB14182 /* CredentialCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36F23F53DC1BBEC026D3492D /* CredentialCard.swift */; };
+		621E33FA471D8F2266850DDD /* IDDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = A055EF2D8B6352004C3F1385 /* IDDocument.swift */; };
+		62D2E2966B6AC14D843AF5C5 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D8BD2DF7A6B9B51B09BBFB1 /* ContentView.swift */; };
+		62E2E734E254EB3357656581 /* DisplaySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF1E67080E7F7125A4AF7743 /* DisplaySettingsView.swift */; };
+		630829B183E1D5ADC58F0200 /* EthereumWalletStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5553C64547D24AFF0AD93B6 /* EthereumWalletStore.swift */; };
+		639563C3E47F4256B21EC5AC /* BumpFeeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A27BEDA915D75A7B1516BA4 /* BumpFeeSheet.swift */; };
+		6533A53F538E1E59FBD3C7DC /* CBOR.swift in Sources */ = {isa = PBXBuildFile; fileRef = B989C40CC0EB286EEE5FC202 /* CBOR.swift */; };
+		6624B0F1FE3B484A972B0962 /* ActivityTrackingHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = 123AE24905B970516285F026 /* ActivityTrackingHost.swift */; };
+		68819289394782F3D384D5FF /* SettingsImportReportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9AED9FB2A66F694919549CD /* SettingsImportReportSheet.swift */; };
+		6A13EF3E6E3BD5A4FB19BB81 /* AppStoreSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B24486466D694FB3A3E85FB /* AppStoreSettingsView.swift */; };
+		6A905A3AA94F8D8546598EB9 /* CustomNetworkEditorSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66FE937BC1627EA26F372031 /* CustomNetworkEditorSheet.swift */; };
+		6D27E662AF795DE108DF276C /* HardwareWalletProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67A835304185D11EE561B171 /* HardwareWalletProtocol.swift */; };
+		7174EED092282E80A98F3539 /* DiscoverTronWalletsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6F175E03AE49701B6C5DBEF /* DiscoverTronWalletsView.swift */; };
+		748CCB91E331764F86B35954 /* IdentitySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC69EA632A0819B230C2B273 /* IdentitySettingsView.swift */; };
+		76D341A6A64B5AD5F2D5B94E /* BitcoinLabelEditSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A41A784C7482EB5893120D81 /* BitcoinLabelEditSheet.swift */; };
+		7700B8C8DA287F25D3E16242 /* SolanaWalletView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDA8E027EBADEF282F51B03F /* SolanaWalletView.swift */; };
+		783C56DBDC079B4DC787AB35 /* DiscoverEthereumWalletsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A98A9E08E678A09A1AB6A622 /* DiscoverEthereumWalletsView.swift */; };
+		78DB2480A839F6A0C822C431 /* YubiKit in Frameworks */ = {isa = PBXBuildFile; productRef = 7F36CEE837DAAFCB96FDBD76 /* YubiKit */; };
+		7AC6CD6E0E6DE175AC1D4B40 /* ElabifyCore in Frameworks */ = {isa = PBXBuildFile; productRef = F66600E21BBDD0914E86A2EB /* ElabifyCore */; };
+		7AD8DDBB23570F67A0880836 /* FiatPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24AF6BC078BE81D91DE8DDF3 /* FiatPreferences.swift */; };
+		7B0B96AB26B39427F0CED94A /* IDDocumentReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = F78685D41442087FA588F8FD /* IDDocumentReader.swift */; };
+		7BBD82811F0CB2277987CA2A /* EthereumTokenDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0089A29F77AC06D988671DE /* EthereumTokenDetailView.swift */; };
+		7D22C3EDDD1C0DA91619E189 /* DeviceRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BE60861D4A71D3FD5045634 /* DeviceRegistry.swift */; };
+		7D2D152416218B3B71F8E678 /* TronTRC20TransferBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83742EAD7B81D427DCC87455 /* TronTRC20TransferBuilder.swift */; };
+		7D63C5715BE1CE0BD05493EC /* TronRPCClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5B1318E3C640B525D0859E7 /* TronRPCClient.swift */; };
+		7DD027E9A58B18D358308652 /* RemoveFromSandwichSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CBFC78AC8632154AD11DEA1 /* RemoveFromSandwichSheet.swift */; };
+		7E2666F993AB53A46A7A619C /* BackupState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4320F4D4EC7DFDBAC89DEB32 /* BackupState.swift */; };
+		7EEEAEB0D4B8C7D9B535CD3A /* LedgerSolCore.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = DF773AB794E7D186505D141B /* LedgerSolCore.xcframework */; };
+		8068215857A90FC051E93FC1 /* SolanaSendView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6AB7D1B82B0A6EA02C54CCC /* SolanaSendView.swift */; };
+		807C302CD7049820D1D65F7A /* LightningWalletView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41D0B6721932CDBCA7A7E1FF /* LightningWalletView.swift */; };
+		8109578DD8FE2DF96042521F /* EthereumWalletsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F562B4B5FF6D574D35FC091C /* EthereumWalletsView.swift */; };
+		811D6D412C70FCB5AFAA8E89 /* LightningSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22E76FFA541A8100CAF31670 /* LightningSettingsView.swift */; };
+		81B12FA83DCC3D91C5179900 /* TapIDDocumentSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92D74B60A61C7A1B55DCC6B2 /* TapIDDocumentSheet.swift */; };
+		82981D02B237CB1B71A6D53D /* SolanaWalletDiscovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18516F31B3939D3CE4127D38 /* SolanaWalletDiscovery.swift */; };
+		85950FAA1E3128AC0C33D37C /* IDDocumentIssuanceClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31A5E06677C85122400D3F55 /* IDDocumentIssuanceClient.swift */; };
+		883E8715D9728F781111DFDD /* CurrencySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26492F32B298FD4FC287C13 /* CurrencySettingsView.swift */; };
+		88457E01A2A6FB41608E6B42 /* TronSendView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 367A19E6AB5B12D23CE2DCCF /* TronSendView.swift */; };
+		8878F636D334A32F9F4401FE /* SolanaRPCClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9E8028EE7B222BA6F26DAD1 /* SolanaRPCClient.swift */; };
+		8927DB599E3A1E8FAE4F451F /* BitcoinDevKit in Frameworks */ = {isa = PBXBuildFile; productRef = C6AA67B6DC31F812D470536A /* BitcoinDevKit */; };
+		89D5B1D78C5EA39AE796A7FF /* ExtendedKeyNormalize.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D7A6AEF293896F5027C58D4 /* ExtendedKeyNormalize.swift */; };
+		8B9B1398977E4FA6945ACFC3 /* TronTokenCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07AEBF66C1FEAA9846A0FE17 /* TronTokenCatalog.swift */; };
+		8C11ED7F9E6016DD8C3A6F20 /* ENSResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB0F10376C36120744B62891 /* ENSResolver.swift */; };
+		8C9F3C390133A17703F49E4F /* BitcoinWalletDiscovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DE6DCBB63CBA5555EDF317A /* BitcoinWalletDiscovery.swift */; };
+		8D6976828323546030DAE17F /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = EF8F78585DB579EEEB4825E1 /* Localizable.xcstrings */; };
+		8DAD241AE22E88D03AAF2211 /* IdentitySandwich.swift in Sources */ = {isa = PBXBuildFile; fileRef = 440EAB68D2F42B883FECA1ED /* IdentitySandwich.swift */; };
+		8FFBB529B11A033752025045 /* NFCPassportReader in Frameworks */ = {isa = PBXBuildFile; productRef = 35D0BFBF8825E8D3B602A305 /* NFCPassportReader */; };
+		921038A5009E2D9B1C68C721 /* DeviceReadyConfirmationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89B59F185D51766DCF2E99CB /* DeviceReadyConfirmationSheet.swift */; };
+		92FAC5699515A15732C5C42C /* EthereumABI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E44F9E4BD34C6E2FD2A2F41 /* EthereumABI.swift */; };
+		95650C018BCF1B1D5E528EC2 /* BitcoinWalletDescriptor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F592B77DD80C23FFA81C2F9 /* BitcoinWalletDescriptor.swift */; };
+		975EE513762EDDBF80CB9A2B /* EthereumWeiValue.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF322F29F6470DA7DC270E96 /* EthereumWeiValue.swift */; };
+		99703B134122145C5C37BA95 /* ledger_btc_core.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAA50E1AC8D8BB04D561FF03 /* ledger_btc_core.swift */; };
+		9D6EABF8A70F0A48BEA93F95 /* ScanVerifierSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 491F12D271EC69DD66FDDDD2 /* ScanVerifierSheet.swift */; };
+		9F41E4FEFFF6CE3B73EFBC95 /* BitcoinWalletKind.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13C92173A6DB04779DDCEA38 /* BitcoinWalletKind.swift */; };
+		A2A5097556AFCDC83FA42F17 /* TronTRC20TokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87B2D1CBB57F8E855F5F3CC6 /* TronTRC20TokenStore.swift */; };
+		A618497AFB333762F26871F7 /* LedgerERC20Descriptors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60D6541EA87D362AD70F4B13 /* LedgerERC20Descriptors.swift */; };
+		A715DE150B14A4816C58AC51 /* AssetPriceCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B5597D7CF500A17E76F0B10 /* AssetPriceCache.swift */; };
+		A717B73CC4CEC687FBA2788C /* Network.swift in Sources */ = {isa = PBXBuildFile; fileRef = C45C79B1823E2220CBB8AA02 /* Network.swift */; };
+		A944BADC8334EDBD49013A40 /* BIP39.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8E2A4D8F22B59D7DC125302 /* BIP39.swift */; };
+		A9AD725D95A7F4B41912A688 /* AddTronWalletSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 789A9F5B37A8AEAEA6D03A5E /* AddTronWalletSheet.swift */; };
+		ABBAEA4E86B386F0103D9B85 /* LocalFrames.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0FCA2105A947F349A466D61 /* LocalFrames.swift */; };
+		AC4931D3EB2BBE1ECD575B71 /* SanctionsScreeningClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A601F3DD81F329EFDED94B92 /* SanctionsScreeningClient.swift */; };
+		AC6B30D7F72EF66884F67A06 /* URPSBTScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52D5BDFA2C4309B3EC545271 /* URPSBTScannerView.swift */; };
+		AC91E9D23F3C53B898C98312 /* ledger_sol_core.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05219ABAE32B08FC2266F36E /* ledger_sol_core.swift */; };
+		ADF8B4055243F1C5213F7343 /* EthereumExplorerClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD74B0CC3853E8569C62F2B8 /* EthereumExplorerClient.swift */; };
+		AEC405D0B6297D7EA7D4A218 /* BitcoinSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7E6B087CA3BBA4A9862BF2A /* BitcoinSettingsView.swift */; };
+		B01222401E0CF75D13913DBB /* SolanaAddTokenSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48ECB7B74ED43F6D55D57D7D /* SolanaAddTokenSheet.swift */; };
+		B10E0ACD1930DE6B578419B1 /* BitcoinWalletsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D0B519230DB406EC3722097 /* BitcoinWalletsView.swift */; };
+		B14B101C59CD57BA0FCEE35D /* AppsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97E1A88CA74F6FDE714572F1 /* AppsView.swift */; };
+		B15D35F3544F4555CEBCA0AE /* EthereumAddTokenSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52F8883137AF613FBFEDA295 /* EthereumAddTokenSheet.swift */; };
+		B34CBCB57855AB627AD7EA76 /* LightningSendView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DDF5D78FA829EB2551AC88F /* LightningSendView.swift */; };
+		B45E650349A598B60A766C1D /* LedgerBLE.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA29AE92BA173E045657FE37 /* LedgerBLE.swift */; };
+		B4D3B1E536306CF707535D5B /* DisplaySettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = E00781FE3EA1ED943E115EFE /* DisplaySettings.swift */; };
+		B5326598FEC26CE9A84CD2C2 /* BitcoinSendView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7141A599D32742546CBD638C /* BitcoinSendView.swift */; };
+		B5BBBFB3CA8739848F8066B9 /* AddressBookEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3815B7C83F9E66BE08B5B726 /* AddressBookEntry.swift */; };
+		B6166C906C45B6C65B6DAA66 /* DeviceDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF949F2A61EA01E1CE577AF9 /* DeviceDetailView.swift */; };
+		B6D765168955AC7BE03FE1B9 /* IssuerIdentityResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82B93E5736DDBD081D26D8D1 /* IssuerIdentityResolver.swift */; };
+		B947EA979F48EB35D86538D0 /* BitcoinSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD7AC3A17F5D0CDFEF504C45 /* BitcoinSettings.swift */; };
+		B99D7FB388E38F9C6698C9C7 /* CustomEthereumNetwork.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79A77DE4B9C164CD2DF07A46 /* CustomEthereumNetwork.swift */; };
+		B9C66FC1E0AD0F089ED1808D /* BitcoinMessageSign.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3216838A447CA2FC496D267C /* BitcoinMessageSign.swift */; };
+		B9D0CB60E28CEB454A1A6F37 /* TronTokenLookup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C273827243CE05970369D5B /* TronTokenLookup.swift */; };
+		BB20029E5D770ECDFC9615A9 /* AddSolanaWalletSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E827F02EB31CBA8E06F09FC /* AddSolanaWalletSheet.swift */; };
+		BDC16379902F461142E131E2 /* WalletThumbprint.swift in Sources */ = {isa = PBXBuildFile; fileRef = B850355D2C321E700E2F7503 /* WalletThumbprint.swift */; };
+		BEB40B0A4C698C4EC6B3BA2C /* MaknoonApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5266F1677045AE99DDEB0739 /* MaknoonApp.swift */; };
+		C0BFF55FAC80E320938A9C95 /* TronWalletView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 620573E34C128D213F04A821 /* TronWalletView.swift */; };
+		C13C76537A5293DC64A1144E /* EthereumSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E94EAD6A135A9A0EB863E601 /* EthereumSettingsView.swift */; };
+		C13D7E4680BB62DF79392224 /* EthereumNetwork.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15EABD99913B0357DB4834AA /* EthereumNetwork.swift */; };
+		C29E8070B4A336617AAAD9B3 /* WalletView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AC736E7CCCD192BFA5A364C /* WalletView.swift */; };
+		C337884E5047892E7215C1AD /* BadgeQR.swift in Sources */ = {isa = PBXBuildFile; fileRef = E14F63B53A3C06CAB555AB23 /* BadgeQR.swift */; };
+		C3E6FF172B1CABB37EDC29C1 /* SendViewKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E36295E34D3E3DECB033209 /* SendViewKit.swift */; };
+		C47F69B097B114505D99E93B /* EthereumToken.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD5642A874242550314C46DA /* EthereumToken.swift */; };
+		C4B38293629D24BC49F14AA1 /* CSCATrustStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19F60C1A16659F1397725C60 /* CSCATrustStore.swift */; };
+		C4C78853E2C8EA5D0FA3DA70 /* TronWalletsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF09E05D705F0FCDB7626059 /* TronWalletsView.swift */; };
+		C526D7DC996FC348633C0603 /* SolanaSPLTokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CCFA6FD5C8A3BE3829D540E /* SolanaSPLTokenStore.swift */; };
+		C620213A3DE405861E0E8D09 /* SolanaReceiveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7B3C5723D4BC2D0D69EAC24 /* SolanaReceiveView.swift */; };
+		C63EFA8815F3CF464289D764 /* CredentialPresentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53BF39B86EDFE895E7DE1CEC /* CredentialPresentView.swift */; };
+		C831F67534500B6BC7823BEF /* LightningReceiveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1867622EC9D93A23F0C44FFF /* LightningReceiveView.swift */; };
+		C89C74C1422C8D6842F36AA2 /* TronSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DDCB990DD27CDEE8D7213DB /* TronSettingsView.swift */; };
+		CACBCD4A3DED161366533F9F /* AnimatedQRView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83C2E187A32E8AB7FE44664A /* AnimatedQRView.swift */; };
+		CB162465B2DE29BC8A1E245A /* BLEPeripheralHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AD7F4252B89F731D10AB150 /* BLEPeripheralHost.swift */; };
+		CD003F3A2BE7AD0CE3622066 /* EthereumTokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 124806FAB9D690153B7747C9 /* EthereumTokenStore.swift */; };
+		CDD16022D7ADF72080AA9335 /* AddNetworkSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2AE6C9A8A6ABD1818C0B7F8 /* AddNetworkSheet.swift */; };
+		CE254B0C58B5570C7C262946 /* SolanaSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BD33D18AEB869BCEA690926 /* SolanaSettingsView.swift */; };
+		CFA89A17FB53453B2579FA7E /* BitcoinTransactionListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 831269A88BE85A5D4686CFB0 /* BitcoinTransactionListView.swift */; };
+		D09A7420268FE6DA6ABE7A5C /* VerifyOtherSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9C9A67331FA1917FC5A5424 /* VerifyOtherSheet.swift */; };
+		D359F9DA855F4313A01205AD /* TronScanAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 877085F19D96747208D93D8B /* TronScanAPI.swift */; };
+		D3ECB1A7F9A2E958EFA835DD /* IdentityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51FF2AE98E05D9928A8CE87 /* IdentityView.swift */; };
+		D5C4BADE7DA0DE9C70D51978 /* TrezorBLE.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F221DAFF98E6E925AA11A4D /* TrezorBLE.swift */; };
+		D66C1AB63B461D6710835E88 /* ledger_eth_core.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB671C3D2566E7ADC0FB59F9 /* ledger_eth_core.swift */; };
+		D88ADE0480299CBE2AA4A488 /* EthereumWallet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A15B8E340EDA6903D9C64CE /* EthereumWallet.swift */; };
+		DA73589B5FFC9C266C59FA4D /* QRScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C088E8E81BAF3169512FA66C /* QRScannerView.swift */; };
+		DB9EF9066FE8E8456834E56F /* TronTRC20Token.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CC5E0785A932C169B00B254 /* TronTRC20Token.swift */; };
+		DC597067C5571F120602AB50 /* IDDocumentDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45C01EA7B48067B85FF3CDDB /* IDDocumentDetailView.swift */; };
+		DDAAF3DA173FFF6307FBF36A /* Issuers.json in Resources */ = {isa = PBXBuildFile; fileRef = 984C4373BF60AA9AEA7CD53C /* Issuers.json */; };
+		DFF6BECACD3E78A4A312FD86 /* TransportSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FBBFA99FD8D7F58BABB14DE /* TransportSession.swift */; };
+		E093556FD35D3713D2D72E07 /* PresentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97B4ABC426F9BC924379056B /* PresentView.swift */; };
+		E150F4DA64AB39328602139C /* SolanaTokenDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E994B078263EC474EA0C69D /* SolanaTokenDetailView.swift */; };
+		E168661E3B6947071822779D /* LightningAccountStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD82FA19478B86DB4068EE9F /* LightningAccountStore.swift */; };
+		E1E1B4F0DFD477B5B6A505A1 /* NetworksDestination.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33873ECD91EFAAD6724203A1 /* NetworksDestination.swift */; };
+		E24C9EBBC5F4BE8FBD20981B /* EthereumReceiveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A2B043A8D2DEEC54C74C23D /* EthereumReceiveView.swift */; };
+		E305FA5359E58AB783188E7F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3A4132D254F8037570F61CCF /* Assets.xcassets */; };
+		E307E11AB83D74DC69309D28 /* AppAttestVerifierTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD42A4B7BF0A8A1B2374D882 /* AppAttestVerifierTests.swift */; };
+		E340CC00F8B24FB9E44607A5 /* BackupBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18525844CC3667A6E126E365 /* BackupBanner.swift */; };
+		E42708847A12F989B68BF58D /* BLECentralClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D29AFE40A34755117F5FACB /* BLECentralClient.swift */; };
+		E5C9437E7969F4021A5DAEE1 /* LocalShareQrSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4B3E724F86807A19B2BE982 /* LocalShareQrSheet.swift */; };
+		E654FA1197AEA4FF50910716 /* SolanaSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1FD48DD113C43FEA00D4EAB /* SolanaSettings.swift */; };
+		E6B1795AA723BF4346953D0D /* VerifierRequestValidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC2CEDD2C8FEB628E3A0A18C /* VerifierRequestValidator.swift */; };
+		E8AAAB16E5073902A35498AF /* SolanaWallet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D1551828EC592A83FC34341 /* SolanaWallet.swift */; };
+		E8FB169D74AC1C80BCB91A1E /* EthereumSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A027606E15EA04BBD0DDCF7 /* EthereumSettings.swift */; };
+		E9789B67DEE37C7DF0F60599 /* DiscoverHardwareWalletsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CD5F324AF647D654A835161 /* DiscoverHardwareWalletsView.swift */; };
+		EBC7F3CA13596150B4EC0AFA /* MaknoonAppAttest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944484FE7530090622DC2341 /* MaknoonAppAttest.swift */; };
+		ECB4ABCDEC9BD82950DEA9D5 /* TronTRC20TokenRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8254400B5339E1E814CB5708 /* TronTRC20TokenRow.swift */; };
+		ECCCB89C15DE2704CDF2B331 /* MLDSAClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98E681B727D330E2D7954129 /* MLDSAClient.swift */; };
+		ED2A774E428BDF2B710C69B6 /* TronDescriptors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A24E5FB213F912B7E0BF695 /* TronDescriptors.swift */; };
+		EE2A4E450C00BF8CE41AD850 /* EthereumRLP.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0680DACBFBF40ABFB823BE41 /* EthereumRLP.swift */; };
+		EE92BDC7F149CB55D01476E0 /* TokenLogoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2071026F9BA9E1F094DA366B /* TokenLogoView.swift */; };
+		EF1942FF141A40475F4BEB05 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E950755BB3F4E27713ADAEA0 /* SettingsView.swift */; };
+		EF5EBD0D5925FD2855F6FC97 /* SandwichLockedBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DFE53D851F965059054F226 /* SandwichLockedBanner.swift */; };
+		F021D3E4E655F3038FDA1828 /* BitcoinLabelStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89C507C62F88E82A34B59D16 /* BitcoinLabelStore.swift */; };
+		F1554093D23EBF7F0CF60ABD /* LNDHubClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C8E1F03A61355DA3CC73FD5 /* LNDHubClient.swift */; };
+		F1685B5C823EEFC13B159BA5 /* AddressBookView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCFBE78DA70DB6462BBC5B4A /* AddressBookView.swift */; };
+		F211C9658022C954F4BFB52A /* IDDocumentStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40E4817AD2B82A08B3C8D9C3 /* IDDocumentStore.swift */; };
+		F25F47F11E33CA7CF7406472 /* AddBitcoinWalletFromDeviceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31FF33DA347F7ED8E6CE6445 /* AddBitcoinWalletFromDeviceView.swift */; };
+		F2BB7BA3E8507812705F45C7 /* SolanaWalletStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B77F8005967BD2743A145BB6 /* SolanaWalletStore.swift */; };
+		F38A61428FEC103ACFEC1EF6 /* URPSBTCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = 164693AAD8138C3B0EA818ED /* URPSBTCodec.swift */; };
+		F57D799AB32648ABF27C624B /* WalletCoreSwiftProtobuf in Frameworks */ = {isa = PBXBuildFile; productRef = 7C4789293AB735FF8B1870E9 /* WalletCoreSwiftProtobuf */; };
+		F5F536459E12FF47959222AD /* YubiKeyEnrollment.swift in Sources */ = {isa = PBXBuildFile; fileRef = B292F740FDFEF00B1CF1691C /* YubiKeyEnrollment.swift */; };
+		F92E737F13273624D85B6A09 /* ElabifyCore in Frameworks */ = {isa = PBXBuildFile; productRef = 791520AB8D8C57897385CAFA /* ElabifyCore */; };
+		FA71FD986F4D701B023A8EE0 /* SolanaDescriptors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D73F8175673428011D8BD28 /* SolanaDescriptors.swift */; };
+		FA7B8AB89D0A2690BCC23ECC /* BitcoinSigningHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DCF0A6F7B0B0F821B0020AA /* BitcoinSigningHelpers.swift */; };
+		FD80CA7F783A42B00DDD2F10 /* LightningAccount.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6829283675AC53F4994B6C95 /* LightningAccount.swift */; };
+		FE317E7FD1D45157582C2141 /* EthereumTokenLookup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B41151FD708E7E6CA54809D /* EthereumTokenLookup.swift */; };
+		FE96A62430D9A469B82AC2A6 /* WalletCore in Frameworks */ = {isa = PBXBuildFile; productRef = 7C633F96B87FA3C9E339106B /* WalletCore */; };
+		FF583E9C1B4663FED15CD1BB /* SolanaWalletsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5264BD217C71ECB735262A61 /* SolanaWalletsView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		F4E39BAE80748B11015132DE /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = B562A3AF0FB722D80ECEEA26 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 1E0B5B62D69D877A6A04C738;
+			remoteInfo = Maknoon;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		0429CAD2D40DEF6452BB4348 /* LedgerBtcCore.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = LedgerBtcCore.xcframework; path = "../ledger-btc-rs/ios/LedgerBtcCore.xcframework"; sourceTree = "<group>"; };
+		05219ABAE32B08FC2266F36E /* ledger_sol_core.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ledger_sol_core.swift; sourceTree = "<group>"; };
+		05C1D115C59094CAEA05FDA1 /* LocalPassportCredentialTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalPassportCredentialTests.swift; sourceTree = "<group>"; };
+		0680DACBFBF40ABFB823BE41 /* EthereumRLP.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EthereumRLP.swift; sourceTree = "<group>"; };
+		07AEBF66C1FEAA9846A0FE17 /* TronTokenCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TronTokenCatalog.swift; sourceTree = "<group>"; };
+		086C839C7BFA0809977C27CE /* TokenListParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenListParser.swift; sourceTree = "<group>"; };
+		0A2B043A8D2DEEC54C74C23D /* EthereumReceiveView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EthereumReceiveView.swift; sourceTree = "<group>"; };
+		0AD7F4252B89F731D10AB150 /* BLEPeripheralHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BLEPeripheralHost.swift; sourceTree = "<group>"; };
+		0C74D9DD0AC28C9BEA335D30 /* EthereumTokenRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EthereumTokenRegistry.swift; sourceTree = "<group>"; };
+		0CD5F324AF647D654A835161 /* DiscoverHardwareWalletsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverHardwareWalletsView.swift; sourceTree = "<group>"; };
+		0E44F9E4BD34C6E2FD2A2F41 /* EthereumABI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EthereumABI.swift; sourceTree = "<group>"; };
+		0F39342E0F8BEB1937D85DBC /* PrivacyCurtain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyCurtain.swift; sourceTree = "<group>"; };
+		123AE24905B970516285F026 /* ActivityTrackingHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityTrackingHost.swift; sourceTree = "<group>"; };
+		124806FAB9D690153B7747C9 /* EthereumTokenStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EthereumTokenStore.swift; sourceTree = "<group>"; };
+		1295D39B1AE056B8DD022E6A /* Maknoon.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Maknoon.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		12ADE212F4ACD5E87A2EC1D0 /* BitcoinWallet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BitcoinWallet.swift; sourceTree = "<group>"; };
+		13C92173A6DB04779DDCEA38 /* BitcoinWalletKind.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BitcoinWalletKind.swift; sourceTree = "<group>"; };
+		13DDE4AC20C980973E6C4CF5 /* LocalFramesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalFramesTests.swift; sourceTree = "<group>"; };
+		149C9525D487AD16139C228E /* KnownIssuersStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KnownIssuersStore.swift; sourceTree = "<group>"; };
+		15EABD99913B0357DB4834AA /* EthereumNetwork.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EthereumNetwork.swift; sourceTree = "<group>"; };
+		164693AAD8138C3B0EA818ED /* URPSBTCodec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = URPSBTCodec.swift; sourceTree = "<group>"; };
+		1711296BC2B99CC6229CAD6F /* AddressBookPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddressBookPicker.swift; sourceTree = "<group>"; };
+		18516F31B3939D3CE4127D38 /* SolanaWalletDiscovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SolanaWalletDiscovery.swift; sourceTree = "<group>"; };
+		18525844CC3667A6E126E365 /* BackupBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupBanner.swift; sourceTree = "<group>"; };
+		1867622EC9D93A23F0C44FFF /* LightningReceiveView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LightningReceiveView.swift; sourceTree = "<group>"; };
+		19F60C1A16659F1397725C60 /* CSCATrustStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSCATrustStore.swift; sourceTree = "<group>"; };
+		1A15B8E340EDA6903D9C64CE /* EthereumWallet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EthereumWallet.swift; sourceTree = "<group>"; };
+		1AC736E7CCCD192BFA5A364C /* WalletView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletView.swift; sourceTree = "<group>"; };
+		1B83D5DAF1D32F913EC37BBD /* AppStoreRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStoreRegistry.swift; sourceTree = "<group>"; };
+		1D7A6AEF293896F5027C58D4 /* ExtendedKeyNormalize.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtendedKeyNormalize.swift; sourceTree = "<group>"; };
+		1E55D7002BC841D55A4646A1 /* BitcoinDescriptors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BitcoinDescriptors.swift; sourceTree = "<group>"; };
+		1F7E585C99041CE81A2D54A6 /* EthereumSendView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EthereumSendView.swift; sourceTree = "<group>"; };
+		2071026F9BA9E1F094DA366B /* TokenLogoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenLogoView.swift; sourceTree = "<group>"; };
+		2246A720D5A53E89A6A0113E /* VerifyPhraseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifyPhraseView.swift; sourceTree = "<group>"; };
+		22E76FFA541A8100CAF31670 /* LightningSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LightningSettingsView.swift; sourceTree = "<group>"; };
+		238725740C17047D9618C4F5 /* TronReceiveView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TronReceiveView.swift; sourceTree = "<group>"; };
+		2439E298CE25EF2B8BAEA253 /* ReceiveView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiveView.swift; sourceTree = "<group>"; };
+		24AF6BC078BE81D91DE8DDF3 /* FiatPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FiatPreferences.swift; sourceTree = "<group>"; };
+		25F7F84C14EFE18929BEB078 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		274CB5300CF94A36DC590B34 /* HardwareUnlockView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HardwareUnlockView.swift; sourceTree = "<group>"; };
+		29AD69C41F3B2B9E29239FC8 /* BitcoinWalletView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BitcoinWalletView.swift; sourceTree = "<group>"; };
+		29C81B84BD472BD42B318254 /* HolderStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HolderStore.swift; sourceTree = "<group>"; };
+		2A24E5FB213F912B7E0BF695 /* TronDescriptors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TronDescriptors.swift; sourceTree = "<group>"; };
+		2D2F635005C49F930D6EC465 /* BitcoinReceiveView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BitcoinReceiveView.swift; sourceTree = "<group>"; };
+		2D73F8175673428011D8BD28 /* SolanaDescriptors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SolanaDescriptors.swift; sourceTree = "<group>"; };
+		2DE46BBFD5FD4B83D69F89AF /* SeedSignerSignFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeedSignerSignFlow.swift; sourceTree = "<group>"; };
+		2EA467B33F3A6E3077615D90 /* PendingPickupsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingPickupsStore.swift; sourceTree = "<group>"; };
+		2FC81DD155EE07C3BB52FC27 /* EthereumDescriptors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EthereumDescriptors.swift; sourceTree = "<group>"; };
+		31A5E06677C85122400D3F55 /* IDDocumentIssuanceClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IDDocumentIssuanceClient.swift; sourceTree = "<group>"; };
+		31FF33DA347F7ED8E6CE6445 /* AddBitcoinWalletFromDeviceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddBitcoinWalletFromDeviceView.swift; sourceTree = "<group>"; };
+		3216838A447CA2FC496D267C /* BitcoinMessageSign.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BitcoinMessageSign.swift; sourceTree = "<group>"; };
+		330630C68D2881DC45E9A776 /* Maknoon.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Maknoon.entitlements; sourceTree = "<group>"; };
+		33873ECD91EFAAD6724203A1 /* NetworksDestination.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworksDestination.swift; sourceTree = "<group>"; };
+		367A19E6AB5B12D23CE2DCCF /* TronSendView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TronSendView.swift; sourceTree = "<group>"; };
+		36F23F53DC1BBEC026D3492D /* CredentialCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialCard.swift; sourceTree = "<group>"; };
+		3815B7C83F9E66BE08B5B726 /* AddressBookEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddressBookEntry.swift; sourceTree = "<group>"; };
+		3A4132D254F8037570F61CCF /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		3A5D428804039F539355E87E /* AddressBookStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddressBookStore.swift; sourceTree = "<group>"; };
+		3B5597D7CF500A17E76F0B10 /* AssetPriceCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssetPriceCache.swift; sourceTree = "<group>"; };
+		3B86778BB5B9C1D79EF1A9BE /* LedgerEthCore.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = LedgerEthCore.xcframework; path = "../ledger-eth-rs/ios/LedgerEthCore.xcframework"; sourceTree = "<group>"; };
+		3BD33D18AEB869BCEA690926 /* SolanaSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SolanaSettingsView.swift; sourceTree = "<group>"; };
+		3CAAD3AA895C97261C6E0AA7 /* iCloudBackup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iCloudBackup.swift; sourceTree = "<group>"; };
+		3D29AFE40A34755117F5FACB /* BLECentralClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BLECentralClient.swift; sourceTree = "<group>"; };
+		3DE6DCBB63CBA5555EDF317A /* BitcoinWalletDiscovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BitcoinWalletDiscovery.swift; sourceTree = "<group>"; };
+		3F592B77DD80C23FFA81C2F9 /* BitcoinWalletDescriptor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BitcoinWalletDescriptor.swift; sourceTree = "<group>"; };
+		3FBBFA99FD8D7F58BABB14DE /* TransportSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransportSession.swift; sourceTree = "<group>"; };
+		407AA819EC8CA153DE52AE0F /* LNURL.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LNURL.swift; sourceTree = "<group>"; };
+		40BE5B7A4CE335B15D143AAD /* BLEShareSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BLEShareSheet.swift; sourceTree = "<group>"; };
+		40E4817AD2B82A08B3C8D9C3 /* IDDocumentStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IDDocumentStore.swift; sourceTree = "<group>"; };
+		41D0B6721932CDBCA7A7E1FF /* LightningWalletView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LightningWalletView.swift; sourceTree = "<group>"; };
+		4320F4D4EC7DFDBAC89DEB32 /* BackupState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupState.swift; sourceTree = "<group>"; };
+		439A785FCEAD59A4CA6049DF /* SeedSignerPairingSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeedSignerPairingSheet.swift; sourceTree = "<group>"; };
+		43F9A1C0B4B24E8C75E42591 /* EthereumTokenRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EthereumTokenRow.swift; sourceTree = "<group>"; };
+		440EAB68D2F42B883FECA1ED /* IdentitySandwich.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdentitySandwich.swift; sourceTree = "<group>"; };
+		448C77471A8896830BAA6871 /* MockHardwareWallet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockHardwareWallet.swift; sourceTree = "<group>"; };
+		44BCDDAE2AE557E3EF301CE5 /* BrowseAppStoreView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowseAppStoreView.swift; sourceTree = "<group>"; };
+		45C01EA7B48067B85FF3CDDB /* IDDocumentDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IDDocumentDetailView.swift; sourceTree = "<group>"; };
+		48ECB7B74ED43F6D55D57D7D /* SolanaAddTokenSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SolanaAddTokenSheet.swift; sourceTree = "<group>"; };
+		491F12D271EC69DD66FDDDD2 /* ScanVerifierSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanVerifierSheet.swift; sourceTree = "<group>"; };
+		4A27BEDA915D75A7B1516BA4 /* BumpFeeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BumpFeeSheet.swift; sourceTree = "<group>"; };
+		4A8232E5ED60359EDE3E8692 /* swift */ = {isa = PBXFileReference; lastKnownFileType = folder; name = swift; path = "../elabify-core/bindings/swift"; sourceTree = SOURCE_ROOT; };
+		4BDA476AC3BC8E238F1E8475 /* KeyStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyStore.swift; sourceTree = "<group>"; };
+		4E29C53F5B7D656B08F44532 /* AddLightningAccountSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddLightningAccountSheet.swift; sourceTree = "<group>"; };
+		4E36295E34D3E3DECB033209 /* SendViewKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SendViewKit.swift; sourceTree = "<group>"; };
+		4F221DAFF98E6E925AA11A4D /* TrezorBLE.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrezorBLE.swift; sourceTree = "<group>"; };
+		5154E6E2E6A7BE6286B38BAB /* EthereumGasEstimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EthereumGasEstimator.swift; sourceTree = "<group>"; };
+		5264BD217C71ECB735262A61 /* SolanaWalletsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SolanaWalletsView.swift; sourceTree = "<group>"; };
+		5266F1677045AE99DDEB0739 /* MaknoonApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaknoonApp.swift; sourceTree = "<group>"; };
+		52D5BDFA2C4309B3EC545271 /* URPSBTScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = URPSBTScannerView.swift; sourceTree = "<group>"; };
+		52F8883137AF613FBFEDA295 /* EthereumAddTokenSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EthereumAddTokenSheet.swift; sourceTree = "<group>"; };
+		53BF39B86EDFE895E7DE1CEC /* CredentialPresentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialPresentView.swift; sourceTree = "<group>"; };
+		575A16560F25F5CE1B0CA812 /* BitcoinFeeEstimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BitcoinFeeEstimator.swift; sourceTree = "<group>"; };
+		58B2520CFB319E9F5802132B /* EthereumWalletView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EthereumWalletView.swift; sourceTree = "<group>"; };
+		5B41151FD708E7E6CA54809D /* EthereumTokenLookup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EthereumTokenLookup.swift; sourceTree = "<group>"; };
+		5BE60861D4A71D3FD5045634 /* DeviceRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceRegistry.swift; sourceTree = "<group>"; };
+		5C36A3F05AD86FD67781A7ED /* BitcoinPriceCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BitcoinPriceCache.swift; sourceTree = "<group>"; };
+		5C8E1F03A61355DA3CC73FD5 /* LNDHubClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LNDHubClient.swift; sourceTree = "<group>"; };
+		5CC5E0785A932C169B00B254 /* TronTRC20Token.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TronTRC20Token.swift; sourceTree = "<group>"; };
+		5D1551828EC592A83FC34341 /* SolanaWallet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SolanaWallet.swift; sourceTree = "<group>"; };
+		5DCF0A6F7B0B0F821B0020AA /* BitcoinSigningHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BitcoinSigningHelpers.swift; sourceTree = "<group>"; };
+		5E994B078263EC474EA0C69D /* SolanaTokenDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SolanaTokenDetailView.swift; sourceTree = "<group>"; };
+		6029C11246370C9FC973A58F /* DiscoverSolanaWalletsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverSolanaWalletsView.swift; sourceTree = "<group>"; };
+		60D6541EA87D362AD70F4B13 /* LedgerERC20Descriptors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LedgerERC20Descriptors.swift; sourceTree = "<group>"; };
+		620573E34C128D213F04A821 /* TronWalletView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TronWalletView.swift; sourceTree = "<group>"; };
+		62F9278BFC039C35C7058E4B /* LightningAccountsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LightningAccountsView.swift; sourceTree = "<group>"; };
+		66DC96D7144A2BF3519734AB /* EthereumWalletDiscovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EthereumWalletDiscovery.swift; sourceTree = "<group>"; };
+		66FE937BC1627EA26F372031 /* CustomNetworkEditorSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomNetworkEditorSheet.swift; sourceTree = "<group>"; };
+		6755D91A5ACB2F92104ECCAE /* EthereumTokenCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EthereumTokenCatalog.swift; sourceTree = "<group>"; };
+		67A835304185D11EE561B171 /* HardwareWalletProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HardwareWalletProtocol.swift; sourceTree = "<group>"; };
+		6829283675AC53F4994B6C95 /* LightningAccount.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LightningAccount.swift; sourceTree = "<group>"; };
+		68A62F4E88FABB776EBC9640 /* BitcoinMessageSigningTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BitcoinMessageSigningTests.swift; sourceTree = "<group>"; };
+		6975D8BD21AAD12980984922 /* CTAP2Client.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CTAP2Client.swift; sourceTree = "<group>"; };
+		6AE0FE07923652FF93A4ADB7 /* AppAttestRootCA.pem */ = {isa = PBXFileReference; path = AppAttestRootCA.pem; sourceTree = "<group>"; };
+		6D3EE0CD1B8BE5EC0FAD6056 /* SolanaTokenCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SolanaTokenCatalog.swift; sourceTree = "<group>"; };
+		7130AC2217E02A0EEF502490 /* AboutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutView.swift; sourceTree = "<group>"; };
+		71402AA84744709149C20245 /* EthereumTransactionListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EthereumTransactionListView.swift; sourceTree = "<group>"; };
+		7141A599D32742546CBD638C /* BitcoinSendView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BitcoinSendView.swift; sourceTree = "<group>"; };
+		7339C03CE5A9DAAAA502341D /* VerifierHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifierHistory.swift; sourceTree = "<group>"; };
+		77193A9D9342A6A6C7447A9D /* TronSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TronSettings.swift; sourceTree = "<group>"; };
+		789A9F5B37A8AEAEA6D03A5E /* AddTronWalletSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddTronWalletSheet.swift; sourceTree = "<group>"; };
+		791950425261053C9DC4EB29 /* CredentialFolderStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialFolderStore.swift; sourceTree = "<group>"; };
+		79A77DE4B9C164CD2DF07A46 /* CustomEthereumNetwork.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomEthereumNetwork.swift; sourceTree = "<group>"; };
+		7A668AC9E8453698E90B8677 /* AutoLockManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoLockManager.swift; sourceTree = "<group>"; };
+		7CCFA6FD5C8A3BE3829D540E /* SolanaSPLTokenStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SolanaSPLTokenStore.swift; sourceTree = "<group>"; };
+		7CED2641148BD13334093B49 /* UTXOPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UTXOPickerView.swift; sourceTree = "<group>"; };
+		7D9B30C450B3852D0146221C /* ledger_tron_core.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ledger_tron_core.swift; sourceTree = "<group>"; };
+		7DFE53D851F965059054F226 /* SandwichLockedBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SandwichLockedBanner.swift; sourceTree = "<group>"; };
+		7E80C8572CBF8B911614E7BB /* RegisteredDevice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegisteredDevice.swift; sourceTree = "<group>"; };
+		81FDBB0527EA618D857A9018 /* SolanaTokenLookup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SolanaTokenLookup.swift; sourceTree = "<group>"; };
+		8254400B5339E1E814CB5708 /* TronTRC20TokenRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TronTRC20TokenRow.swift; sourceTree = "<group>"; };
+		82B93E5736DDBD081D26D8D1 /* IssuerIdentityResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IssuerIdentityResolver.swift; sourceTree = "<group>"; };
+		831269A88BE85A5D4686CFB0 /* BitcoinTransactionListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BitcoinTransactionListView.swift; sourceTree = "<group>"; };
+		83742EAD7B81D427DCC87455 /* TronTRC20TransferBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TronTRC20TransferBuilder.swift; sourceTree = "<group>"; };
+		83C2E187A32E8AB7FE44664A /* AnimatedQRView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimatedQRView.swift; sourceTree = "<group>"; };
+		845B82CEF80A601CF7358F01 /* SettingsBackup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsBackup.swift; sourceTree = "<group>"; };
+		8483D27FCB9ACFCE953DBC87 /* EthereumWalletKind.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EthereumWalletKind.swift; sourceTree = "<group>"; };
+		84BB9146DDD5B0D39A96E539 /* IdentityWrap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdentityWrap.swift; sourceTree = "<group>"; };
+		85624876D5FE049B79AA2EE9 /* EthereumWalletDescriptor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EthereumWalletDescriptor.swift; sourceTree = "<group>"; };
+		85FEF33EDD25528BA49744DB /* SeedSignerAccount.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeedSignerAccount.swift; sourceTree = "<group>"; };
+		877085F19D96747208D93D8B /* TronScanAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TronScanAPI.swift; sourceTree = "<group>"; };
+		87B2D1CBB57F8E855F5F3CC6 /* TronTRC20TokenStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TronTRC20TokenStore.swift; sourceTree = "<group>"; };
+		89B59F185D51766DCF2E99CB /* DeviceReadyConfirmationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceReadyConfirmationSheet.swift; sourceTree = "<group>"; };
+		89C507C62F88E82A34B59D16 /* BitcoinLabelStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BitcoinLabelStore.swift; sourceTree = "<group>"; };
+		8A027606E15EA04BBD0DDCF7 /* EthereumSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EthereumSettings.swift; sourceTree = "<group>"; };
+		8A9694FEFCA6CAF655B1D00A /* FiatCurrencyCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FiatCurrencyCatalog.swift; sourceTree = "<group>"; };
+		8B24486466D694FB3A3E85FB /* AppStoreSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStoreSettingsView.swift; sourceTree = "<group>"; };
+		8C273827243CE05970369D5B /* TronTokenLookup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TronTokenLookup.swift; sourceTree = "<group>"; };
+		8CBFC78AC8632154AD11DEA1 /* RemoveFromSandwichSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoveFromSandwichSheet.swift; sourceTree = "<group>"; };
+		8DDCB990DD27CDEE8D7213DB /* TronSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TronSettingsView.swift; sourceTree = "<group>"; };
+		922FD7EA58A7C538FA8B43BE /* BitcoinNetwork.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BitcoinNetwork.swift; sourceTree = "<group>"; };
+		92D74B60A61C7A1B55DCC6B2 /* TapIDDocumentSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TapIDDocumentSheet.swift; sourceTree = "<group>"; };
+		933DE395F418890C579E687B /* COSEKey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = COSEKey.swift; sourceTree = "<group>"; };
+		944484FE7530090622DC2341 /* MaknoonAppAttest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaknoonAppAttest.swift; sourceTree = "<group>"; };
+		97B4ABC426F9BC924379056B /* PresentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresentView.swift; sourceTree = "<group>"; };
+		97E1A88CA74F6FDE714572F1 /* AppsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppsView.swift; sourceTree = "<group>"; };
+		984C4373BF60AA9AEA7CD53C /* Issuers.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = Issuers.json; sourceTree = "<group>"; };
+		98E681B727D330E2D7954129 /* MLDSAClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MLDSAClient.swift; sourceTree = "<group>"; };
+		9BDCDB28E5B98987CBB3F047 /* AccountAddressBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountAddressBadge.swift; sourceTree = "<group>"; };
+		9D0B519230DB406EC3722097 /* BitcoinWalletsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BitcoinWalletsView.swift; sourceTree = "<group>"; };
+		9D8BD2DF7A6B9B51B09BBFB1 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		9DDF5D78FA829EB2551AC88F /* LightningSendView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LightningSendView.swift; sourceTree = "<group>"; };
+		9E827F02EB31CBA8E06F09FC /* AddSolanaWalletSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddSolanaWalletSheet.swift; sourceTree = "<group>"; };
+		9FFB5A467ABC1703419DABB2 /* LogStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogStore.swift; sourceTree = "<group>"; };
+		A0089A29F77AC06D988671DE /* EthereumTokenDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EthereumTokenDetailView.swift; sourceTree = "<group>"; };
+		A055EF2D8B6352004C3F1385 /* IDDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IDDocument.swift; sourceTree = "<group>"; };
+		A1FD48DD113C43FEA00D4EAB /* SolanaSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SolanaSettings.swift; sourceTree = "<group>"; };
+		A26492F32B298FD4FC287C13 /* CurrencySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CurrencySettingsView.swift; sourceTree = "<group>"; };
+		A41A784C7482EB5893120D81 /* BitcoinLabelEditSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BitcoinLabelEditSheet.swift; sourceTree = "<group>"; };
+		A601F3DD81F329EFDED94B92 /* SanctionsScreeningClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SanctionsScreeningClient.swift; sourceTree = "<group>"; };
+		A7731704DB7EF3249B51DAC3 /* AppAttestVerifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppAttestVerifier.swift; sourceTree = "<group>"; };
+		A7B3C5723D4BC2D0D69EAC24 /* SolanaReceiveView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SolanaReceiveView.swift; sourceTree = "<group>"; };
+		A9120BE0E29B90C66AFCF84A /* TronAddTokenSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TronAddTokenSheet.swift; sourceTree = "<group>"; };
+		A98A9E08E678A09A1AB6A622 /* DiscoverEthereumWalletsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverEthereumWalletsView.swift; sourceTree = "<group>"; };
+		AA29AE92BA173E045657FE37 /* LedgerBLE.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LedgerBLE.swift; sourceTree = "<group>"; };
+		ABACF72979216EB86C67B1B4 /* MatchingEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MatchingEngine.swift; sourceTree = "<group>"; };
+		AD727F20C7D3E99123272BA8 /* IDDocumentCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IDDocumentCard.swift; sourceTree = "<group>"; };
+		AE8A965D6C61B1A7DDEEBDBD /* EthereumRPCClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EthereumRPCClient.swift; sourceTree = "<group>"; };
+		AF09E05D705F0FCDB7626059 /* TronWalletsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TronWalletsView.swift; sourceTree = "<group>"; };
+		AF1E67080E7F7125A4AF7743 /* DisplaySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisplaySettingsView.swift; sourceTree = "<group>"; };
+		B1C5DE9E02D39F38885580D8 /* TronTransactionListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TronTransactionListView.swift; sourceTree = "<group>"; };
+		B292F740FDFEF00B1CF1691C /* YubiKeyEnrollment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YubiKeyEnrollment.swift; sourceTree = "<group>"; };
+		B367AE9A8D4C4762FB831345 /* BitcoinOfflinePSBTSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BitcoinOfflinePSBTSheet.swift; sourceTree = "<group>"; };
+		B431975A8CBE6BC4702EA3E5 /* TronWalletStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TronWalletStore.swift; sourceTree = "<group>"; };
+		B5553C64547D24AFF0AD93B6 /* EthereumWalletStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EthereumWalletStore.swift; sourceTree = "<group>"; };
+		B6F175E03AE49701B6C5DBEF /* DiscoverTronWalletsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverTronWalletsView.swift; sourceTree = "<group>"; };
+		B77F8005967BD2743A145BB6 /* SolanaWalletStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SolanaWalletStore.swift; sourceTree = "<group>"; };
+		B7DD7AB288FECCD075C0767D /* RegisterDeviceSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegisterDeviceSheet.swift; sourceTree = "<group>"; };
+		B850355D2C321E700E2F7503 /* WalletThumbprint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletThumbprint.swift; sourceTree = "<group>"; };
+		B8E2A4D8F22B59D7DC125302 /* BIP39.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BIP39.swift; sourceTree = "<group>"; };
+		B910864655CBB0A9A7E48EA4 /* YubiKeyClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YubiKeyClient.swift; sourceTree = "<group>"; };
+		B989C40CC0EB286EEE5FC202 /* CBOR.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CBOR.swift; sourceTree = "<group>"; };
+		B9AED9FB2A66F694919549CD /* SettingsImportReportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsImportReportSheet.swift; sourceTree = "<group>"; };
+		BB671C3D2566E7ADC0FB59F9 /* ledger_eth_core.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ledger_eth_core.swift; sourceTree = "<group>"; };
+		BC2CEDD2C8FEB628E3A0A18C /* VerifierRequestValidator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifierRequestValidator.swift; sourceTree = "<group>"; };
+		BD7AC3A17F5D0CDFEF504C45 /* BitcoinSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BitcoinSettings.swift; sourceTree = "<group>"; };
+		BD82FA19478B86DB4068EE9F /* LightningAccountStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LightningAccountStore.swift; sourceTree = "<group>"; };
+		BEBD8E4610A32B0087EEF8A8 /* SolanaSPLTokenRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SolanaSPLTokenRow.swift; sourceTree = "<group>"; };
+		BF949F2A61EA01E1CE577AF9 /* DeviceDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceDetailView.swift; sourceTree = "<group>"; };
+		C088E8E81BAF3169512FA66C /* QRScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QRScannerView.swift; sourceTree = "<group>"; };
+		C3FC0E538D85E64C6F3CDF00 /* PresentationVerifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresentationVerifier.swift; sourceTree = "<group>"; };
+		C45C79B1823E2220CBB8AA02 /* Network.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Network.swift; sourceTree = "<group>"; };
+		C4B3E724F86807A19B2BE982 /* LocalShareQrSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalShareQrSheet.swift; sourceTree = "<group>"; };
+		C4D7E0B8A791A0E5C57EE873 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		C6AB7D1B82B0A6EA02C54CCC /* SolanaSendView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SolanaSendView.swift; sourceTree = "<group>"; };
+		C9C9A67331FA1917FC5A5424 /* VerifyOtherSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifyOtherSheet.swift; sourceTree = "<group>"; };
+		CB19E3D01620F179DD1818F1 /* Bech32.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bech32.swift; sourceTree = "<group>"; };
+		CC64F2BA18F4E17047518E7C /* LockScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LockScreen.swift; sourceTree = "<group>"; };
+		CD5642A874242550314C46DA /* EthereumToken.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EthereumToken.swift; sourceTree = "<group>"; };
+		CD7D11A8B1FF116189BAD1D1 /* TronWallet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TronWallet.swift; sourceTree = "<group>"; };
+		CD83F549B7F16E9F885D87D8 /* SolanaSPLTransferBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SolanaSPLTransferBuilder.swift; sourceTree = "<group>"; };
+		CF322F29F6470DA7DC270E96 /* EthereumWeiValue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EthereumWeiValue.swift; sourceTree = "<group>"; };
+		D032B09F940618C922548214 /* SolanaSPLToken.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SolanaSPLToken.swift; sourceTree = "<group>"; };
+		D08CC1B0A8548C6A25754CD6 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		D0C094977DB720F5C670FC9E /* PassportPassiveAuthVerifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PassportPassiveAuthVerifier.swift; sourceTree = "<group>"; };
+		D0E808D78473ED732634C0BF /* PINProtocolV1.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PINProtocolV1.swift; sourceTree = "<group>"; };
+		D2F7AC09291DA964D61A1A1A /* RecoveryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecoveryView.swift; sourceTree = "<group>"; };
+		D32A6B4881A4726594C7FEA2 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		D5B1318E3C640B525D0859E7 /* TronRPCClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TronRPCClient.swift; sourceTree = "<group>"; };
+		DA0FBF0F1E916633110CBB43 /* MaknoonTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = MaknoonTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		DAA50E1AC8D8BB04D561FF03 /* ledger_btc_core.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ledger_btc_core.swift; sourceTree = "<group>"; };
+		DB0F10376C36120744B62891 /* ENSResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ENSResolver.swift; sourceTree = "<group>"; };
+		DC69EA632A0819B230C2B273 /* IdentitySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdentitySettingsView.swift; sourceTree = "<group>"; };
+		DD446F6895AEC3266F8358AB /* TronTokenDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TronTokenDetailView.swift; sourceTree = "<group>"; };
+		DD74B0CC3853E8569C62F2B8 /* EthereumExplorerClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EthereumExplorerClient.swift; sourceTree = "<group>"; };
+		DF773AB794E7D186505D141B /* LedgerSolCore.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = LedgerSolCore.xcframework; path = "../ledger-sol-rs/ios/LedgerSolCore.xcframework"; sourceTree = "<group>"; };
+		E00781FE3EA1ED943E115EFE /* DisplaySettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisplaySettings.swift; sourceTree = "<group>"; };
+		E14F63B53A3C06CAB555AB23 /* BadgeQR.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BadgeQR.swift; sourceTree = "<group>"; };
+		E2AE6C9A8A6ABD1818C0B7F8 /* AddNetworkSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddNetworkSheet.swift; sourceTree = "<group>"; };
+		E4E25C493329E05C67A668DC /* AppStoreCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStoreCatalog.swift; sourceTree = "<group>"; };
+		E7E6B087CA3BBA4A9862BF2A /* BitcoinSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BitcoinSettingsView.swift; sourceTree = "<group>"; };
+		E7EA9A5F164B297CEF625CF2 /* BitcoinAddressesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BitcoinAddressesView.swift; sourceTree = "<group>"; };
+		E92900A319F58CD7FCFE1127 /* BitcoinWalletStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BitcoinWalletStore.swift; sourceTree = "<group>"; };
+		E94EAD6A135A9A0EB863E601 /* EthereumSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EthereumSettingsView.swift; sourceTree = "<group>"; };
+		E950755BB3F4E27713ADAEA0 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		EA0AC3DD42FFE26C26733200 /* CameraPermission.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraPermission.swift; sourceTree = "<group>"; };
+		EDA8E027EBADEF282F51B03F /* SolanaWalletView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SolanaWalletView.swift; sourceTree = "<group>"; };
+		EF8F78585DB579EEEB4825E1 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
+		F0FCA2105A947F349A466D61 /* LocalFrames.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalFrames.swift; sourceTree = "<group>"; };
+		F3CE2A9AF57176BEE841C3EE /* PBKDF2.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PBKDF2.swift; sourceTree = "<group>"; };
+		F404B6DD9B63557EAF16B248 /* DevicesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevicesView.swift; sourceTree = "<group>"; };
+		F51FF2AE98E05D9928A8CE87 /* IdentityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdentityView.swift; sourceTree = "<group>"; };
+		F562B4B5FF6D574D35FC091C /* EthereumWalletsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EthereumWalletsView.swift; sourceTree = "<group>"; };
+		F61937B94D18DFDC3AB3B2BA /* LocalCredentialFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalCredentialFactory.swift; sourceTree = "<group>"; };
+		F78685D41442087FA588F8FD /* IDDocumentReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IDDocumentReader.swift; sourceTree = "<group>"; };
+		F9E8028EE7B222BA6F26DAD1 /* SolanaRPCClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SolanaRPCClient.swift; sourceTree = "<group>"; };
+		FCFBE78DA70DB6462BBC5B4A /* AddressBookView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddressBookView.swift; sourceTree = "<group>"; };
+		FD42A4B7BF0A8A1B2374D882 /* AppAttestVerifierTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppAttestVerifierTests.swift; sourceTree = "<group>"; };
+		FDE37BF5EBEB999A0EDE0DF9 /* HardwareWalletManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HardwareWalletManager.swift; sourceTree = "<group>"; };
+		FE0B3C966F1066EC5B15829D /* LedgerTronCore.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = LedgerTronCore.xcframework; path = "../ledger-tron-rs/ios/LedgerTronCore.xcframework"; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		2995CE80FA7894112D410059 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F92E737F13273624D85B6A09 /* ElabifyCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A7678B9C7E441707A3E0F381 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				418C3D99C1E3A44D335F9F87 /* LedgerBtcCore.xcframework in Frameworks */,
+				7EEEAEB0D4B8C7D9B535CD3A /* LedgerSolCore.xcframework in Frameworks */,
+				06506A7A55E09C61E5601898 /* LedgerEthCore.xcframework in Frameworks */,
+				0B50330C1027E58CB1A6014F /* LedgerTronCore.xcframework in Frameworks */,
+				7AC6CD6E0E6DE175AC1D4B40 /* ElabifyCore in Frameworks */,
+				8927DB599E3A1E8FAE4F451F /* BitcoinDevKit in Frameworks */,
+				FE96A62430D9A469B82AC2A6 /* WalletCore in Frameworks */,
+				F57D799AB32648ABF27C624B /* WalletCoreSwiftProtobuf in Frameworks */,
+				8FFBB529B11A033752025045 /* NFCPassportReader in Frameworks */,
+				60F3AD170B288A9EFA1F6CDD /* URKit in Frameworks */,
+				78DB2480A839F6A0C822C431 /* YubiKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		002B4EA087562BA17B204AE7 /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				4A8232E5ED60359EDE3E8692 /* swift */,
+			);
+			name = Packages;
+			sourceTree = "<group>";
+		};
+		03F31541D90BD44AF8018085 /* Solana */ = {
+			isa = PBXGroup;
+			children = (
+				9E827F02EB31CBA8E06F09FC /* AddSolanaWalletSheet.swift */,
+				6029C11246370C9FC973A58F /* DiscoverSolanaWalletsView.swift */,
+				48ECB7B74ED43F6D55D57D7D /* SolanaAddTokenSheet.swift */,
+				2D73F8175673428011D8BD28 /* SolanaDescriptors.swift */,
+				A7B3C5723D4BC2D0D69EAC24 /* SolanaReceiveView.swift */,
+				F9E8028EE7B222BA6F26DAD1 /* SolanaRPCClient.swift */,
+				C6AB7D1B82B0A6EA02C54CCC /* SolanaSendView.swift */,
+				A1FD48DD113C43FEA00D4EAB /* SolanaSettings.swift */,
+				3BD33D18AEB869BCEA690926 /* SolanaSettingsView.swift */,
+				D032B09F940618C922548214 /* SolanaSPLToken.swift */,
+				BEBD8E4610A32B0087EEF8A8 /* SolanaSPLTokenRow.swift */,
+				7CCFA6FD5C8A3BE3829D540E /* SolanaSPLTokenStore.swift */,
+				CD83F549B7F16E9F885D87D8 /* SolanaSPLTransferBuilder.swift */,
+				6D3EE0CD1B8BE5EC0FAD6056 /* SolanaTokenCatalog.swift */,
+				5E994B078263EC474EA0C69D /* SolanaTokenDetailView.swift */,
+				81FDBB0527EA618D857A9018 /* SolanaTokenLookup.swift */,
+				5D1551828EC592A83FC34341 /* SolanaWallet.swift */,
+				18516F31B3939D3CE4127D38 /* SolanaWalletDiscovery.swift */,
+				B77F8005967BD2743A145BB6 /* SolanaWalletStore.swift */,
+				5264BD217C71ECB735262A61 /* SolanaWalletsView.swift */,
+				EDA8E027EBADEF282F51B03F /* SolanaWalletView.swift */,
+			);
+			path = Solana;
+			sourceTree = "<group>";
+		};
+		062EC86AEC73AA8860E17289 /* Lightning */ = {
+			isa = PBXGroup;
+			children = (
+				4E29C53F5B7D656B08F44532 /* AddLightningAccountSheet.swift */,
+				CB19E3D01620F179DD1818F1 /* Bech32.swift */,
+				6829283675AC53F4994B6C95 /* LightningAccount.swift */,
+				BD82FA19478B86DB4068EE9F /* LightningAccountStore.swift */,
+				62F9278BFC039C35C7058E4B /* LightningAccountsView.swift */,
+				1867622EC9D93A23F0C44FFF /* LightningReceiveView.swift */,
+				9DDF5D78FA829EB2551AC88F /* LightningSendView.swift */,
+				22E76FFA541A8100CAF31670 /* LightningSettingsView.swift */,
+				41D0B6721932CDBCA7A7E1FF /* LightningWalletView.swift */,
+				5C8E1F03A61355DA3CC73FD5 /* LNDHubClient.swift */,
+				407AA819EC8CA153DE52AE0F /* LNURL.swift */,
+			);
+			path = Lightning;
+			sourceTree = "<group>";
+		};
+		074C80A65E511F7D30896A48 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				1295D39B1AE056B8DD022E6A /* Maknoon.app */,
+				DA0FBF0F1E916633110CBB43 /* MaknoonTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		07EB5A0D1B678D431B6051F0 /* Credentials */ = {
+			isa = PBXGroup;
+			children = (
+				A7731704DB7EF3249B51DAC3 /* AppAttestVerifier.swift */,
+				F61937B94D18DFDC3AB3B2BA /* LocalCredentialFactory.swift */,
+			);
+			path = Credentials;
+			sourceTree = "<group>";
+		};
+		0E7E904FB803DBAA31B0210A /* YubiKey */ = {
+			isa = PBXGroup;
+			children = (
+				9CBFCEB644CD960B67416C75 /* CTAP2 */,
+				B910864655CBB0A9A7E48EA4 /* YubiKeyClient.swift */,
+				B292F740FDFEF00B1CF1691C /* YubiKeyEnrollment.swift */,
+			);
+			path = YubiKey;
+			sourceTree = "<group>";
+		};
+		1AC2EB2707F88118B7BBC75D /* Tron */ = {
+			isa = PBXGroup;
+			children = (
+				789A9F5B37A8AEAEA6D03A5E /* AddTronWalletSheet.swift */,
+				B6F175E03AE49701B6C5DBEF /* DiscoverTronWalletsView.swift */,
+				A9120BE0E29B90C66AFCF84A /* TronAddTokenSheet.swift */,
+				2A24E5FB213F912B7E0BF695 /* TronDescriptors.swift */,
+				238725740C17047D9618C4F5 /* TronReceiveView.swift */,
+				D5B1318E3C640B525D0859E7 /* TronRPCClient.swift */,
+				877085F19D96747208D93D8B /* TronScanAPI.swift */,
+				367A19E6AB5B12D23CE2DCCF /* TronSendView.swift */,
+				77193A9D9342A6A6C7447A9D /* TronSettings.swift */,
+				8DDCB990DD27CDEE8D7213DB /* TronSettingsView.swift */,
+				07AEBF66C1FEAA9846A0FE17 /* TronTokenCatalog.swift */,
+				DD446F6895AEC3266F8358AB /* TronTokenDetailView.swift */,
+				8C273827243CE05970369D5B /* TronTokenLookup.swift */,
+				B1C5DE9E02D39F38885580D8 /* TronTransactionListView.swift */,
+				5CC5E0785A932C169B00B254 /* TronTRC20Token.swift */,
+				8254400B5339E1E814CB5708 /* TronTRC20TokenRow.swift */,
+				87B2D1CBB57F8E855F5F3CC6 /* TronTRC20TokenStore.swift */,
+				83742EAD7B81D427DCC87455 /* TronTRC20TransferBuilder.swift */,
+				CD7D11A8B1FF116189BAD1D1 /* TronWallet.swift */,
+				B431975A8CBE6BC4702EA3E5 /* TronWalletStore.swift */,
+				AF09E05D705F0FCDB7626059 /* TronWalletsView.swift */,
+				620573E34C128D213F04A821 /* TronWalletView.swift */,
+			);
+			path = Tron;
+			sourceTree = "<group>";
+		};
+		1EDE2A379F92517C4FA6139F /* bindings */ = {
+			isa = PBXGroup;
+			children = (
+				7D9B30C450B3852D0146221C /* ledger_tron_core.swift */,
+			);
+			name = bindings;
+			path = "../ledger-tron-rs/ios/bindings";
+			sourceTree = "<group>";
+		};
+		2A4C9AFB9A00D49F49326FE7 /* bindings */ = {
+			isa = PBXGroup;
+			children = (
+				DAA50E1AC8D8BB04D561FF03 /* ledger_btc_core.swift */,
+			);
+			name = bindings;
+			path = "../ledger-btc-rs/ios/bindings";
+			sourceTree = "<group>";
+		};
+		4CD651CE85C8A6F7F6768DF9 /* MaknoonTests */ = {
+			isa = PBXGroup;
+			children = (
+				FD42A4B7BF0A8A1B2374D882 /* AppAttestVerifierTests.swift */,
+				68A62F4E88FABB776EBC9640 /* BitcoinMessageSigningTests.swift */,
+				13DDE4AC20C980973E6C4CF5 /* LocalFramesTests.swift */,
+				05C1D115C59094CAEA05FDA1 /* LocalPassportCredentialTests.swift */,
+			);
+			path = MaknoonTests;
+			sourceTree = "<group>";
+		};
+		4F806214C282BF9E71B37917 /* bindings */ = {
+			isa = PBXGroup;
+			children = (
+				BB671C3D2566E7ADC0FB59F9 /* ledger_eth_core.swift */,
+			);
+			name = bindings;
+			path = "../ledger-eth-rs/ios/bindings";
+			sourceTree = "<group>";
+		};
+		4F8B4861CC5E18BDEF863188 /* Apps */ = {
+			isa = PBXGroup;
+			children = (
+				E2AE6C9A8A6ABD1818C0B7F8 /* AddNetworkSheet.swift */,
+				E4E25C493329E05C67A668DC /* AppStoreCatalog.swift */,
+				1B83D5DAF1D32F913EC37BBD /* AppStoreRegistry.swift */,
+				8B24486466D694FB3A3E85FB /* AppStoreSettingsView.swift */,
+				44BCDDAE2AE557E3EF301CE5 /* BrowseAppStoreView.swift */,
+			);
+			path = Apps;
+			sourceTree = "<group>";
+		};
+		57D6DBDEAF6488F9AEBE7CF1 /* HardwareWallet */ = {
+			isa = PBXGroup;
+			children = (
+				89B59F185D51766DCF2E99CB /* DeviceReadyConfirmationSheet.swift */,
+				FDE37BF5EBEB999A0EDE0DF9 /* HardwareWalletManager.swift */,
+				67A835304185D11EE561B171 /* HardwareWalletProtocol.swift */,
+				AA29AE92BA173E045657FE37 /* LedgerBLE.swift */,
+				448C77471A8896830BAA6871 /* MockHardwareWallet.swift */,
+				4F221DAFF98E6E925AA11A4D /* TrezorBLE.swift */,
+			);
+			path = HardwareWallet;
+			sourceTree = "<group>";
+		};
+		6552DBA6B4D69A9104CD0749 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				6AE0FE07923652FF93A4ADB7 /* AppAttestRootCA.pem */,
+				984C4373BF60AA9AEA7CD53C /* Issuers.json */,
+				EF8F78585DB579EEEB4825E1 /* Localizable.xcstrings */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		6B15FA50CA23751BB0073555 /* AddressBook */ = {
+			isa = PBXGroup;
+			children = (
+				3815B7C83F9E66BE08B5B726 /* AddressBookEntry.swift */,
+				1711296BC2B99CC6229CAD6F /* AddressBookPicker.swift */,
+				3A5D428804039F539355E87E /* AddressBookStore.swift */,
+				FCFBE78DA70DB6462BBC5B4A /* AddressBookView.swift */,
+			);
+			path = AddressBook;
+			sourceTree = "<group>";
+		};
+		7D60898C2208F8B2E8E140FE /* Display */ = {
+			isa = PBXGroup;
+			children = (
+				123AE24905B970516285F026 /* ActivityTrackingHost.swift */,
+				7A668AC9E8453698E90B8677 /* AutoLockManager.swift */,
+				E00781FE3EA1ED943E115EFE /* DisplaySettings.swift */,
+				AF1E67080E7F7125A4AF7743 /* DisplaySettingsView.swift */,
+				CC64F2BA18F4E17047518E7C /* LockScreen.swift */,
+				0F39342E0F8BEB1937D85DBC /* PrivacyCurtain.swift */,
+			);
+			path = Display;
+			sourceTree = "<group>";
+		};
+		7F28FC7E4EE5C470F98304D1 /* IDDocument */ = {
+			isa = PBXGroup;
+			children = (
+				19F60C1A16659F1397725C60 /* CSCATrustStore.swift */,
+				A055EF2D8B6352004C3F1385 /* IDDocument.swift */,
+				AD727F20C7D3E99123272BA8 /* IDDocumentCard.swift */,
+				45C01EA7B48067B85FF3CDDB /* IDDocumentDetailView.swift */,
+				31A5E06677C85122400D3F55 /* IDDocumentIssuanceClient.swift */,
+				F78685D41442087FA588F8FD /* IDDocumentReader.swift */,
+				40E4817AD2B82A08B3C8D9C3 /* IDDocumentStore.swift */,
+				D0C094977DB720F5C670FC9E /* PassportPassiveAuthVerifier.swift */,
+				A601F3DD81F329EFDED94B92 /* SanctionsScreeningClient.swift */,
+				92D74B60A61C7A1B55DCC6B2 /* TapIDDocumentSheet.swift */,
+			);
+			path = IDDocument;
+			sourceTree = "<group>";
+		};
+		80017944963DCA2E729B4DA5 /* SeedSigner */ = {
+			isa = PBXGroup;
+			children = (
+				83C2E187A32E8AB7FE44664A /* AnimatedQRView.swift */,
+				85FEF33EDD25528BA49744DB /* SeedSignerAccount.swift */,
+				439A785FCEAD59A4CA6049DF /* SeedSignerPairingSheet.swift */,
+				2DE46BBFD5FD4B83D69F89AF /* SeedSignerSignFlow.swift */,
+				164693AAD8138C3B0EA818ED /* URPSBTCodec.swift */,
+				52D5BDFA2C4309B3EC545271 /* URPSBTScannerView.swift */,
+			);
+			path = SeedSigner;
+			sourceTree = "<group>";
+		};
+		863384D9069DBAA765519884 /* AppAttest */ = {
+			isa = PBXGroup;
+			children = (
+				944484FE7530090622DC2341 /* MaknoonAppAttest.swift */,
+			);
+			path = AppAttest;
+			sourceTree = "<group>";
+		};
+		97A5C8CC187DFEA09CB43E9F /* Ethereum */ = {
+			isa = PBXGroup;
+			children = (
+				79A77DE4B9C164CD2DF07A46 /* CustomEthereumNetwork.swift */,
+				66FE937BC1627EA26F372031 /* CustomNetworkEditorSheet.swift */,
+				A98A9E08E678A09A1AB6A622 /* DiscoverEthereumWalletsView.swift */,
+				DB0F10376C36120744B62891 /* ENSResolver.swift */,
+				0E44F9E4BD34C6E2FD2A2F41 /* EthereumABI.swift */,
+				52F8883137AF613FBFEDA295 /* EthereumAddTokenSheet.swift */,
+				2FC81DD155EE07C3BB52FC27 /* EthereumDescriptors.swift */,
+				DD74B0CC3853E8569C62F2B8 /* EthereumExplorerClient.swift */,
+				5154E6E2E6A7BE6286B38BAB /* EthereumGasEstimator.swift */,
+				15EABD99913B0357DB4834AA /* EthereumNetwork.swift */,
+				0A2B043A8D2DEEC54C74C23D /* EthereumReceiveView.swift */,
+				0680DACBFBF40ABFB823BE41 /* EthereumRLP.swift */,
+				AE8A965D6C61B1A7DDEEBDBD /* EthereumRPCClient.swift */,
+				1F7E585C99041CE81A2D54A6 /* EthereumSendView.swift */,
+				8A027606E15EA04BBD0DDCF7 /* EthereumSettings.swift */,
+				E94EAD6A135A9A0EB863E601 /* EthereumSettingsView.swift */,
+				CD5642A874242550314C46DA /* EthereumToken.swift */,
+				6755D91A5ACB2F92104ECCAE /* EthereumTokenCatalog.swift */,
+				A0089A29F77AC06D988671DE /* EthereumTokenDetailView.swift */,
+				5B41151FD708E7E6CA54809D /* EthereumTokenLookup.swift */,
+				0C74D9DD0AC28C9BEA335D30 /* EthereumTokenRegistry.swift */,
+				43F9A1C0B4B24E8C75E42591 /* EthereumTokenRow.swift */,
+				124806FAB9D690153B7747C9 /* EthereumTokenStore.swift */,
+				71402AA84744709149C20245 /* EthereumTransactionListView.swift */,
+				1A15B8E340EDA6903D9C64CE /* EthereumWallet.swift */,
+				85624876D5FE049B79AA2EE9 /* EthereumWalletDescriptor.swift */,
+				66DC96D7144A2BF3519734AB /* EthereumWalletDiscovery.swift */,
+				8483D27FCB9ACFCE953DBC87 /* EthereumWalletKind.swift */,
+				B5553C64547D24AFF0AD93B6 /* EthereumWalletStore.swift */,
+				F562B4B5FF6D574D35FC091C /* EthereumWalletsView.swift */,
+				58B2520CFB319E9F5802132B /* EthereumWalletView.swift */,
+				CF322F29F6470DA7DC270E96 /* EthereumWeiValue.swift */,
+				60D6541EA87D362AD70F4B13 /* LedgerERC20Descriptors.swift */,
+			);
+			path = Ethereum;
+			sourceTree = "<group>";
+		};
+		9CBFCEB644CD960B67416C75 /* CTAP2 */ = {
+			isa = PBXGroup;
+			children = (
+				B989C40CC0EB286EEE5FC202 /* CBOR.swift */,
+				933DE395F418890C579E687B /* COSEKey.swift */,
+				6975D8BD21AAD12980984922 /* CTAP2Client.swift */,
+				D0E808D78473ED732634C0BF /* PINProtocolV1.swift */,
+			);
+			path = CTAP2;
+			sourceTree = "<group>";
+		};
+		A407236AB32D4C3EEC70F809 /* Maknoon */ = {
+			isa = PBXGroup;
+			children = (
+				6B15FA50CA23751BB0073555 /* AddressBook */,
+				863384D9069DBAA765519884 /* AppAttest */,
+				4F8B4861CC5E18BDEF863188 /* Apps */,
+				CEFC97301C34D824C64F4326 /* Bitcoin */,
+				07EB5A0D1B678D431B6051F0 /* Credentials */,
+				D56C5EF891985BFD2B599C71 /* Devices */,
+				DDDC0FD9AB863DA0B852791E /* Diagnostics */,
+				7D60898C2208F8B2E8E140FE /* Display */,
+				97A5C8CC187DFEA09CB43E9F /* Ethereum */,
+				57D6DBDEAF6488F9AEBE7CF1 /* HardwareWallet */,
+				7F28FC7E4EE5C470F98304D1 /* IDDocument */,
+				062EC86AEC73AA8860E17289 /* Lightning */,
+				6552DBA6B4D69A9104CD0749 /* Resources */,
+				80017944963DCA2E729B4DA5 /* SeedSigner */,
+				03F31541D90BD44AF8018085 /* Solana */,
+				B915759225854A18561B90A3 /* Transport */,
+				1AC2EB2707F88118B7BBC75D /* Tron */,
+				D68977FFB84E000B450E696D /* UI */,
+				0E7E904FB803DBAA31B0210A /* YubiKey */,
+				7130AC2217E02A0EEF502490 /* AboutView.swift */,
+				97E1A88CA74F6FDE714572F1 /* AppsView.swift */,
+				3B5597D7CF500A17E76F0B10 /* AssetPriceCache.swift */,
+				3A4132D254F8037570F61CCF /* Assets.xcassets */,
+				18525844CC3667A6E126E365 /* BackupBanner.swift */,
+				4320F4D4EC7DFDBAC89DEB32 /* BackupState.swift */,
+				E14F63B53A3C06CAB555AB23 /* BadgeQR.swift */,
+				B8E2A4D8F22B59D7DC125302 /* BIP39.swift */,
+				EA0AC3DD42FFE26C26733200 /* CameraPermission.swift */,
+				9D8BD2DF7A6B9B51B09BBFB1 /* ContentView.swift */,
+				36F23F53DC1BBEC026D3492D /* CredentialCard.swift */,
+				791950425261053C9DC4EB29 /* CredentialFolderStore.swift */,
+				53BF39B86EDFE895E7DE1CEC /* CredentialPresentView.swift */,
+				A26492F32B298FD4FC287C13 /* CurrencySettingsView.swift */,
+				8A9694FEFCA6CAF655B1D00A /* FiatCurrencyCatalog.swift */,
+				24AF6BC078BE81D91DE8DDF3 /* FiatPreferences.swift */,
+				274CB5300CF94A36DC590B34 /* HardwareUnlockView.swift */,
+				29C81B84BD472BD42B318254 /* HolderStore.swift */,
+				3CAAD3AA895C97261C6E0AA7 /* iCloudBackup.swift */,
+				440EAB68D2F42B883FECA1ED /* IdentitySandwich.swift */,
+				F51FF2AE98E05D9928A8CE87 /* IdentityView.swift */,
+				84BB9146DDD5B0D39A96E539 /* IdentityWrap.swift */,
+				D32A6B4881A4726594C7FEA2 /* Info.plist */,
+				82B93E5736DDBD081D26D8D1 /* IssuerIdentityResolver.swift */,
+				4BDA476AC3BC8E238F1E8475 /* KeyStore.swift */,
+				149C9525D487AD16139C228E /* KnownIssuersStore.swift */,
+				F0FCA2105A947F349A466D61 /* LocalFrames.swift */,
+				C4B3E724F86807A19B2BE982 /* LocalShareQrSheet.swift */,
+				330630C68D2881DC45E9A776 /* Maknoon.entitlements */,
+				5266F1677045AE99DDEB0739 /* MaknoonApp.swift */,
+				ABACF72979216EB86C67B1B4 /* MatchingEngine.swift */,
+				98E681B727D330E2D7954129 /* MLDSAClient.swift */,
+				C4D7E0B8A791A0E5C57EE873 /* Models.swift */,
+				C45C79B1823E2220CBB8AA02 /* Network.swift */,
+				33873ECD91EFAAD6724203A1 /* NetworksDestination.swift */,
+				D08CC1B0A8548C6A25754CD6 /* OnboardingView.swift */,
+				F3CE2A9AF57176BEE841C3EE /* PBKDF2.swift */,
+				2EA467B33F3A6E3077615D90 /* PendingPickupsStore.swift */,
+				C3FC0E538D85E64C6F3CDF00 /* PresentationVerifier.swift */,
+				97B4ABC426F9BC924379056B /* PresentView.swift */,
+				25F7F84C14EFE18929BEB078 /* PrivacyInfo.xcprivacy */,
+				C088E8E81BAF3169512FA66C /* QRScannerView.swift */,
+				2439E298CE25EF2B8BAEA253 /* ReceiveView.swift */,
+				D2F7AC09291DA964D61A1A1A /* RecoveryView.swift */,
+				491F12D271EC69DD66FDDDD2 /* ScanVerifierSheet.swift */,
+				845B82CEF80A601CF7358F01 /* SettingsBackup.swift */,
+				B9AED9FB2A66F694919549CD /* SettingsImportReportSheet.swift */,
+				E950755BB3F4E27713ADAEA0 /* SettingsView.swift */,
+				7339C03CE5A9DAAAA502341D /* VerifierHistory.swift */,
+				BC2CEDD2C8FEB628E3A0A18C /* VerifierRequestValidator.swift */,
+				C9C9A67331FA1917FC5A5424 /* VerifyOtherSheet.swift */,
+				2246A720D5A53E89A6A0113E /* VerifyPhraseView.swift */,
+				1AC736E7CCCD192BFA5A364C /* WalletView.swift */,
+			);
+			path = Maknoon;
+			sourceTree = "<group>";
+		};
+		AF3DE37F397C8B73D743E91D /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				0429CAD2D40DEF6452BB4348 /* LedgerBtcCore.xcframework */,
+				3B86778BB5B9C1D79EF1A9BE /* LedgerEthCore.xcframework */,
+				DF773AB794E7D186505D141B /* LedgerSolCore.xcframework */,
+				FE0B3C966F1066EC5B15829D /* LedgerTronCore.xcframework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		B915759225854A18561B90A3 /* Transport */ = {
+			isa = PBXGroup;
+			children = (
+				3D29AFE40A34755117F5FACB /* BLECentralClient.swift */,
+				0AD7F4252B89F731D10AB150 /* BLEPeripheralHost.swift */,
+				40BE5B7A4CE335B15D143AAD /* BLEShareSheet.swift */,
+				3FBBFA99FD8D7F58BABB14DE /* TransportSession.swift */,
+			);
+			path = Transport;
+			sourceTree = "<group>";
+		};
+		CEFC97301C34D824C64F4326 /* Bitcoin */ = {
+			isa = PBXGroup;
+			children = (
+				31FF33DA347F7ED8E6CE6445 /* AddBitcoinWalletFromDeviceView.swift */,
+				E7EA9A5F164B297CEF625CF2 /* BitcoinAddressesView.swift */,
+				1E55D7002BC841D55A4646A1 /* BitcoinDescriptors.swift */,
+				575A16560F25F5CE1B0CA812 /* BitcoinFeeEstimator.swift */,
+				A41A784C7482EB5893120D81 /* BitcoinLabelEditSheet.swift */,
+				89C507C62F88E82A34B59D16 /* BitcoinLabelStore.swift */,
+				3216838A447CA2FC496D267C /* BitcoinMessageSign.swift */,
+				922FD7EA58A7C538FA8B43BE /* BitcoinNetwork.swift */,
+				B367AE9A8D4C4762FB831345 /* BitcoinOfflinePSBTSheet.swift */,
+				5C36A3F05AD86FD67781A7ED /* BitcoinPriceCache.swift */,
+				2D2F635005C49F930D6EC465 /* BitcoinReceiveView.swift */,
+				7141A599D32742546CBD638C /* BitcoinSendView.swift */,
+				BD7AC3A17F5D0CDFEF504C45 /* BitcoinSettings.swift */,
+				E7E6B087CA3BBA4A9862BF2A /* BitcoinSettingsView.swift */,
+				5DCF0A6F7B0B0F821B0020AA /* BitcoinSigningHelpers.swift */,
+				831269A88BE85A5D4686CFB0 /* BitcoinTransactionListView.swift */,
+				12ADE212F4ACD5E87A2EC1D0 /* BitcoinWallet.swift */,
+				3F592B77DD80C23FFA81C2F9 /* BitcoinWalletDescriptor.swift */,
+				3DE6DCBB63CBA5555EDF317A /* BitcoinWalletDiscovery.swift */,
+				13C92173A6DB04779DDCEA38 /* BitcoinWalletKind.swift */,
+				E92900A319F58CD7FCFE1127 /* BitcoinWalletStore.swift */,
+				9D0B519230DB406EC3722097 /* BitcoinWalletsView.swift */,
+				29AD69C41F3B2B9E29239FC8 /* BitcoinWalletView.swift */,
+				4A27BEDA915D75A7B1516BA4 /* BumpFeeSheet.swift */,
+				0CD5F324AF647D654A835161 /* DiscoverHardwareWalletsView.swift */,
+				1D7A6AEF293896F5027C58D4 /* ExtendedKeyNormalize.swift */,
+				7CED2641148BD13334093B49 /* UTXOPickerView.swift */,
+				B850355D2C321E700E2F7503 /* WalletThumbprint.swift */,
+			);
+			path = Bitcoin;
+			sourceTree = "<group>";
+		};
+		D56C5EF891985BFD2B599C71 /* Devices */ = {
+			isa = PBXGroup;
+			children = (
+				BF949F2A61EA01E1CE577AF9 /* DeviceDetailView.swift */,
+				5BE60861D4A71D3FD5045634 /* DeviceRegistry.swift */,
+				F404B6DD9B63557EAF16B248 /* DevicesView.swift */,
+				DC69EA632A0819B230C2B273 /* IdentitySettingsView.swift */,
+				B7DD7AB288FECCD075C0767D /* RegisterDeviceSheet.swift */,
+				7E80C8572CBF8B911614E7BB /* RegisteredDevice.swift */,
+				8CBFC78AC8632154AD11DEA1 /* RemoveFromSandwichSheet.swift */,
+			);
+			path = Devices;
+			sourceTree = "<group>";
+		};
+		D68977FFB84E000B450E696D /* UI */ = {
+			isa = PBXGroup;
+			children = (
+				9BDCDB28E5B98987CBB3F047 /* AccountAddressBadge.swift */,
+				7DFE53D851F965059054F226 /* SandwichLockedBanner.swift */,
+				4E36295E34D3E3DECB033209 /* SendViewKit.swift */,
+				086C839C7BFA0809977C27CE /* TokenListParser.swift */,
+				2071026F9BA9E1F094DA366B /* TokenLogoView.swift */,
+			);
+			path = UI;
+			sourceTree = "<group>";
+		};
+		DDDC0FD9AB863DA0B852791E /* Diagnostics */ = {
+			isa = PBXGroup;
+			children = (
+				9FFB5A467ABC1703419DABB2 /* LogStore.swift */,
+			);
+			path = Diagnostics;
+			sourceTree = "<group>";
+		};
+		E3AB9CAA99A8BDB7D6727768 = {
+			isa = PBXGroup;
+			children = (
+				2A4C9AFB9A00D49F49326FE7 /* bindings */,
+				4F806214C282BF9E71B37917 /* bindings */,
+				E609CA49A28058DDFB26812B /* bindings */,
+				1EDE2A379F92517C4FA6139F /* bindings */,
+				A407236AB32D4C3EEC70F809 /* Maknoon */,
+				4CD651CE85C8A6F7F6768DF9 /* MaknoonTests */,
+				002B4EA087562BA17B204AE7 /* Packages */,
+				AF3DE37F397C8B73D743E91D /* Frameworks */,
+				074C80A65E511F7D30896A48 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		E609CA49A28058DDFB26812B /* bindings */ = {
+			isa = PBXGroup;
+			children = (
+				05219ABAE32B08FC2266F36E /* ledger_sol_core.swift */,
+			);
+			name = bindings;
+			path = "../ledger-sol-rs/ios/bindings";
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		1E0B5B62D69D877A6A04C738 /* Maknoon */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 2AE41D23058EE33013301520 /* Build configuration list for PBXNativeTarget "Maknoon" */;
+			buildPhases = (
+				6776FF953DA6E05D62D738EE /* Sources */,
+				A06E53C9F34D3F4103086647 /* Resources */,
+				A7678B9C7E441707A3E0F381 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Maknoon;
+			packageProductDependencies = (
+				F66600E21BBDD0914E86A2EB /* ElabifyCore */,
+				C6AA67B6DC31F812D470536A /* BitcoinDevKit */,
+				7C633F96B87FA3C9E339106B /* WalletCore */,
+				7C4789293AB735FF8B1870E9 /* WalletCoreSwiftProtobuf */,
+				35D0BFBF8825E8D3B602A305 /* NFCPassportReader */,
+				37239310A4A6F98C3BD8CD01 /* URKit */,
+				7F36CEE837DAAFCB96FDBD76 /* YubiKit */,
+			);
+			productName = Maknoon;
+			productReference = 1295D39B1AE056B8DD022E6A /* Maknoon.app */;
+			productType = "com.apple.product-type.application";
+		};
+		6C72D01179C95ABAA292ECE8 /* MaknoonTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 40C9BFE1649AC268FF494AC8 /* Build configuration list for PBXNativeTarget "MaknoonTests" */;
+			buildPhases = (
+				607211CF36B52A4C8D469FD2 /* Sources */,
+				2995CE80FA7894112D410059 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				6997B38556F71B3FAD7A838B /* PBXTargetDependency */,
+			);
+			name = MaknoonTests;
+			packageProductDependencies = (
+				791520AB8D8C57897385CAFA /* ElabifyCore */,
+			);
+			productName = MaknoonTests;
+			productReference = DA0FBF0F1E916633110CBB43 /* MaknoonTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		B562A3AF0FB722D80ECEEA26 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					1E0B5B62D69D877A6A04C738 = {
+						DevelopmentTeam = PQ34VD5384;
+						ProvisioningStyle = Automatic;
+					};
+					6C72D01179C95ABAA292ECE8 = {
+						DevelopmentTeam = PQ34VD5384;
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 60B99664C31BB2B87D0C9DEE /* Build configuration list for PBXProject "Maknoon" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				ar,
+				en,
+				"zh-Hans",
+			);
+			mainGroup = E3AB9CAA99A8BDB7D6727768;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				419236EC98EE8EF37BF93311 /* XCRemoteSwiftPackageReference "bdk-swift" */,
+				76FEC893F390E3E886BCD702 /* XCRemoteSwiftPackageReference "NFCPassportReader" */,
+				E91874B0300125B79CC860CA /* XCRemoteSwiftPackageReference "URKit" */,
+				4C9E389823E4115E71647E08 /* XCRemoteSwiftPackageReference "wallet-core" */,
+				946275F7A32CF47AA7A38522 /* XCRemoteSwiftPackageReference "yubikit-ios" */,
+				15BA5B554635E3D321C6DB5D /* XCLocalSwiftPackageReference "../elabify-core/bindings/swift" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 074C80A65E511F7D30896A48 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				1E0B5B62D69D877A6A04C738 /* Maknoon */,
+				6C72D01179C95ABAA292ECE8 /* MaknoonTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A06E53C9F34D3F4103086647 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				27268BA57C14EF7830B5C6E6 /* AppAttestRootCA.pem in Resources */,
+				E305FA5359E58AB783188E7F /* Assets.xcassets in Resources */,
+				DDAAF3DA173FFF6307FBF36A /* Issuers.json in Resources */,
+				8D6976828323546030DAE17F /* Localizable.xcstrings in Resources */,
+				264DE284CDF0AAAAEDA7C5E9 /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		607211CF36B52A4C8D469FD2 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E307E11AB83D74DC69309D28 /* AppAttestVerifierTests.swift in Sources */,
+				19486D81CDBA06517158CDD8 /* BitcoinMessageSigningTests.swift in Sources */,
+				5DEE34B432830C0AD2E6390C /* LocalFramesTests.swift in Sources */,
+				1D62C327CF2D60AE5DAC8598 /* LocalPassportCredentialTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		6776FF953DA6E05D62D738EE /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3B001372DF08E86CA467BD86 /* AboutView.swift in Sources */,
+				08A513A9193CE9654E5B896E /* AccountAddressBadge.swift in Sources */,
+				6624B0F1FE3B484A972B0962 /* ActivityTrackingHost.swift in Sources */,
+				F25F47F11E33CA7CF7406472 /* AddBitcoinWalletFromDeviceView.swift in Sources */,
+				26373649BC18A20370239138 /* AddLightningAccountSheet.swift in Sources */,
+				CDD16022D7ADF72080AA9335 /* AddNetworkSheet.swift in Sources */,
+				BB20029E5D770ECDFC9615A9 /* AddSolanaWalletSheet.swift in Sources */,
+				A9AD725D95A7F4B41912A688 /* AddTronWalletSheet.swift in Sources */,
+				B5BBBFB3CA8739848F8066B9 /* AddressBookEntry.swift in Sources */,
+				3CD124068273BA487F94D108 /* AddressBookPicker.swift in Sources */,
+				01B5198E09130EE913D48383 /* AddressBookStore.swift in Sources */,
+				F1685B5C823EEFC13B159BA5 /* AddressBookView.swift in Sources */,
+				CACBCD4A3DED161366533F9F /* AnimatedQRView.swift in Sources */,
+				1B44F8758505FDEB27970BD1 /* AppAttestVerifier.swift in Sources */,
+				5B316E1677F1693CB3F08AB3 /* AppStoreCatalog.swift in Sources */,
+				07E4CA316E85104A6EEF60D6 /* AppStoreRegistry.swift in Sources */,
+				6A13EF3E6E3BD5A4FB19BB81 /* AppStoreSettingsView.swift in Sources */,
+				B14B101C59CD57BA0FCEE35D /* AppsView.swift in Sources */,
+				A715DE150B14A4816C58AC51 /* AssetPriceCache.swift in Sources */,
+				5792A961B6D9792EC22F2EF9 /* AutoLockManager.swift in Sources */,
+				A944BADC8334EDBD49013A40 /* BIP39.swift in Sources */,
+				E42708847A12F989B68BF58D /* BLECentralClient.swift in Sources */,
+				CB162465B2DE29BC8A1E245A /* BLEPeripheralHost.swift in Sources */,
+				389447317FC8F611DD64C0A4 /* BLEShareSheet.swift in Sources */,
+				E340CC00F8B24FB9E44607A5 /* BackupBanner.swift in Sources */,
+				7E2666F993AB53A46A7A619C /* BackupState.swift in Sources */,
+				C337884E5047892E7215C1AD /* BadgeQR.swift in Sources */,
+				02C941AE8035A4DC675CA35C /* Bech32.swift in Sources */,
+				00A251904BC05A646BF721F7 /* BitcoinAddressesView.swift in Sources */,
+				2ABA0D33A10D094978F71098 /* BitcoinDescriptors.swift in Sources */,
+				471A760192643A75A389ABA8 /* BitcoinFeeEstimator.swift in Sources */,
+				76D341A6A64B5AD5F2D5B94E /* BitcoinLabelEditSheet.swift in Sources */,
+				F021D3E4E655F3038FDA1828 /* BitcoinLabelStore.swift in Sources */,
+				B9C66FC1E0AD0F089ED1808D /* BitcoinMessageSign.swift in Sources */,
+				3123FC799F53EA8D7E226173 /* BitcoinNetwork.swift in Sources */,
+				26D2E083DD039E2AD456B67E /* BitcoinOfflinePSBTSheet.swift in Sources */,
+				07CFFCE2DC713E4C5AB7F94A /* BitcoinPriceCache.swift in Sources */,
+				3761B29926856B06B2147B48 /* BitcoinReceiveView.swift in Sources */,
+				B5326598FEC26CE9A84CD2C2 /* BitcoinSendView.swift in Sources */,
+				B947EA979F48EB35D86538D0 /* BitcoinSettings.swift in Sources */,
+				AEC405D0B6297D7EA7D4A218 /* BitcoinSettingsView.swift in Sources */,
+				FA7B8AB89D0A2690BCC23ECC /* BitcoinSigningHelpers.swift in Sources */,
+				CFA89A17FB53453B2579FA7E /* BitcoinTransactionListView.swift in Sources */,
+				399E434C9C628D7F14884090 /* BitcoinWallet.swift in Sources */,
+				95650C018BCF1B1D5E528EC2 /* BitcoinWalletDescriptor.swift in Sources */,
+				8C9F3C390133A17703F49E4F /* BitcoinWalletDiscovery.swift in Sources */,
+				9F41E4FEFFF6CE3B73EFBC95 /* BitcoinWalletKind.swift in Sources */,
+				12A629BB9600B7E661ADCEFE /* BitcoinWalletStore.swift in Sources */,
+				3170D0D5409AF503F73673D4 /* BitcoinWalletView.swift in Sources */,
+				B10E0ACD1930DE6B578419B1 /* BitcoinWalletsView.swift in Sources */,
+				27B41CD0375BCB942B1629A5 /* BrowseAppStoreView.swift in Sources */,
+				639563C3E47F4256B21EC5AC /* BumpFeeSheet.swift in Sources */,
+				6533A53F538E1E59FBD3C7DC /* CBOR.swift in Sources */,
+				4FD30B838B1AECEBAA1B1CF4 /* COSEKey.swift in Sources */,
+				C4B38293629D24BC49F14AA1 /* CSCATrustStore.swift in Sources */,
+				354FEC489C5764AA2FFFFA9F /* CTAP2Client.swift in Sources */,
+				2982FF6810D452502A130857 /* CameraPermission.swift in Sources */,
+				62D2E2966B6AC14D843AF5C5 /* ContentView.swift in Sources */,
+				6194ADE2FDFA10706FB14182 /* CredentialCard.swift in Sources */,
+				35A348725E80A765F4FF5006 /* CredentialFolderStore.swift in Sources */,
+				C63EFA8815F3CF464289D764 /* CredentialPresentView.swift in Sources */,
+				883E8715D9728F781111DFDD /* CurrencySettingsView.swift in Sources */,
+				B99D7FB388E38F9C6698C9C7 /* CustomEthereumNetwork.swift in Sources */,
+				6A905A3AA94F8D8546598EB9 /* CustomNetworkEditorSheet.swift in Sources */,
+				B6166C906C45B6C65B6DAA66 /* DeviceDetailView.swift in Sources */,
+				921038A5009E2D9B1C68C721 /* DeviceReadyConfirmationSheet.swift in Sources */,
+				7D22C3EDDD1C0DA91619E189 /* DeviceRegistry.swift in Sources */,
+				545F7E8A3FBB3FC6EDEEE837 /* DevicesView.swift in Sources */,
+				783C56DBDC079B4DC787AB35 /* DiscoverEthereumWalletsView.swift in Sources */,
+				E9789B67DEE37C7DF0F60599 /* DiscoverHardwareWalletsView.swift in Sources */,
+				3FEAD09893E62A3241A21F9E /* DiscoverSolanaWalletsView.swift in Sources */,
+				7174EED092282E80A98F3539 /* DiscoverTronWalletsView.swift in Sources */,
+				B4D3B1E536306CF707535D5B /* DisplaySettings.swift in Sources */,
+				62E2E734E254EB3357656581 /* DisplaySettingsView.swift in Sources */,
+				8C11ED7F9E6016DD8C3A6F20 /* ENSResolver.swift in Sources */,
+				92FAC5699515A15732C5C42C /* EthereumABI.swift in Sources */,
+				B15D35F3544F4555CEBCA0AE /* EthereumAddTokenSheet.swift in Sources */,
+				5AB0B3E1B8D1C7C04C58C801 /* EthereumDescriptors.swift in Sources */,
+				ADF8B4055243F1C5213F7343 /* EthereumExplorerClient.swift in Sources */,
+				5615BE5580F1D1ED1CC6ADC5 /* EthereumGasEstimator.swift in Sources */,
+				C13D7E4680BB62DF79392224 /* EthereumNetwork.swift in Sources */,
+				EE2A4E450C00BF8CE41AD850 /* EthereumRLP.swift in Sources */,
+				41F04959B6F2CB17CE5CF28E /* EthereumRPCClient.swift in Sources */,
+				E24C9EBBC5F4BE8FBD20981B /* EthereumReceiveView.swift in Sources */,
+				2FE704BF480AE1EDE810F5F6 /* EthereumSendView.swift in Sources */,
+				E8FB169D74AC1C80BCB91A1E /* EthereumSettings.swift in Sources */,
+				C13C76537A5293DC64A1144E /* EthereumSettingsView.swift in Sources */,
+				C47F69B097B114505D99E93B /* EthereumToken.swift in Sources */,
+				3976B0009696E05BA31182DE /* EthereumTokenCatalog.swift in Sources */,
+				7BBD82811F0CB2277987CA2A /* EthereumTokenDetailView.swift in Sources */,
+				FE317E7FD1D45157582C2141 /* EthereumTokenLookup.swift in Sources */,
+				34ECA05B8B06493D8C84C5EE /* EthereumTokenRegistry.swift in Sources */,
+				58AD6D99935480DA398987CA /* EthereumTokenRow.swift in Sources */,
+				CD003F3A2BE7AD0CE3622066 /* EthereumTokenStore.swift in Sources */,
+				2ADCA446F93548AAD0509242 /* EthereumTransactionListView.swift in Sources */,
+				D88ADE0480299CBE2AA4A488 /* EthereumWallet.swift in Sources */,
+				33B3715D31B13B8161C5BFC3 /* EthereumWalletDescriptor.swift in Sources */,
+				0A2790E37E07ACE4318E25C9 /* EthereumWalletDiscovery.swift in Sources */,
+				53819E3C52B382D0018FEEA4 /* EthereumWalletKind.swift in Sources */,
+				630829B183E1D5ADC58F0200 /* EthereumWalletStore.swift in Sources */,
+				42BC51ACC24A45B4EA246CBC /* EthereumWalletView.swift in Sources */,
+				8109578DD8FE2DF96042521F /* EthereumWalletsView.swift in Sources */,
+				975EE513762EDDBF80CB9A2B /* EthereumWeiValue.swift in Sources */,
+				89D5B1D78C5EA39AE796A7FF /* ExtendedKeyNormalize.swift in Sources */,
+				373E4955E78D61B84274FD04 /* FiatCurrencyCatalog.swift in Sources */,
+				7AD8DDBB23570F67A0880836 /* FiatPreferences.swift in Sources */,
+				219E3154C0BC894AA013BF74 /* HardwareUnlockView.swift in Sources */,
+				06F960265F6CB044680355EB /* HardwareWalletManager.swift in Sources */,
+				6D27E662AF795DE108DF276C /* HardwareWalletProtocol.swift in Sources */,
+				43BFB231048C6DA3BC7FFA2A /* HolderStore.swift in Sources */,
+				621E33FA471D8F2266850DDD /* IDDocument.swift in Sources */,
+				1BC662600CC4C011B909BE60 /* IDDocumentCard.swift in Sources */,
+				DC597067C5571F120602AB50 /* IDDocumentDetailView.swift in Sources */,
+				85950FAA1E3128AC0C33D37C /* IDDocumentIssuanceClient.swift in Sources */,
+				7B0B96AB26B39427F0CED94A /* IDDocumentReader.swift in Sources */,
+				F211C9658022C954F4BFB52A /* IDDocumentStore.swift in Sources */,
+				8DAD241AE22E88D03AAF2211 /* IdentitySandwich.swift in Sources */,
+				748CCB91E331764F86B35954 /* IdentitySettingsView.swift in Sources */,
+				D3ECB1A7F9A2E958EFA835DD /* IdentityView.swift in Sources */,
+				57161F1B900194F09975DB01 /* IdentityWrap.swift in Sources */,
+				B6D765168955AC7BE03FE1B9 /* IssuerIdentityResolver.swift in Sources */,
+				31794028361EE6547A49F130 /* KeyStore.swift in Sources */,
+				09BF9744FD16D3CBCE0E9915 /* KnownIssuersStore.swift in Sources */,
+				F1554093D23EBF7F0CF60ABD /* LNDHubClient.swift in Sources */,
+				3A9129AD995CBC4E8472FF12 /* LNURL.swift in Sources */,
+				B45E650349A598B60A766C1D /* LedgerBLE.swift in Sources */,
+				A618497AFB333762F26871F7 /* LedgerERC20Descriptors.swift in Sources */,
+				FD80CA7F783A42B00DDD2F10 /* LightningAccount.swift in Sources */,
+				E168661E3B6947071822779D /* LightningAccountStore.swift in Sources */,
+				41E0468A32A408065681675B /* LightningAccountsView.swift in Sources */,
+				C831F67534500B6BC7823BEF /* LightningReceiveView.swift in Sources */,
+				B34CBCB57855AB627AD7EA76 /* LightningSendView.swift in Sources */,
+				811D6D412C70FCB5AFAA8E89 /* LightningSettingsView.swift in Sources */,
+				807C302CD7049820D1D65F7A /* LightningWalletView.swift in Sources */,
+				2BA77B964126BACD5E6C5912 /* LocalCredentialFactory.swift in Sources */,
+				ABBAEA4E86B386F0103D9B85 /* LocalFrames.swift in Sources */,
+				E5C9437E7969F4021A5DAEE1 /* LocalShareQrSheet.swift in Sources */,
+				23007971E171747E00BA2F00 /* LockScreen.swift in Sources */,
+				00D48D15F2CD48EA59C96CAB /* LogStore.swift in Sources */,
+				ECCCB89C15DE2704CDF2B331 /* MLDSAClient.swift in Sources */,
+				BEB40B0A4C698C4EC6B3BA2C /* MaknoonApp.swift in Sources */,
+				EBC7F3CA13596150B4EC0AFA /* MaknoonAppAttest.swift in Sources */,
+				480AC49291149EC0A8F71396 /* MatchingEngine.swift in Sources */,
+				14E6E252913C2A345A40098E /* MockHardwareWallet.swift in Sources */,
+				3D1768614CC73470CA5F1D6E /* Models.swift in Sources */,
+				A717B73CC4CEC687FBA2788C /* Network.swift in Sources */,
+				E1E1B4F0DFD477B5B6A505A1 /* NetworksDestination.swift in Sources */,
+				30F8707AC0AFA49B4C868EEF /* OnboardingView.swift in Sources */,
+				43475EB4EB56E82C3B5DB5C7 /* PBKDF2.swift in Sources */,
+				05B4F738223BC3E3DB2D67CD /* PINProtocolV1.swift in Sources */,
+				2EB9CF48EF0A94D42EF3D58D /* PassportPassiveAuthVerifier.swift in Sources */,
+				0FF6448F58C391AE52793B5C /* PendingPickupsStore.swift in Sources */,
+				E093556FD35D3713D2D72E07 /* PresentView.swift in Sources */,
+				0845E0B4C3905477F2794243 /* PresentationVerifier.swift in Sources */,
+				3234BCAB9FA7139126427565 /* PrivacyCurtain.swift in Sources */,
+				DA73589B5FFC9C266C59FA4D /* QRScannerView.swift in Sources */,
+				49A601FA8924C89090AC1EFA /* ReceiveView.swift in Sources */,
+				5ED14AF7DECE6FC917A897B3 /* RecoveryView.swift in Sources */,
+				380EF89E7E555A95BFE1D476 /* RegisterDeviceSheet.swift in Sources */,
+				11F8124DFA80D02EDFEE6083 /* RegisteredDevice.swift in Sources */,
+				7DD027E9A58B18D358308652 /* RemoveFromSandwichSheet.swift in Sources */,
+				AC4931D3EB2BBE1ECD575B71 /* SanctionsScreeningClient.swift in Sources */,
+				EF5EBD0D5925FD2855F6FC97 /* SandwichLockedBanner.swift in Sources */,
+				9D6EABF8A70F0A48BEA93F95 /* ScanVerifierSheet.swift in Sources */,
+				4ED4F1E457763E3DD3C349A4 /* SeedSignerAccount.swift in Sources */,
+				2EDB01D26C26A185756C5C53 /* SeedSignerPairingSheet.swift in Sources */,
+				0ACFB4ACA3835B1B5B1CDCB1 /* SeedSignerSignFlow.swift in Sources */,
+				C3E6FF172B1CABB37EDC29C1 /* SendViewKit.swift in Sources */,
+				05A8878CEAC1CFA46330D614 /* SettingsBackup.swift in Sources */,
+				68819289394782F3D384D5FF /* SettingsImportReportSheet.swift in Sources */,
+				EF1942FF141A40475F4BEB05 /* SettingsView.swift in Sources */,
+				B01222401E0CF75D13913DBB /* SolanaAddTokenSheet.swift in Sources */,
+				FA71FD986F4D701B023A8EE0 /* SolanaDescriptors.swift in Sources */,
+				8878F636D334A32F9F4401FE /* SolanaRPCClient.swift in Sources */,
+				C620213A3DE405861E0E8D09 /* SolanaReceiveView.swift in Sources */,
+				0796845CD1E5A552D60AAB5B /* SolanaSPLToken.swift in Sources */,
+				2B80CD8755E8AAB6393715F1 /* SolanaSPLTokenRow.swift in Sources */,
+				C526D7DC996FC348633C0603 /* SolanaSPLTokenStore.swift in Sources */,
+				3629AED87ED7056C5D159507 /* SolanaSPLTransferBuilder.swift in Sources */,
+				8068215857A90FC051E93FC1 /* SolanaSendView.swift in Sources */,
+				E654FA1197AEA4FF50910716 /* SolanaSettings.swift in Sources */,
+				CE254B0C58B5570C7C262946 /* SolanaSettingsView.swift in Sources */,
+				029BDDC86E63DA5AB68F24C7 /* SolanaTokenCatalog.swift in Sources */,
+				E150F4DA64AB39328602139C /* SolanaTokenDetailView.swift in Sources */,
+				48DFEA847274C384624191BE /* SolanaTokenLookup.swift in Sources */,
+				E8AAAB16E5073902A35498AF /* SolanaWallet.swift in Sources */,
+				82981D02B237CB1B71A6D53D /* SolanaWalletDiscovery.swift in Sources */,
+				F2BB7BA3E8507812705F45C7 /* SolanaWalletStore.swift in Sources */,
+				7700B8C8DA287F25D3E16242 /* SolanaWalletView.swift in Sources */,
+				FF583E9C1B4663FED15CD1BB /* SolanaWalletsView.swift in Sources */,
+				81B12FA83DCC3D91C5179900 /* TapIDDocumentSheet.swift in Sources */,
+				49C0E1CDE1A05308276BDCE5 /* TokenListParser.swift in Sources */,
+				EE92BDC7F149CB55D01476E0 /* TokenLogoView.swift in Sources */,
+				DFF6BECACD3E78A4A312FD86 /* TransportSession.swift in Sources */,
+				D5C4BADE7DA0DE9C70D51978 /* TrezorBLE.swift in Sources */,
+				4A8C783128650728C43D2362 /* TronAddTokenSheet.swift in Sources */,
+				ED2A774E428BDF2B710C69B6 /* TronDescriptors.swift in Sources */,
+				7D63C5715BE1CE0BD05493EC /* TronRPCClient.swift in Sources */,
+				1F431B4D55497500D86F57DE /* TronReceiveView.swift in Sources */,
+				D359F9DA855F4313A01205AD /* TronScanAPI.swift in Sources */,
+				88457E01A2A6FB41608E6B42 /* TronSendView.swift in Sources */,
+				2FD105123424CD314CDFFD48 /* TronSettings.swift in Sources */,
+				C89C74C1422C8D6842F36AA2 /* TronSettingsView.swift in Sources */,
+				DB9EF9066FE8E8456834E56F /* TronTRC20Token.swift in Sources */,
+				ECB4ABCDEC9BD82950DEA9D5 /* TronTRC20TokenRow.swift in Sources */,
+				A2A5097556AFCDC83FA42F17 /* TronTRC20TokenStore.swift in Sources */,
+				7D2D152416218B3B71F8E678 /* TronTRC20TransferBuilder.swift in Sources */,
+				8B9B1398977E4FA6945ACFC3 /* TronTokenCatalog.swift in Sources */,
+				266B0D5F53B887A6F1D654BF /* TronTokenDetailView.swift in Sources */,
+				B9D0CB60E28CEB454A1A6F37 /* TronTokenLookup.swift in Sources */,
+				5E655E9F6BFFC489624F21F3 /* TronTransactionListView.swift in Sources */,
+				406F754D8FC0BED2EF8D9B09 /* TronWallet.swift in Sources */,
+				2E14AECC5CC0C148B1D9C5A7 /* TronWalletStore.swift in Sources */,
+				C0BFF55FAC80E320938A9C95 /* TronWalletView.swift in Sources */,
+				C4C78853E2C8EA5D0FA3DA70 /* TronWalletsView.swift in Sources */,
+				F38A61428FEC103ACFEC1EF6 /* URPSBTCodec.swift in Sources */,
+				AC6B30D7F72EF66884F67A06 /* URPSBTScannerView.swift in Sources */,
+				60D9DCCF5EA7961C9CCC0214 /* UTXOPickerView.swift in Sources */,
+				5A9A8D6E5F53C0AA2AF02386 /* VerifierHistory.swift in Sources */,
+				E6B1795AA723BF4346953D0D /* VerifierRequestValidator.swift in Sources */,
+				D09A7420268FE6DA6ABE7A5C /* VerifyOtherSheet.swift in Sources */,
+				55F28A24272D591E9FCCF9C0 /* VerifyPhraseView.swift in Sources */,
+				BDC16379902F461142E131E2 /* WalletThumbprint.swift in Sources */,
+				C29E8070B4A336617AAAD9B3 /* WalletView.swift in Sources */,
+				0147D819AB4FB97283016DBD /* YubiKeyClient.swift in Sources */,
+				F5F536459E12FF47959222AD /* YubiKeyEnrollment.swift in Sources */,
+				4A498E3E7D20D5AD65386041 /* iCloudBackup.swift in Sources */,
+				99703B134122145C5C37BA95 /* ledger_btc_core.swift in Sources */,
+				D66C1AB63B461D6710835E88 /* ledger_eth_core.swift in Sources */,
+				AC91E9D23F3C53B898C98312 /* ledger_sol_core.swift in Sources */,
+				100EBC95F73DCE32A26BF315 /* ledger_tron_core.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		6997B38556F71B3FAD7A838B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 1E0B5B62D69D877A6A04C738 /* Maknoon */;
+			targetProxy = F4E39BAE80748B11015132DE /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		22DE376B86D06B3A24BFED45 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = PQ34VD5384;
+				ELABIFY_BUILD_COMMIT = dev;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 0.4.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) MAKNOON_NFC MAKNOON_CLOUDKIT";
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.10;
+			};
+			name = Release;
+		};
+		2407AE5ABBCF2E783AE56B37 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.elabify.app.maknoon.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Maknoon.app/Maknoon";
+			};
+			name = Debug;
+		};
+		517F8527D5CD090695BC14BD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = PQ34VD5384;
+				ELABIFY_BUILD_COMMIT = dev;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 0.4.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) MAKNOON_NFC MAKNOON_CLOUDKIT";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.10;
+			};
+			name = Debug;
+		};
+		A494BF42E26AB943D3E4666C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Maknoon/Maknoon.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"../ledger-btc-rs/ios\"",
+					"\"../ledger-eth-rs/ios\"",
+					"\"../ledger-sol-rs/ios\"",
+					"\"../ledger-tron-rs/ios\"",
+				);
+				INFOPLIST_FILE = Maknoon/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.elabify.app.maknoon;
+				SDKROOT = iphoneos;
+				SWIFT_STRICT_CONCURRENCY = minimal;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		B82FA03812DDBC39A316A20B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.elabify.app.maknoon.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Maknoon.app/Maknoon";
+			};
+			name = Release;
+		};
+		B98AF6708A35F4B9EA5D06E6 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Maknoon/Maknoon.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"../ledger-btc-rs/ios\"",
+					"\"../ledger-eth-rs/ios\"",
+					"\"../ledger-sol-rs/ios\"",
+					"\"../ledger-tron-rs/ios\"",
+				);
+				INFOPLIST_FILE = Maknoon/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.elabify.app.maknoon;
+				SDKROOT = iphoneos;
+				SWIFT_STRICT_CONCURRENCY = minimal;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		2AE41D23058EE33013301520 /* Build configuration list for PBXNativeTarget "Maknoon" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B98AF6708A35F4B9EA5D06E6 /* Debug */,
+				A494BF42E26AB943D3E4666C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		40C9BFE1649AC268FF494AC8 /* Build configuration list for PBXNativeTarget "MaknoonTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2407AE5ABBCF2E783AE56B37 /* Debug */,
+				B82FA03812DDBC39A316A20B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		60B99664C31BB2B87D0C9DEE /* Build configuration list for PBXProject "Maknoon" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				517F8527D5CD090695BC14BD /* Debug */,
+				22DE376B86D06B3A24BFED45 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		15BA5B554635E3D321C6DB5D /* XCLocalSwiftPackageReference "../elabify-core/bindings/swift" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = "../elabify-core/bindings/swift";
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		419236EC98EE8EF37BF93311 /* XCRemoteSwiftPackageReference "bdk-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/bitcoindevkit/bdk-swift.git";
+			requirement = {
+				kind = exactVersion;
+				version = 2.3.1;
+			};
+		};
+		4C9E389823E4115E71647E08 /* XCRemoteSwiftPackageReference "wallet-core" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/trustwallet/wallet-core.git";
+			requirement = {
+				kind = exactVersion;
+				version = 4.6.9;
+			};
+		};
+		76FEC893F390E3E886BCD702 /* XCRemoteSwiftPackageReference "NFCPassportReader" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/AndyQ/NFCPassportReader.git";
+			requirement = {
+				kind = exactVersion;
+				version = 2.3.0;
+			};
+		};
+		946275F7A32CF47AA7A38522 /* XCRemoteSwiftPackageReference "yubikit-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/Yubico/yubikit-ios.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 4.6.0;
+			};
+		};
+		E91874B0300125B79CC860CA /* XCRemoteSwiftPackageReference "URKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/BlockchainCommons/URKit.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 14.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		35D0BFBF8825E8D3B602A305 /* NFCPassportReader */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 76FEC893F390E3E886BCD702 /* XCRemoteSwiftPackageReference "NFCPassportReader" */;
+			productName = NFCPassportReader;
+		};
+		37239310A4A6F98C3BD8CD01 /* URKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E91874B0300125B79CC860CA /* XCRemoteSwiftPackageReference "URKit" */;
+			productName = URKit;
+		};
+		791520AB8D8C57897385CAFA /* ElabifyCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ElabifyCore;
+		};
+		7C4789293AB735FF8B1870E9 /* WalletCoreSwiftProtobuf */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4C9E389823E4115E71647E08 /* XCRemoteSwiftPackageReference "wallet-core" */;
+			productName = WalletCoreSwiftProtobuf;
+		};
+		7C633F96B87FA3C9E339106B /* WalletCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4C9E389823E4115E71647E08 /* XCRemoteSwiftPackageReference "wallet-core" */;
+			productName = WalletCore;
+		};
+		7F36CEE837DAAFCB96FDBD76 /* YubiKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 946275F7A32CF47AA7A38522 /* XCRemoteSwiftPackageReference "yubikit-ios" */;
+			productName = YubiKit;
+		};
+		C6AA67B6DC31F812D470536A /* BitcoinDevKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 419236EC98EE8EF37BF93311 /* XCRemoteSwiftPackageReference "bdk-swift" */;
+			productName = BitcoinDevKit;
+		};
+		F66600E21BBDD0914E86A2EB /* ElabifyCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ElabifyCore;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = B562A3AF0FB722D80ECEEA26 /* Project object */;
+}
