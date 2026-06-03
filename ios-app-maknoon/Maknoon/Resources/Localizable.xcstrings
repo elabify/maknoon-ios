@@ -324,6 +324,19 @@
     "Account %@" : {
 
     },
+    "Account %@ already exists on %@. Pick another to avoid a duplicate." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Account %1$@ already exists on %2$@. Pick another to avoid a duplicate."
+          }
+        }
+      }
+    },
+    "Account %@ is already in your wallets. Pick another to avoid a duplicate." : {
+
+    },
     "Account actions" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4251,9 +4264,6 @@
         }
       }
     },
-    "Elabify verifies the document chip on its server and screens you against sanctions lists, then issues an anchored credential. Optional, takes a moment." : {
-
-    },
     "elabify.com" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5619,6 +5629,9 @@
           }
         }
       }
+    },
+    "Hold steady. The verifier's wallet collects every frame, then assembles your Presentation locally. No server in the loop. If the scanner is missing frames, slide toward the tortoise." : {
+
     },
     "Hold the SeedSigner camera 6-10 inches from the phone" : {
       "extractionState" : "manual",
@@ -9535,6 +9548,9 @@
         }
       }
     },
+    "Optional, takes a moment. Pick an issuer, or choose Custom URL to add your own (employer, university, self-hosted). Manage the list in Settings → Identity → Known issuers." : {
+
+    },
     "Original transaction" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -10368,6 +10384,9 @@
 
     },
     "Pre-verification did not complete automatically (%@). An operator will review your packet shortly; you can close this screen." : {
+
+    },
+    "Pre-verification did not complete automatically (%@). An operator will review your packet shortly." : {
 
     },
     "Present" : {
@@ -11628,6 +11647,9 @@
         }
       }
     },
+    "Rotation speed" : {
+
+    },
     "Route through Tor" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -12735,6 +12757,9 @@
           }
         }
       }
+    },
+    "Send the document's chip-signed fields to an issuer for verification and sanctions screening. You get back a post-quantum credential, anchored privately on ledger, that any compatible verifier can check." : {
+
     },
     "Send to URL" : {
       "extractionState" : "manual",
@@ -14053,6 +14078,9 @@
         }
       }
     },
+    "The account number fills in automatically to the next free one on this network. You'll confirm with biometric or passcode once." : {
+
+    },
     "The Apps catalog already lives on the Apps tab. Settings for individual catalog entries land here once any of them require user-configurable knobs." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -14124,6 +14152,9 @@
           }
         }
       }
+    },
+    "The issuer accepted your passport's chip-signed bytes and confirmed they chain to a recognised national CSCA. An operator will approve it shortly." : {
+
     },
     "The issuer accepted your passport's chip-signed bytes and confirmed they chain to a recognised national CSCA. It's now pending review; an operator will approve it shortly." : {
 
@@ -14243,13 +14274,13 @@
         }
       }
     },
-    "The same wallet works on every EVM network, the initial choice just decides which one opens first. You can switch from the dropdown above the wallet's balance any time." : {
+    "The same wallet works on every EVM network; \"Open on\" just decides which one opens first. The account number fills in automatically to the next free one. You'll confirm with biometric or passcode once." : {
 
     },
-    "The same wallet works on every Solana cluster. \"Open on\" picks which one the wallet opens to first; you can flip the chip above the balance any time. Most users keep Account 0." : {
+    "The same wallet works on every Solana cluster; \"Open on\" picks which one opens first. The account number fills in automatically to the next free one. You'll confirm with biometric or passcode once." : {
 
     },
-    "The same wallet works on every Tron network. \"Open on\" picks which one the wallet opens to first; you can flip the chip above the balance any time. Most users keep Account 0." : {
+    "The same wallet works on every Tron network; \"Open on\" picks which one opens first. The account number fills in automatically to the next free one. You'll confirm with biometric or passcode once." : {
 
     },
     "The signed Presentation is on your clipboard. Paste it into the verifier's tool." : {
@@ -15722,9 +15753,6 @@
     "Verifies a legacy \"Bitcoin Signed Message\" signature (Bitcoin Core / Electrum). Paste the address, message, and base64 signature from any source. Works for legacy addresses (starting with 1 on mainnet)." : {
 
     },
-    "Verifies on-device that the chip's signed data is intact and chains to a recognized national signing certificate (ICAO 9303 Passive Authentication). The CSCA trust list is fetched from your issuer and refreshed periodically; the issuer also re-verifies on its side." : {
-
-    },
     "Verify" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -16485,9 +16513,6 @@
         }
       }
     },
-    "You'll be asked to confirm with biometric or passcode once." : {
-
-    },
     "Your credential has been minted server-side and is being anchored. You can close this screen and continue using the app — the credential will appear on the Identity tab as soon as the issuer's batch flushes. The pending pickup also shows at the top of the Identity tab with a cancel option." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -16607,6 +16632,9 @@
 
     },
     "Your private key owns this address across every Tron compatible network." : {
+
+    },
+    "Your verified credential is being anchored. It appears on the Identity tab as soon as the issuer's batch flushes; a pending row at the top of that tab lets you cancel." : {
 
     },
     "Your wallet's local index could not be read, so Maknoon wiped it and is doing a full re-scan now. Your on-chain funds are safe and untouched." : {

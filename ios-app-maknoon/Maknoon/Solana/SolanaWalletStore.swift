@@ -295,6 +295,29 @@ final class SolanaWalletStore {
         mirrorToAddressBook(descriptor)
     }
 
+    /// Next unused software-account index. Solana descriptors are
+    /// cluster-agnostic, so a single sequence applies across all
+    /// clusters. The Add sheet seeds the Account stepper with this so
+    /// the default never collides with an existing wallet.
+    func nextSoftwareAccount() -> UInt32 {
+        let used: Set<UInt32> = Set(wallets.compactMap { w in
+            guard case let .software(account) = w.kind else { return nil }
+            return account
+        })
+        var i: UInt32 = 0
+        while used.contains(i) { i += 1 }
+        return i
+    }
+
+    /// True if a software wallet already exists at this account index.
+    /// Blocks creating a duplicate that would derive the same keypair.
+    func hasSoftwareWallet(account: UInt32) -> Bool {
+        wallets.contains {
+            guard case let .software(a) = $0.kind else { return false }
+            return a == account
+        }
+    }
+
     func setActive(_ id: UUID) {
         guard wallets.contains(where: { $0.id == id }) else { return }
         activeWalletId = id

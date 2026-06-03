@@ -118,6 +118,15 @@ struct TronWalletView: View {
         }
         .refreshable { await refresh() }
         .task(id: activeWallet?.id) { await refresh() }
+        // Deleting the last wallet (from Manage wallets) leaves this
+        // screen with no active wallet and nothing to show. Close the
+        // manage sheet and pop back to the Wallets home instead of
+        // stranding the user on an empty, non-functional Tron page.
+        .onChange(of: store.tronWalletStore.wallets.isEmpty) { _, isEmpty in
+            guard isEmpty else { return }
+            showWallets = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { dismiss() }
+        }
         .simultaneousGesture(
             DragGesture(minimumDistance: 60, coordinateSpace: .local)
                 .onEnded { value in

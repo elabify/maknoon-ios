@@ -44,10 +44,27 @@ final class IDDocumentStore {
     ) -> IDDocument {
         var copy = doc
 
+        // The dir URLs are cached in static `let`s, so their one-time
+        // createDirectory only runs on first access. A "Reset Wallet"
+        // (HolderStore.resetEverything) deletes both directories
+        // wholesale, leaving the cached URLs pointing at paths that no
+        // longer exist; without this re-create, every atomic write
+        // below fails silently and the photo + raw SOD/DG blobs are
+        // lost (no card photo, on-device passive auth reports
+        // sod_missing, and the issuer packet ships without dg2/sod).
+        Self.ensureStorageDirectories()
+
         if let photo, let jpeg = photo.jpegData(compressionQuality: 0.85) {
             let filename = "\(doc.id.uuidString).jpg"
-            try? jpeg.write(to: Self.photosDir.appendingPathComponent(filename), options: .atomic)
-            copy.photoFilename = filename
+            // Only stamp the filename if the write actually landed, so a
+            // failed write never leaves a reference to a missing file
+            // (which renders as a card with no photo).
+            do {
+                try jpeg.write(to: Self.photosDir.appendingPathComponent(filename), options: .atomic)
+                copy.photoFilename = filename
+            } catch {
+                // Leave photoFilename nil; the card falls back to the placeholder.
+            }
         }
 
         for (group, bytes) in rawChipData {
@@ -136,6 +153,18 @@ final class IDDocumentStore {
     }
 
     // MARK: -- file helpers
+
+    /// Re-create the photo + chip-data directories if a wallet reset
+    /// removed them after the static URLs were first cached. Cheap and
+    /// idempotent (createDirectory is a no-op when the dir exists), so
+    /// every write path calls this first rather than trusting the
+    /// one-time static-`let` creation.
+    private static func ensureStorageDirectories() {
+        for dir in [photosDir, chipDataDir] {
+            try? FileManager.default.createDirectory(
+                at: dir, withIntermediateDirectories: true)
+        }
+    }
 
     private func deleteFiles(for doc: IDDocument) {
         if let filename = doc.photoFilename {
@@ -235,6 +264,9 @@ final class IDDocumentStore {
     /// what the backup carried. Any current ID-document state on this
     /// device is gone after this call.
     func applyBackup(_ backup: Backup) {
+        // A reset may have removed the directories before a restore;
+        // re-create them so the writes below land.
+        Self.ensureStorageDirectories()
         // Wipe current state on disk first.
         if let chipFiles = try? FileManager.default.contentsOfDirectory(at: Self.chipDataDir, includingPropertiesForKeys: nil) {
             for url in chipFiles { try? FileManager.default.removeItem(at: url) }

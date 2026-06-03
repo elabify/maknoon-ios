@@ -127,6 +127,15 @@ struct BitcoinWalletView: View {
             }
         }
         .task(id: activeWallet?.id) { await openAndSync() }
+        // Deleting the last wallet (from Manage wallets) leaves this
+        // screen with no active wallet and nothing to show. Close the
+        // manage sheet and pop back to the Wallets home instead of
+        // stranding the user on an empty, non-functional Bitcoin page.
+        .onChange(of: store.bitcoinWalletStore.wallets.isEmpty) { _, isEmpty in
+            guard isEmpty else { return }
+            showWallets = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { dismiss() }
+        }
         .sheet(isPresented: $showWallets) {
             BitcoinWalletsView()
                 .environment(store)

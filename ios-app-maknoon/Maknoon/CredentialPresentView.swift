@@ -74,7 +74,6 @@ struct CredentialPresentView: View {
     var body: some View {
         Form {
             nicknameSection
-            folderSection
 
             Section {
                 Picker("Mode", selection: $mode) {
@@ -101,6 +100,8 @@ struct CredentialPresentView: View {
                 }
                 .font(.callout)
             }
+
+            folderSection
 
             Section {
                 Button(role: .destructive) {

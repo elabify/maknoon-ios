@@ -44,11 +44,6 @@ struct IDDocumentDetailView: View {
     @State private var presentCredential: Credential?
     @State private var presentError: String?
 
-    /// Sentinel value placed at the end of the issuer Picker; selecting
-    /// it reveals an inline TextField for a one-off URL (e.g. an ngrok
-    /// tunnel, or a LAN dev server not yet added to Known Issuers).
-    private static let customIssuerSentinel = "__custom__"
-
     /// The selected entry in the issuer Picker. Stored as a host /
     /// `host:port` string from `KnownIssuersStore`, or the sentinel
     /// `__custom__` when the user wants to type a one-off URL.
@@ -223,14 +218,11 @@ struct IDDocumentDetailView: View {
                 Text("Uploaded: name, document number, dates, nationality, sex. NOT uploaded: chip photo (stays on this device).")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
-                issuerPicker
-                if selectedIssuerEntry == Self.customIssuerSentinel {
-                    TextField("http://192.168.1.50:4000", text: $customIssuerURL)
-                        .keyboardType(.URL)
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
-                        .font(.callout.monospaced())
-                }
+                IssuerPickerField(
+                    knownIssuers: store.knownIssuers,
+                    selectedEntry: $selectedIssuerEntry,
+                    customURL: $customIssuerURL
+                )
                 Button {
                     Task { await runIssuance(for: doc) }
                 } label: {
@@ -407,9 +399,6 @@ struct IDDocumentDetailView: View {
             .disabled(passiveAuthRunning)
         } header: {
             Text("Passport chip")
-        } footer: {
-            Text("Verifies on-device that the chip's signed data is intact and chains to a recognized national signing certificate (ICAO 9303 Passive Authentication). The CSCA trust list is fetched from your issuer and refreshed periodically; the issuer also re-verifies on its side.")
-                .font(.caption)
         }
     }
 
@@ -443,10 +432,10 @@ struct IDDocumentDetailView: View {
         case .verified:      return ""
         case .integrityOnly:
             if r.reason == "dsc_or_chain_expired" {
-                return "The chip's data is intact and validly signed, but the document signer certificate is past its validity window (expected for an expired passport). Passive Authentication checks chip authenticity, not document validity - this is not a forgery signal."
+                return "The chip's data is intact and validly signed, but the signer certificate is past its validity window (expected for an expired passport). This checks chip authenticity, not document validity, so it is not a forgery signal."
             }
             // no_matching_csca: genuine chip, but we don't carry its national signer.
-            return "The chip's data is genuine and validly signed. We just don't carry this passport's national signing certificate (CSCA) in the on-device trust list - public trust lists, ours included, don't cover every country's signers (US coverage in particular is partial). So this device can't independently confirm the national issuer; the issuer verifies it thoroughly on its side. This is not a sign of tampering or forgery."
+            return "The chip's data is genuine and validly signed, but this passport's national signing certificate (CSCA) isn't in the on-device trust list, which doesn't cover every country. The issuer verifies it on its side. Not a sign of tampering."
         case .failed:
             // Real failure - surface the signer DN for diagnosis.
             let signer = r.dscIssuer.map { "\n\nSigner (DSC) issuer: \($0)" } ?? ""
@@ -486,40 +475,6 @@ struct IDDocumentDetailView: View {
             bundleVersion: version
         )
         store.idDocuments.setPassiveAuthResult(result, for: doc.id)
-    }
-
-    /// Dropdown of known issuers (host or host:port entries from
-    /// Settings → Identity → Known Issuers) plus a "Custom…" sentinel
-    /// that reveals a free-form URL field. The selected entry is
-    /// resolved to a base URL at submit time via
-    /// `KnownIssuersStore.outboundBaseURL(forEntry:)` or, for Custom,
-    /// directly off the typed string.
-    @ViewBuilder
-    private var issuerPicker: some View {
-        let entries = store.knownIssuers.hosts
-        Picker("Issuer", selection: $selectedIssuerEntry) {
-            if entries.isEmpty {
-                // The default-seeded store always ships with at least
-                // Elabify's three production issuers; this branch only
-                // hits if the user removed every entry. Show the
-                // sentinel so the picker remains usable.
-                Text("Custom URL").tag(Self.customIssuerSentinel)
-            } else {
-                ForEach(entries, id: \.self) { entry in
-                    Text(entry).tag(entry)
-                }
-                Text("Custom URL…").tag(Self.customIssuerSentinel)
-            }
-        }
-        .pickerStyle(.menu)
-        .onAppear {
-            // Seed the selection the first time this section renders.
-            // Prefer a previously-picked entry; otherwise the first
-            // known issuer; otherwise drop to Custom.
-            if selectedIssuerEntry.isEmpty {
-                selectedIssuerEntry = entries.first ?? Self.customIssuerSentinel
-            }
-        }
     }
 
     /// Host string shown in the "Submitting to …" line during the
@@ -622,26 +577,11 @@ struct IDDocumentDetailView: View {
     }
 
     private var resolvedIssuerBaseURL: URL? {
-        // Fall back to the first known issuer when the picker has not
-        // seeded a selection yet: the issuer Picker only renders in the
-        // idle issuance state, so without this fallback actions like the
-        // sanctions re-check would be disabled whenever the picker is
-        // off screen, even though a trusted issuer is configured.
-        let entry = selectedIssuerEntry.isEmpty
-            ? (store.knownIssuers.hosts.first ?? Self.customIssuerSentinel)
-            : selectedIssuerEntry
-        if entry == Self.customIssuerSentinel {
-            let trimmed = customIssuerURL.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty else { return nil }
-            // Accept either a full URL (`http://...`) or a bare
-            // host[:port]; fall back to the known-issuers helper for the
-            // second case so the local-dev scheme heuristic applies.
-            if let url = URL(string: trimmed), url.scheme != nil, url.host != nil {
-                return url
-            }
-            return store.knownIssuers.outboundBaseURL(forEntry: trimmed)
-        }
-        return store.knownIssuers.outboundBaseURL(forEntry: entry)
+        IssuerSelection.resolveBaseURL(
+            selectedEntry: selectedIssuerEntry,
+            customURL: customIssuerURL,
+            knownIssuers: store.knownIssuers
+        )
     }
 
     @MainActor
@@ -652,67 +592,21 @@ struct IDDocumentDetailView: View {
         }
         issuanceState = .submitting
         do {
-            let ack = try await IDDocumentIssuanceClient.submit(
-                document: doc,
-                store: store,
-                issuerBaseURL: baseURL.absoluteString
-            )
-            // Auto-mint branch: server pre-verified + auto-approved.
-            // Queue the pickup with the holder-store background
-            // poller so the user can close this screen and continue
-            // using the app while the credential anchors. The
-            // pending row appears at the top of the Identity tab
-            // with a cancel button.
-            if ack.status == "approved",
-               let pickup = ack.pickupUrl,
-               let credentialId = ack.credentialId {
-                let resolvedPickup = rewritePickupURLForLAN(pickup, fallbackBase: baseURL)
-                store.pendingPickups.add(
-                    PendingPickup(
-                        id: credentialId,
-                        credentialId: credentialId,
-                        pickupURL: resolvedPickup,
-                        schemaURI: "elabify://schema/global/passport/v1",
-                        humanLabel: "Verified Identity",
-                        startedAt: Date()
-                    )
-                )
+            switch try await IDDocumentIssuance.submit(doc: doc, store: store, baseURL: baseURL) {
+            case .submittedForAnchor(let credentialId):
                 issuanceState = .submittedForAnchor(credentialId: credentialId)
-                return
+            case .pendingReview(let pendingId, let preVerified, let reason):
+                issuanceState = .pendingReview(
+                    pendingId: pendingId,
+                    proofPreVerified: preVerified,
+                    reason: reason
+                )
             }
-            // Pending-review branch: operator approves later (or
-            // pre-verification failed and the operator is the
-            // backstop). No further client action; the user can
-            // close the screen.
-            issuanceState = .pendingReview(
-                pendingId: ack.pendingId,
-                proofPreVerified: ack.proofPreVerified,
-                reason: ack.proofPreVerifiedReason
-            )
         } catch {
             issuanceState = .failed(
                 (error as? LocalizedError)?.errorDescription ?? "\(error)"
             )
         }
-    }
-
-    /// The issuer builds pickup URLs from its configured base
-    /// (typically `http://localhost:4000/...` in dev mode). When the
-    /// holder reaches the issuer through a LAN IP, the localhost URL
-    /// won't resolve from the phone — rewrite it to use the same base
-    /// we submitted to. Production deployments configure
-    /// ELABIFY_PICKUP_BASE_URL with their public hostname and this
-    /// rewrite is a no-op.
-    private func rewritePickupURLForLAN(_ url: String, fallbackBase: URL) -> String {
-        guard let original = URL(string: url),
-              let host = original.host,
-              host == "localhost" || host == "127.0.0.1"
-        else { return url }
-        var comps = URLComponents(url: original, resolvingAgainstBaseURL: false)
-        comps?.host = fallbackBase.host
-        comps?.port = fallbackBase.port
-        comps?.scheme = fallbackBase.scheme
-        return comps?.url?.absoluteString ?? url
     }
 
     private func nicknameSection(_ doc: IDDocument) -> some View {

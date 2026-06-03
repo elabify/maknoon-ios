@@ -145,6 +145,12 @@ struct AddBitcoinWalletSheet: View {
     @State private var selectedDeviceId: UUID?
     @State private var showSoftwareDiscovery: Bool = false
     @State private var account: UInt32 = 0
+    /// Software-path account index, kept separate from the hardware
+    /// `account` so each path has its own default. Seeded to the next
+    /// free account on the selected network so the default never
+    /// duplicates an existing wallet; the user can still adjust it.
+    @State private var softwareAccount: UInt32 = 0
+    @State private var didSeedSoftwareAccount = false
     @State private var creating: Bool = false
     @State private var errorText: String?
     @State private var showUnlock: Bool = false
@@ -178,15 +184,7 @@ struct AddBitcoinWalletSheet: View {
                 }
 
                 if source == .software {
-                    Section("New Bitcoin wallet") {
-                        TextField("Label", text: $label)
-                        Picker("Network", selection: $network) {
-                            ForEach(BitcoinNetwork.allCases, id: \.self) {
-                                Text($0.displayName).tag($0)
-                            }
-                        }
-                    }
-                    softwareCreateSection
+                    softwareWalletSection
                     softwareDiscoverSection
                 } else {
                     hardwareDeviceSection
@@ -200,6 +198,12 @@ struct AddBitcoinWalletSheet: View {
             }
             .navigationTitle("Add Bitcoin wallet")
             .navigationBarTitleDisplayMode(.inline)
+            .task {
+                if !didSeedSoftwareAccount {
+                    seedSoftwareAccount()
+                    didSeedSoftwareAccount = true
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") { dismiss() }
@@ -330,8 +334,30 @@ struct AddBitcoinWalletSheet: View {
         }
     }
 
-    private var softwareCreateSection: some View {
+    private var softwareWalletSection: some View {
         Section {
+            TextField("Label", text: $label)
+            Picker("Network", selection: $network) {
+                ForEach(BitcoinNetwork.allCases, id: \.self) {
+                    Text($0.displayName).tag($0)
+                }
+            }
+            .onChange(of: network) { _, _ in
+                // Account space is per-network for Bitcoin, so re-seed
+                // to the new network's next free account when it changes.
+                seedSoftwareAccount()
+            }
+            Stepper(value: $softwareAccount, in: 0...20) {
+                HStack {
+                    Text("Account")
+                    Spacer()
+                    Text("\(softwareAccount)").foregroundStyle(.secondary)
+                }
+            }
+            if softwareAccountInUse {
+                Text("Account \(softwareAccount) already exists on \(network.displayName). Pick another to avoid a duplicate.")
+                    .font(.caption).foregroundStyle(.orange)
+            }
             Button {
                 Task { await create() }
             } label: {
@@ -340,14 +366,24 @@ struct AddBitcoinWalletSheet: View {
                     Text(creating ? "Setting up…" : "Create")
                 }
             }
-            .disabled(creating || !canCreate)
+            .disabled(creating || !canCreate || softwareAccountInUse)
             if let errorText {
                 Text(errorText).foregroundStyle(.red).font(.callout)
             }
+        } header: {
+            Text("New Bitcoin wallet")
         } footer: {
-            Text("You'll be asked to confirm with biometric or passcode once.")
+            Text("The account number fills in automatically to the next free one on this network. You'll confirm with biometric or passcode once.")
                 .font(.caption)
         }
+    }
+
+    private func seedSoftwareAccount() {
+        softwareAccount = store.bitcoinWalletStore.nextSoftwareAccount(on: network)
+    }
+
+    private var softwareAccountInUse: Bool {
+        store.bitcoinWalletStore.hasSoftwareWallet(account: softwareAccount, on: network)
     }
 
     private var softwareDiscoverSection: some View {
@@ -408,10 +444,17 @@ struct AddBitcoinWalletSheet: View {
 
     @MainActor
     private func createSoftware() async {
-        let account = store.bitcoinWalletStore.nextSoftwareAccount(on: network)
+        let account = softwareAccount
         let trimmed = label.trimmingCharacters(in: .whitespaces)
         let baseLabel = trimmed.isEmpty ? "Wallet" : trimmed
         let suffixedLabel = "\(baseLabel) #\(account)"
+
+        // Never create a second software wallet at the same (network,
+        // account): it would derive the identical address.
+        if store.bitcoinWalletStore.hasSoftwareWallet(account: account, on: network) {
+            errorText = "A software wallet at account #\(account) on \(network.displayName) already exists. Pick a different account number."
+            return
+        }
 
         guard let sandwich = store.sandwich else {
             // Surface the unlock sheet inline rather than just an

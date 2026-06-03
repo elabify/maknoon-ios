@@ -23,6 +23,12 @@ struct AddSolanaWalletSheet: View {
     @State private var label: String = ""
     @State private var initialNetwork: SolanaNetwork = .mainnet
     @State private var account: UInt32 = 0
+    /// Software-path account index, kept separate from the hardware
+    /// `account` so each path has its own default. Seeded once to the
+    /// next free account so the default never duplicates an existing
+    /// wallet; the user can still adjust it.
+    @State private var softwareAccount: UInt32 = 0
+    @State private var didSeedSoftwareAccount = false
     @State private var selectedDeviceId: UUID?
     @State private var creating: Bool = false
     @State private var errorText: String?
@@ -54,7 +60,6 @@ struct AddSolanaWalletSheet: View {
 
                 if source == .software {
                     softwareWalletSection
-                    softwareCreateSection
                     softwareDiscoverSection
                 } else {
                     hardwareDeviceSection
@@ -68,6 +73,12 @@ struct AddSolanaWalletSheet: View {
             }
             .navigationTitle("Add Solana wallet")
             .navigationBarTitleDisplayMode(.inline)
+            .task {
+                if !didSeedSoftwareAccount {
+                    seedSoftwareAccount()
+                    didSeedSoftwareAccount = true
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") {
@@ -190,19 +201,43 @@ struct AddSolanaWalletSheet: View {
                     Text(n.displayName).tag(n)
                 }
             }
-            Stepper(value: $account, in: 0...20) {
+            Stepper(value: $softwareAccount, in: 0...20) {
                 HStack {
                     Text("Account")
                     Spacer()
-                    Text("\(account)").foregroundStyle(.secondary)
+                    Text("\(softwareAccount)").foregroundStyle(.secondary)
                 }
+            }
+            if softwareAccountInUse {
+                Text("Account \(softwareAccount) is already in your wallets. Pick another to avoid a duplicate.")
+                    .font(.caption).foregroundStyle(.orange)
+            }
+            Button {
+                Task { await create() }
+            } label: {
+                HStack {
+                    if creating { ProgressView().controlSize(.small) }
+                    Text(creating ? "Setting up…" : "Create wallet")
+                }
+            }
+            .disabled(creating || !canCreate || softwareAccountInUse)
+            if let errorText {
+                Text(errorText).foregroundStyle(.red).font(.callout)
             }
         } header: {
             Text("New Solana wallet")
         } footer: {
-            Text("The same wallet works on every Solana cluster. \"Open on\" picks which one the wallet opens to first; you can flip the chip above the balance any time. Most users keep Account 0.")
+            Text("The same wallet works on every Solana cluster; \"Open on\" picks which one opens first. The account number fills in automatically to the next free one. You'll confirm with biometric or passcode once.")
                 .font(.caption)
         }
+    }
+
+    private func seedSoftwareAccount() {
+        softwareAccount = store.solanaWalletStore.nextSoftwareAccount()
+    }
+
+    private var softwareAccountInUse: Bool {
+        store.solanaWalletStore.hasSoftwareWallet(account: softwareAccount)
     }
 
     private func hardwareWalletSection(_ dev: RegisteredDevice) -> some View {
@@ -218,26 +253,6 @@ struct AddSolanaWalletSheet: View {
             Text("New Solana wallet")
         } footer: {
             Text("Leave the label blank to use \"\(autoLabel(for: dev))\". The address is the same on every Solana cluster; \"Open on\" picks which one the wallet opens to first.")
-                .font(.caption)
-        }
-    }
-
-    private var softwareCreateSection: some View {
-        Section {
-            Button {
-                Task { await create() }
-            } label: {
-                HStack {
-                    if creating { ProgressView().controlSize(.small) }
-                    Text(creating ? "Setting up…" : "Create wallet")
-                }
-            }
-            .disabled(creating || !canCreate)
-            if let errorText {
-                Text(errorText).foregroundStyle(.red).font(.callout)
-            }
-        } footer: {
-            Text("You'll be asked to confirm with biometric or passcode once.")
                 .font(.caption)
         }
     }
@@ -349,6 +364,13 @@ struct AddSolanaWalletSheet: View {
     private func createSoftware() async {
         guard let sandwich = store.sandwich else {
             showUnlock = true
+            return
+        }
+        let account = softwareAccount
+        // Never create a second software wallet at the same account: it
+        // would derive the identical keypair and address.
+        if store.solanaWalletStore.hasSoftwareWallet(account: account) {
+            errorText = "A software wallet at account \(account) already exists. Pick a different account number."
             return
         }
         let trimmed = label.trimmingCharacters(in: .whitespaces)

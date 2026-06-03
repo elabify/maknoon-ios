@@ -177,6 +177,16 @@ final class BitcoinWalletStore {
         return i
     }
 
+    /// True if a software wallet already exists at this account index
+    /// on the given network. The Add sheet uses it to block duplicates,
+    /// which would otherwise derive the identical address.
+    func hasSoftwareWallet(account: UInt32, on network: BitcoinNetwork) -> Bool {
+        wallets.contains { w in
+            guard w.network == network, case let .software(a) = w.kind else { return false }
+            return a == account
+        }
+    }
+
     // MARK: -- persistence
 
     /// Reset to defaults then re-read UserDefaults (post-restore refresh).

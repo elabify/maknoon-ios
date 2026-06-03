@@ -148,6 +148,12 @@ struct AddEthereumWalletSheet: View {
     @State private var label = ""
     @State private var selectedDeviceId: UUID?
     @State private var account: UInt32 = 0
+    /// Software-path account index, kept separate from the hardware
+    /// `account` so each path has its own default. Seeded once to the
+    /// next free account so the default never duplicates an existing
+    /// wallet; the user can still adjust it.
+    @State private var softwareAccount: UInt32 = 0
+    @State private var didSeedSoftwareAccount = false
     @State private var creating = false
     @State private var errorText: String?
     @State private var discoverSource: DiscoverEthereumWalletsView.Source?
@@ -191,7 +197,6 @@ struct AddEthereumWalletSheet: View {
 
                 if source == .software {
                     softwareWalletSection
-                    softwareCreateSection
                     softwareDiscoverSection
                 } else {
                     hardwareDeviceSection
@@ -205,6 +210,12 @@ struct AddEthereumWalletSheet: View {
             }
             .navigationTitle("Add Ethereum wallet")
             .navigationBarTitleDisplayMode(.inline)
+            .task {
+                if !didSeedSoftwareAccount {
+                    seedSoftwareAccount()
+                    didSeedSoftwareAccount = true
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") { dismiss() }
@@ -316,12 +327,43 @@ struct AddEthereumWalletSheet: View {
                     }
                 }
             }
+            Stepper(value: $softwareAccount, in: 0...20) {
+                HStack {
+                    Text("Account")
+                    Spacer()
+                    Text("\(softwareAccount)").foregroundStyle(.secondary)
+                }
+            }
+            if softwareAccountInUse {
+                Text("Account \(softwareAccount) is already in your wallets. Pick another to avoid a duplicate.")
+                    .font(.caption).foregroundStyle(.orange)
+            }
+            Button {
+                Task { await create() }
+            } label: {
+                HStack {
+                    if creating { ProgressView().controlSize(.small) }
+                    Text(creating ? "Setting up…" : "Create")
+                }
+            }
+            .disabled(creating || !canCreate || softwareAccountInUse)
+            if let errorText {
+                Text(errorText).foregroundStyle(.red).font(.callout)
+            }
         } header: {
             Text("New Ethereum wallet")
         } footer: {
-            Text("The same wallet works on every EVM network, the initial choice just decides which one opens first. You can switch from the dropdown above the wallet's balance any time.")
+            Text("The same wallet works on every EVM network; \"Open on\" just decides which one opens first. The account number fills in automatically to the next free one. You'll confirm with biometric or passcode once.")
                 .font(.caption)
         }
+    }
+
+    private func seedSoftwareAccount() {
+        softwareAccount = store.ethereumWalletStore.nextSoftwareAccount()
+    }
+
+    private var softwareAccountInUse: Bool {
+        store.ethereumWalletStore.hasSoftwareWallet(account: softwareAccount)
     }
 
     private func hardwareWalletSection(_ dev: RegisteredDevice) -> some View {
@@ -348,25 +390,6 @@ struct AddEthereumWalletSheet: View {
         }
     }
 
-    private var softwareCreateSection: some View {
-        Section {
-            Button {
-                Task { await create() }
-            } label: {
-                HStack {
-                    if creating { ProgressView().controlSize(.small) }
-                    Text(creating ? "Setting up…" : "Create")
-                }
-            }
-            .disabled(creating || !canCreate)
-            if let errorText {
-                Text(errorText).foregroundStyle(.red).font(.callout)
-            }
-        } footer: {
-            Text("You'll be asked to confirm with biometric or passcode once.")
-                .font(.caption)
-        }
-    }
 
     private var hardwareCreateSection: some View {
         Section {
@@ -482,10 +505,17 @@ struct AddEthereumWalletSheet: View {
 
     @MainActor
     private func createSoftware() async {
-        let account = store.ethereumWalletStore.nextSoftwareAccount()
+        let account = softwareAccount
         let trimmed = label.trimmingCharacters(in: .whitespaces)
         let baseLabel = trimmed.isEmpty ? "Wallet" : trimmed
         let suffixedLabel = "\(baseLabel) #\(account)"
+
+        // Never create a second software wallet at the same account: it
+        // would derive the identical address across every EVM network.
+        if store.ethereumWalletStore.hasSoftwareWallet(account: account) {
+            errorText = "A software wallet at account #\(account) already exists. Pick a different account number."
+            return
+        }
 
         guard let sandwich = store.sandwich else {
             // Surface the unlock sheet inline rather than just an

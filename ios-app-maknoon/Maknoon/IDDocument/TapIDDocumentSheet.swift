@@ -15,15 +15,31 @@ struct TapIDDocumentSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     /// Called when the sheet finishes. `savedDocId` is the stored document
-    /// (nil if the user cancelled before saving); `openIssuance` is true when
-    /// the user chose "Get a verified credential from Elabify", so the caller
-    /// can open that document's detail (where the issuance + sanctions flow
-    /// lives).
-    var onFinish: (_ savedDocId: UUID?, _ openIssuance: Bool) -> Void = { _, _ in }
+    /// (nil if the user cancelled before saving). Issuance now happens inline
+    /// in the minted step, so the caller just needs to dismiss the sheet.
+    var onFinish: (_ savedDocId: UUID?) -> Void = { _ in }
 
     enum Step: Hashable { case kindPicker, form, scanning, review, minted, error }
 
+    /// Inline issuance state for the minted step's "Get a verified
+    /// credential from an issuer" action. Mirrors the issuance flow on
+    /// IDDocumentDetailView so the user can request a verified
+    /// credential immediately after the scan without hunting for it.
+    enum IssuanceState: Equatable {
+        case idle
+        case submitting
+        case submittedForAnchor(credentialId: String)
+        case pendingReview(pendingId: String, proofPreVerified: Bool, reason: String)
+        case failed(String)
+    }
+
     @State private var mintedDocId: UUID?
+    @State private var issuance: IssuanceState = .idle
+    /// Selected issuer Picker entry (a KnownIssuersStore host /
+    /// `host:port`, or `IssuerSelection.customSentinel`) and the
+    /// free-form URL typed when Custom is chosen.
+    @State private var selectedIssuerEntry: String = ""
+    @State private var customIssuerURL: String = ""
 
     @State private var step: Step = .kindPicker
     @State private var parameters = IDDocumentReadParameters(
@@ -375,7 +391,7 @@ struct TapIDDocumentSheet: View {
         step = .minted
     }
 
-    // MARK: -- step: minted (auto local credential + offer Elabify)
+    // MARK: -- step: minted (local credential saved + inline issuer issuance)
 
     @ViewBuilder
     private var mintedStep: some View {
@@ -390,32 +406,197 @@ struct TapIDDocumentSheet: View {
                 }
                 .padding(.vertical, 2)
             }
+            issuanceSection
+        }
+    }
+
+    /// Inline "get a verified credential" flow, rendered per state.
+    @ViewBuilder
+    private var issuanceSection: some View {
+        switch issuance {
+        case .idle:
             Section {
+                Text("Send the document's chip-signed fields to an issuer for verification and sanctions screening. You get back a post-quantum credential, anchored privately on ledger, that any compatible verifier can check.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                IssuerPickerField(
+                    knownIssuers: store.knownIssuers,
+                    selectedEntry: $selectedIssuerEntry,
+                    customURL: $customIssuerURL
+                )
                 Button {
-                    onFinish(mintedDocId, true)
-                    dismiss()
+                    Task { await runMintIssuance() }
                 } label: {
-                    Label("Get a verified credential from Elabify", systemImage: "checkmark.seal")
+                    Label("Get a verified credential from an issuer", systemImage: "checkmark.seal")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
+                .disabled(!canIssue)
+                if let hint = issuanceDisabledHint {
+                    Text(hint).font(.caption).foregroundStyle(.orange)
+                }
             } footer: {
-                Text("Elabify verifies the document chip on its server and screens you against sanctions lists, then issues an anchored credential. Optional, takes a moment.")
+                Text("Optional, takes a moment. Pick an issuer, or choose Custom URL to add your own (employer, university, self-hosted). Manage the list in Settings → Identity → Known issuers.")
                     .font(.caption)
             }
             Section {
                 Button("Done, keep the local credential only") {
-                    onFinish(mintedDocId, false)
+                    onFinish(mintedDocId)
+                    dismiss()
+                }
+            }
+        case .submitting:
+            Section {
+                HStack {
+                    ProgressView().controlSize(.small)
+                    Text("Submitting to \(submittingHost)…").font(.callout)
+                }
+            }
+        case .submittedForAnchor(let credentialId):
+            Section {
+                Label("Submitted; anchoring in background", systemImage: "checkmark.seal")
+                    .font(.callout.weight(.semibold))
+                    .foregroundStyle(.green)
+                Text("Your verified credential is being anchored. It appears on the Identity tab as soon as the issuer's batch flushes; a pending row at the top of that tab lets you cancel.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text("Credential: \(credentialId)")
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.tertiary)
+                    .textSelection(.enabled)
+                    .lineLimit(2)
+                    .truncationMode(.middle)
+                doneButton
+            }
+        case .pendingReview(let pendingId, let preVerified, let reason):
+            Section {
+                Label(
+                    preVerified ? "Submitted, pre-verified" : "Submitted, awaiting manual review",
+                    systemImage: preVerified ? "checkmark.seal" : "clock.badge.questionmark"
+                )
+                .font(.callout.weight(.semibold))
+                .foregroundStyle(preVerified ? .green : .orange)
+                if preVerified {
+                    Text("The issuer accepted your passport's chip-signed bytes and confirmed they chain to a recognised national CSCA. An operator will approve it shortly.")
+                        .font(.caption).foregroundStyle(.secondary)
+                } else {
+                    Text("Pre-verification did not complete automatically (\(reason)). An operator will review your packet shortly.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Text("Pending ID: \(pendingId)")
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.tertiary)
+                    .textSelection(.enabled)
+                    .lineLimit(2)
+                    .truncationMode(.middle)
+                doneButton
+            }
+        case .failed(let msg):
+            Section {
+                Label(msg, systemImage: "exclamationmark.triangle")
+                    .font(.callout)
+                    .foregroundStyle(.red)
+                Button {
+                    issuance = .idle
+                } label: {
+                    Text("Try again").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                Button("Done, keep the local credential only") {
+                    onFinish(mintedDocId)
                     dismiss()
                 }
             }
         }
     }
 
+    private var doneButton: some View {
+        Button {
+            onFinish(mintedDocId)
+            dismiss()
+        } label: {
+            Text("Done").frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.borderedProminent)
+    }
+
     private var localCredentialIcon: String { "checkmark.seal.fill" }
 
     private var localCredentialStatus: String {
-        "Document saved. It appears as a single card on the Identity tab; open it to present it as a QR (self-signed, offline) or to get an Elabify-verified credential."
+        "Document saved. It appears as a single card on the Identity tab; present it as a self-signed QR offline, or get a verified credential from an issuer below."
+    }
+
+    // MARK: -- minted-step issuance helpers
+
+    private var mintedDoc: IDDocument? {
+        guard let id = mintedDocId else { return nil }
+        return store.idDocuments.documents.first { $0.id == id }
+    }
+
+    private var resolvedIssuerBaseURL: URL? {
+        IssuerSelection.resolveBaseURL(
+            selectedEntry: selectedIssuerEntry,
+            customURL: customIssuerURL,
+            knownIssuers: store.knownIssuers
+        )
+    }
+
+    private var canIssue: Bool {
+        guard let doc = mintedDoc else { return false }
+        return doc.sodFilename != nil
+            && store.sandwich != nil
+            && resolvedIssuerBaseURL != nil
+    }
+
+    /// One-line reason the Issue button is disabled, shown beneath it so
+    /// the path forward is obvious (re-tap for SOD, unlock, pick issuer).
+    private var issuanceDisabledHint: String? {
+        guard let doc = mintedDoc else { return nil }
+        if doc.sodFilename == nil {
+            return "Chip-signed material isn't captured. Re-tap the document so Maknoon can store the SOD bytes; the issuer needs them to validate."
+        }
+        if store.sandwich == nil {
+            return "Unlock your identity first, then try again."
+        }
+        if resolvedIssuerBaseURL == nil {
+            return "Pick an issuer or enter a custom URL."
+        }
+        return nil
+    }
+
+    /// Host[:port] shown in the "Submitting to …" line, mirroring the
+    /// URL the request actually targets.
+    private var submittingHost: String {
+        guard let base = resolvedIssuerBaseURL, let host = base.host else { return "issuer" }
+        if let port = base.port { return "\(host):\(port)" }
+        return host
+    }
+
+    @MainActor
+    private func runMintIssuance() async {
+        guard let doc = mintedDoc else {
+            issuance = .failed("The saved document could not be found.")
+            return
+        }
+        guard let baseURL = resolvedIssuerBaseURL else {
+            issuance = .failed("Pick an issuer or enter a custom URL.")
+            return
+        }
+        issuance = .submitting
+        do {
+            switch try await IDDocumentIssuance.submit(doc: doc, store: store, baseURL: baseURL) {
+            case .submittedForAnchor(let credentialId):
+                issuance = .submittedForAnchor(credentialId: credentialId)
+            case .pendingReview(let pendingId, let preVerified, let reason):
+                issuance = .pendingReview(
+                    pendingId: pendingId,
+                    proofPreVerified: preVerified,
+                    reason: reason
+                )
+            }
+        } catch {
+            issuance = .failed((error as? LocalizedError)?.errorDescription ?? "\(error)")
+        }
     }
 
     // MARK: -- step 4: error

@@ -68,6 +68,15 @@ struct LightningWalletView: View {
             }
         }
         .task(id: activeAccount?.id) { await refresh() }
+        // Deleting the last account (from Manage accounts) leaves this
+        // screen with no active account and nothing to show. Close the
+        // manage sheet and pop back to the Wallets home instead of
+        // stranding the user on an empty, non-functional Lightning page.
+        .onChange(of: store.lightningAccountStore.accounts.isEmpty) { _, isEmpty in
+            guard isEmpty else { return }
+            showAccounts = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { dismiss() }
+        }
         .sheet(isPresented: $showAccounts) {
             LightningAccountsView()
                 .environment(store)

@@ -23,9 +23,6 @@ struct IdentityView: View {
     @State private var showVerifyOther = false
     @State private var showTapIDDocument = false
     @State private var selectedIDDocumentId: SelectedDocumentId?
-    /// Set when the post-scan sheet asks to continue to Elabify issuance;
-    /// consumed on the scan sheet's dismissal to open the document detail.
-    @State private var pendingIssuanceDocId: UUID?
 
     /// `nil` = "All" pseudo-folder. When set, the stack filters to
     /// the cards assigned to this folder via `credentialFolderStore`.
@@ -138,17 +135,11 @@ struct IdentityView: View {
             VerifyOtherSheet(onClose: { showVerifyOther = false })
         }
         #if MAKNOON_NFC
-        .sheet(isPresented: $showTapIDDocument, onDismiss: {
-            // After the scan sheet closes, if the user asked to get a verified
-            // credential from Elabify, open that document's detail (where the
-            // issuance + sanctions flow lives).
-            if let id = pendingIssuanceDocId {
-                pendingIssuanceDocId = nil
-                selectedIDDocumentId = SelectedDocumentId(id: id)
-            }
-        }) {
-            TapIDDocumentSheet(onFinish: { savedDocId, openIssuance in
-                pendingIssuanceDocId = (openIssuance ? savedDocId : nil)
+        .sheet(isPresented: $showTapIDDocument) {
+            // Issuance now happens inline in the scan sheet's minted step;
+            // a freshly verified credential lands on the Identity tab as a
+            // pending pickup on its own, so nothing to do on dismiss.
+            TapIDDocumentSheet(onFinish: { _ in
                 showTapIDDocument = false
             }).environment(store)
         }

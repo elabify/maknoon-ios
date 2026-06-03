@@ -559,12 +559,12 @@ struct OnboardingView: View {
 
                 VStack(alignment: .leading, spacing: 6) {
                     bulletRow("The credential is signed by your key and verifiable by another Maknoon user offline, with no server.")
-                    bulletRow("You can also submit it to Elabify for a sanctions-checked, authority-issued credential later, from the Identity tab.")
+                    bulletRow("You can also submit it to an issuer for a sanctions-checked, authority-issued credential, right after the scan or later from the Identity tab.")
                 }
             }
         }
         .sheet(isPresented: $showOnboardingPassport) {
-            TapIDDocumentSheet(onFinish: { _, _ in
+            TapIDDocumentSheet(onFinish: { _ in
                 showOnboardingPassport = false
                 phase = .recommendWallet
             }).environment(store)
