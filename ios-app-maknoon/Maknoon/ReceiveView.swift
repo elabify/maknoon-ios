@@ -151,9 +151,15 @@ struct ReceiveSheet: View {
                     .padding(.vertical, 8)
                     .background(Color.black.opacity(0.55))
                     .clipShape(Capsule())
+                QRPhotoPickerButton(onCode: handleScannedCode, onNoQR: noQRFound)
                     .padding(.bottom, 24)
             }
         }
+    }
+
+    private func noQRFound() {
+        phase = .error("No QR code found in that image.")
+        mode = .manual
     }
 
     private var permissionDenied: some View {
@@ -177,6 +183,13 @@ struct ReceiveSheet: View {
                 Text("Open Settings").frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
+            .padding(.horizontal, 32)
+
+            QRPhotoPickerButton(onCode: handleScannedCode, onNoQR: noQRFound) {
+                Label("Choose a QR photo instead", systemImage: "photo.on.rectangle")
+                    .foregroundStyle(.white)
+            }
+            .buttonStyle(.bordered)
             .padding(.horizontal, 32)
         }
     }

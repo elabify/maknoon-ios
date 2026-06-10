@@ -6,8 +6,10 @@
 //      callback with the chosen amount, gets back a BOLT11
 //      invoice that the LNDHub client then pays.
 //
-// LNURL-withdraw and LNURL-auth are out of scope for this cut —
-// only LNURL-pay is wired.
+// LNURL-withdraw (LUD-03) is also wired: a payee (e.g. a POS) scans a
+// withdraw voucher the customer presents, then submits its own BOLT11
+// invoice to the voucher's callback to PULL the funds. LNURL-auth is out
+// of scope.
 
 import Foundation
 
@@ -23,7 +25,7 @@ enum LNURL {
             switch self {
             case .invalidEncoding(let m): return "Invalid LNURL: \(m)"
             case .http(let s, let b):     return "LNURL HTTP \(s): \(b.prefix(200))"
-            case .wrongTag(let t):        return "LNURL tag was \(t), expected payRequest."
+            case .wrongTag(let t):        return "LNURL tag was '\(t)', not what this flow expected."
             case .decode(let m):          return "LNURL decode failed: \(m)"
             case .amountOutOfRange(let lo, let hi):
                 return "Amount is outside the issuer's allowed range (\(lo / 1000) - \(hi / 1000) sat)."
@@ -157,6 +159,60 @@ enum LNURL {
             throw Error.decode("payResponse missing `pr` field")
         }
         return pr
+    }
+
+    // MARK: -- LNURL-withdraw (LUD-03)
+
+    struct WithdrawRequest: Decodable, Sendable {
+        let tag: String
+        let callback: String
+        let k1: String
+        let minWithdrawable: Int64    // millisatoshi
+        let maxWithdrawable: Int64    // millisatoshi
+        let defaultDescription: String?
+    }
+
+    private struct StatusResponse: Decodable { let status: String?; let reason: String? }
+
+    /// Append `k1` + `pr` to the voucher callback (preserving any existing
+    /// query items). Pure, for testability.
+    static func withdrawCallbackURL(callback: String, k1: String, bolt11: String) -> URL? {
+        guard var comps = URLComponents(string: callback) else { return nil }
+        var items = comps.queryItems ?? []
+        items.append(URLQueryItem(name: "k1", value: k1))
+        items.append(URLQueryItem(name: "pr", value: bolt11))
+        comps.queryItems = items
+        return comps.url
+    }
+
+    /// Fetch a withdraw voucher's parameters from a decoded LNURL.
+    static func fetchWithdrawRequest(_ url: URL) async throws -> WithdrawRequest {
+        let (data, resp) = try await URLSession.shared.data(from: url)
+        if let http = resp as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+            throw Error.http(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+        }
+        let w: WithdrawRequest
+        do { w = try JSONDecoder().decode(WithdrawRequest.self, from: data) }
+        catch { throw Error.decode("\(error)") }
+        guard w.tag == "withdrawRequest" else { throw Error.wrongTag(w.tag) }
+        return w
+    }
+
+    /// Submit the payee's BOLT11 invoice to the voucher callback so the
+    /// customer's service pays it (the pull). The amount must already be in
+    /// the voucher's [min,max] window. Throws on an ERROR status.
+    static func submitWithdraw(_ w: WithdrawRequest, bolt11: String) async throws {
+        guard let url = withdrawCallbackURL(callback: w.callback, k1: w.k1, bolt11: bolt11) else {
+            throw Error.decode("withdraw callback URL is unparseable")
+        }
+        let (data, resp) = try await URLSession.shared.data(from: url)
+        if let http = resp as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+            throw Error.http(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+        }
+        if let s = try? JSONDecoder().decode(StatusResponse.self, from: data),
+           s.status?.uppercased() == "ERROR" {
+            throw Error.http(0, s.reason ?? "withdraw callback returned ERROR")
+        }
     }
 
     /// Read out the issuer-supplied display name from the

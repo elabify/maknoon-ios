@@ -124,11 +124,19 @@ struct VerifyOtherSheet: View {
                         .padding(.vertical, 8)
                         .background(Color.black.opacity(0.55))
                         .clipShape(Capsule())
+                }
+                if !collecting {
+                    QRPhotoPickerButton(onCode: { handle($0) }, onNoQR: noQRFound)
+                        .padding(.top, 12)
                         .padding(.bottom, 24)
                 }
             }
         }
         .background(Color.black)
+    }
+
+    private func noQRFound() {
+        phase = .rejected(reason: "No QR code found in that image. Note: multi-frame / rotating QR can't be read from a still photo — use the live camera for those.")
     }
 
     private var cameraDeniedView: some View {
@@ -151,6 +159,11 @@ struct VerifyOtherSheet: View {
             }
             .buttonStyle(.borderedProminent)
             .padding(.horizontal, 32)
+
+            QRPhotoPickerButton(onCode: { handle($0) }, onNoQR: noQRFound) {
+                Label("Choose a QR photo instead", systemImage: "photo.on.rectangle")
+            }
+            .buttonStyle(.bordered)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

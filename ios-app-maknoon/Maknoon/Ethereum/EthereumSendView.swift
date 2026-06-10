@@ -179,8 +179,17 @@ struct EthereumSendView: View {
             .task { await loadOnAppear() }
             .sheet(isPresented: $showScanner) {
                 ChainScanSheet { scanned in
-                    recipient = stripEthereumPrefix(scanned)
                     showScanner = false
+                    let stripped = stripEthereumPrefix(scanned)
+                    if isValidAddress(stripped) || ENSResolver.looksLikeName(stripped) {
+                        recipient = stripped
+                    } else if let frame = try? JSONDecoder().decode(LocalFrameEnvelope.self, from: Data(scanned.utf8)),
+                              frame.v == LocalFrameEnvelope.version {
+                        // A Verify & Pay request, not a send target.
+                        ensError = "That's a Verify & Pay code — use Wallet → Verify & Pay, not Send."
+                    } else {
+                        ensError = "That QR isn't an Ethereum address."
+                    }
                 }
             }
             .sheet(isPresented: $showContacts) {

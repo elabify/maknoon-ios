@@ -166,9 +166,13 @@ enum EncryptedBackup {
         "display.theme",
         "display.autoLock",
         "display.language",
-        // Apps registry: configured catalogs + installed apps.
+        // Apps registry: configured catalogs + installed apps + preferences.
         "appstore.userStores.v1",
         "appstore.installed.v1",
+        "appstore.showBetaApps.v1",
+        // Per-mini-app settings (window.maknoon.storage) — includes the merchant
+        // dApp's own settings + receipts (txlog) + the per-install merchant name.
+        "miniapp.settings.v1",
         // YubiKey FIDO2 hmac-secret enrollment record.
         "yubikey.enrollments.v1",
     ]

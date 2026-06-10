@@ -167,6 +167,16 @@ final class HolderStore {
     /// Appstore registry: configured catalogs + installed apps.
     let appStores = AppStoreRegistry()
 
+    /// Per-mini-app durable settings (window.maknoon.storage). Backed up
+    /// via the `miniapp.settings.v1` walletState key.
+    let miniAppSettings = MiniAppSettingsStore()
+
+    /// Per-install merchant verifier identity used by the POS to sign
+    /// VerifierRequests / CommerceRequests (see MerchantIdentityStore). The
+    /// merchant dApp keeps its own settings + receipts via window.maknoon.storage;
+    /// only the verifier key is native (window.maknoon.merchant).
+    let merchantIdentity = MerchantIdentityStore()
+
     /// Vendor-neutral registry of hardware devices the user has
     /// registered (YubiKey, Ledger, Trezor). Each device can be
     /// promoted independently into the Identity Sandwich and into
@@ -334,6 +344,7 @@ final class HolderStore {
         addressBook.reload()
         devices.reload()
         appStores.reload()
+        miniAppSettings.reload()
         knownIssuers.reload()
         pendingPickups.reload()
         credentialFolderStore.reload()

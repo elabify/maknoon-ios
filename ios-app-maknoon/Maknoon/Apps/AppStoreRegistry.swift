@@ -1,7 +1,7 @@
 // Registry of configured dApps catalogs + installed apps. Lives on
 // HolderStore so views can observe and persist changes.
 //
-// Default state: the Elabify curated dApps catalog is always present
+// Default state: the Maknoon dApps catalog is always present
 // (it ships with the app and cannot be removed). The user can add
 // other catalog URLs in Settings > Apps. `refresh()` fetches every
 // catalog URL (the built-in one plus any user-added) and populates
@@ -35,6 +35,16 @@ final class AppStoreRegistry: @unchecked Sendable {
         /// Snapshot of the app entry at install time. Used to render
         /// the Apps tab without needing the store to be online.
         let entry: AppStoreEntry
+        /// Capability tokens the user accepted at install (and may later
+        /// revoke). nil for apps installed before the consent model — those
+        /// fall back to the entry's declared set via `grantedSet`.
+        var grantedCapabilities: [String]?
+
+        /// Effective granted capability set used for enforcement.
+        var grantedSet: Set<String> {
+            if let g = grantedCapabilities { return Set(g.map { $0.lowercased() }) }
+            return entry.declaredCapabilityTokens   // back-compat
+        }
     }
 
     /// Always-present Elabify built-in dApps catalog. Not part of
@@ -53,11 +63,17 @@ final class AppStoreRegistry: @unchecked Sendable {
     /// Apps the user has installed into the Apps tab.
     private(set) var installedApps: [InstalledApp] = []
 
+    /// When false (the default), beta-channel apps are hidden from the browse
+    /// list. Installed apps are unaffected. Backed up via `walletStateKeys`.
+    private(set) var showBetaApps: Bool = false
+
     private static let userStoresKey   = "appstore.userStores.v1"
     private static let installedAppsKey = "appstore.installed.v1"
+    static let showBetaAppsKey         = "appstore.showBetaApps.v1"
 
     init() {
         load()
+        migrateSeededDappsStore()
     }
 
     private func load() {
@@ -73,10 +89,36 @@ final class AppStoreRegistry: @unchecked Sendable {
         } else {
             installedApps = []
         }
+        // Absent key ⇒ false ⇒ beta apps hidden by default.
+        showBetaApps = UserDefaults.standard.bool(forKey: Self.showBetaAppsKey)
+    }
+
+    /// Toggle whether beta-channel apps appear in the browse list (persisted).
+    func setShowBetaApps(_ on: Bool) {
+        showBetaApps = on
+        UserDefaults.standard.set(on, forKey: Self.showBetaAppsKey)
+    }
+
+    /// A catalog entry is "beta" when its channel is exactly "beta"
+    /// (case-insensitive). Pure + static so the browse filter is unit-testable.
+    static func isBeta(_ entry: AppStoreEntry) -> Bool {
+        (entry.channel ?? "").lowercased() == "beta"
     }
 
     /// Reset to defaults then re-read UserDefaults (post-restore refresh).
     func reload() { load() }
+
+    /// Maknoon dApps is now the built-in `defaultStore`. Earlier builds
+    /// seeded it as a *user* store (alongside the retired "Elabify dApps"
+    /// default). Drop any user store that points at the default catalog URL
+    /// so it doesn't appear twice. Idempotent.
+    private func migrateSeededDappsStore() {
+        let before = userStores.count
+        userStores.removeAll { $0.url == DefaultAppStore.catalogURL }
+        if userStores.count != before { persistStores() }
+        // Retire the old one-shot seed flag if present.
+        UserDefaults.standard.removeObject(forKey: "appstore.seeded.maknoon-dapps.v1")
+    }
 
     // MARK: -- store management
 
@@ -162,15 +204,26 @@ final class AppStoreRegistry: @unchecked Sendable {
         installedApps.contains { $0.storeId == storeId && $0.appId == appId }
     }
 
-    func install(_ entry: AppStoreEntry, fromStore storeId: String) {
+    /// Install, granting `granted` capability tokens (default: everything the
+    /// entry declares). The install UI passes the set the user accepted.
+    func install(_ entry: AppStoreEntry, fromStore storeId: String, granted: Set<String>? = nil) {
         guard !isInstalled(storeId: storeId, appId: entry.id) else { return }
+        let tokens = granted ?? entry.declaredCapabilityTokens
         installedApps.append(InstalledApp(
             id: "\(storeId)::\(entry.id)",
             storeId: storeId,
             appId: entry.id,
             installedAt: Date(),
-            entry: entry
+            entry: entry,
+            grantedCapabilities: Array(tokens).sorted()
         ))
+        persistInstalled()
+    }
+
+    /// Replace an installed app's granted capability set (review/revoke UI).
+    func setGrantedCapabilities(installedAppId: String, _ tokens: Set<String>) {
+        guard let idx = installedApps.firstIndex(where: { $0.id == installedAppId }) else { return }
+        installedApps[idx].grantedCapabilities = Array(tokens).sorted()
         persistInstalled()
     }
 

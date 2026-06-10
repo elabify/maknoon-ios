@@ -25,12 +25,30 @@ struct ScanVerifierSheet: View {
         case validating(payload: String)
         case noMatch(VerifierRequestValidator.Decision)
         case rejected(VerifierRequestValidator.Decision?)
-        case matched(VerifierRequestValidator.Decision, [Credential])
+        /// Single-confirm Approve/Reject screen shown for every match.
+        case confirm(VerifierRequestValidator.Decision, [Credential])
+        /// Terminal success after the presentation was posted to the verifier.
+        case sent(String)
     }
 
     @State private var phase: Phase = .requestingPermission
     @State private var permission: CameraPermissionState = CameraPermission.current
-    @State private var selectedCredentialId: String?
+    /// Credential chosen on the single-confirm screen.
+    @State private var confirmCredId: String?
+    @State private var sending = false
+    @State private var sendError: String?
+    /// Set when the scanned code is recognized as a different flow's code (e.g.
+    /// a Verify & Pay request) so we can redirect instead of a generic reject.
+    @State private var rejectionHint: String?
+    /// Set when the scanned URL resolves to a server-hosted CommerceRequest, so
+    /// the single-confirm Verify & Pay sheet opens here (unified entry).
+    @State private var commercePay: CommercePayContext?
+
+    struct CommercePayContext: Identifiable {
+        let id = UUID()
+        let request: CommerceRequest
+        let baseURL: URL
+    }
 
     var body: some View {
         NavigationStack {
@@ -43,16 +61,10 @@ struct ScanVerifierSheet: View {
                     }
                 }
                 .task { await ensurePermission() }
-                .navigationDestination(item: $selectedCredentialId) { credId in
-                    if case .matched(let decision, let matches) = phase,
-                       let cred = matches.first(where: { $0.id == credId }) {
-                        CredentialPresentView(
-                            credential: cred,
-                            initialMode: .attributes,
-                            pendingRequest: decision.request,
-                            nicknameInjection: store.nickname(for: cred.id)
-                        )
-                    }
+                .sheet(item: $commercePay) { ctx in
+                    CommercePaySheet(
+                        store: store, request: ctx.request, responseBaseURL: ctx.baseURL,
+                        onClose: { commercePay = nil; onClose() })
                 }
         }
     }
@@ -80,8 +92,10 @@ struct ScanVerifierSheet: View {
             rejectedView(decision)
         case .noMatch(let decision):
             noMatchView(decision)
-        case .matched(let decision, let matches):
-            matchedView(decision, matches: matches)
+        case .confirm(let decision, let matches):
+            confirmView(decision, matches: matches)
+        case .sent(let verifierName):
+            sentView(verifierName)
         }
     }
 
@@ -104,10 +118,16 @@ struct ScanVerifierSheet: View {
                     .padding(.vertical, 8)
                     .background(Color.black.opacity(0.55))
                     .clipShape(Capsule())
+                QRPhotoPickerButton(onCode: { handleScannedCode($0) }, onNoQR: noQRFound)
                     .padding(.bottom, 24)
             }
         }
         .background(Color.black)
+    }
+
+    private func noQRFound() {
+        rejectionHint = "No QR code found in that image."
+        phase = .rejected(nil)
     }
 
     private var cameraDeniedView: some View {
@@ -130,6 +150,11 @@ struct ScanVerifierSheet: View {
             }
             .buttonStyle(.borderedProminent)
             .padding(.horizontal, 32)
+
+            QRPhotoPickerButton(onCode: { handleScannedCode($0) }, onNoQR: noQRFound) {
+                Label("Choose a QR photo instead", systemImage: "photo.on.rectangle")
+            }
+            .buttonStyle(.bordered)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -140,7 +165,7 @@ struct ScanVerifierSheet: View {
                 .font(.system(size: 56))
                 .foregroundStyle(.red)
             Text("Request rejected").font(.title3.bold())
-            Text(decision?.reason ?? "Scanned payload is not a valid verifier request.")
+            Text(rejectionHint ?? decision?.reason ?? "Scanned payload is not a valid verifier request.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -170,87 +195,140 @@ struct ScanVerifierSheet: View {
         }
     }
 
-    private func matchedView(_ decision: VerifierRequestValidator.Decision, matches: [Credential]) -> some View {
+    // MARK: -- single-confirm (Approve / Reject)
+
+    @ViewBuilder
+    private func confirmView(_ decision: VerifierRequestValidator.Decision, matches: [Credential]) -> some View {
+        let selected = matches.first { $0.id == confirmCredId } ?? matches[0]
+        let claims = decision.request.filter.requiredClaims
         Form {
             Section {
                 trustBadge(tier: decision.tier, verifierName: decision.request.verifierName ?? "Verifier")
                 Text(verifierDidDisplay(decision.request.verifierDid))
-                    .font(.caption.monospaced())
-                    .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
-            } header: {
-                Text("Verifier")
-            }
+                    .font(.caption.monospaced()).foregroundStyle(.secondary).textSelection(.enabled)
+            } header: { Text("Verifier") }
 
             Section {
-                if !decision.request.filter.requiredClaims.isEmpty {
-                    HStack(alignment: .top, spacing: 8) {
-                        Text("Required:")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                        Text(decision.request.filter.requiredClaims.joined(separator: ", "))
-                            .font(.caption)
-                    }
-                }
-                if decision.request.filter.issuers?.mode == "allow",
-                   let list = decision.request.filter.issuers?.list, !list.isEmpty {
-                    Text("Issuers allowed: " + list.joined(separator: ", "))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                if decision.request.filter.schemas?.mode == "allow",
-                   let list = decision.request.filter.schemas?.list, !list.isEmpty {
-                    Text("Schemas accepted: " + list.joined(separator: ", "))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Text("Response: " + decision.request.response.mode)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            } header: {
-                Text("What they need")
-            }
-
-            Section {
-                ForEach(matches) { c in
-                    Button {
-                        selectedCredentialId = c.id
-                    } label: {
-                        HStack(alignment: .top, spacing: 12) {
-                            Image(systemName: SchemaPalette.forSchema(c.header.schema).iconSystemName)
-                                .font(.title3)
-                                .foregroundStyle(.purple)
-                                .frame(width: 28)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(SchemaPalette.forSchema(c.header.schema).humanLabel)
-                                    .font(.callout.weight(.semibold))
-                                    .foregroundStyle(.primary)
-                                Text(shortIssuerName(c.header.iss))
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                if let nick = store.nickname(for: c.id), !nick.isEmpty {
-                                    Text(nick).font(.caption).foregroundStyle(.tertiary)
-                                }
-                            }
-                            Spacer(minLength: 0)
-                            Image(systemName: "chevron.forward")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.tertiary)
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: SchemaPalette.forSchema(selected.header.schema).iconSystemName)
+                        .font(.title3).foregroundStyle(.purple).frame(width: 28)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(SchemaPalette.forSchema(selected.header.schema).humanLabel)
+                            .font(.callout.weight(.semibold))
+                        Text(shortIssuerName(selected.header.iss))
+                            .font(.caption).foregroundStyle(.secondary)
+                        if let nick = store.nickname(for: selected.id), !nick.isEmpty {
+                            Text(nick).font(.caption).foregroundStyle(.tertiary)
                         }
                     }
-                    .buttonStyle(.plain)
+                    Spacer(minLength: 0)
                 }
-            } header: {
-                Text(matches.count == 1 ? "1 matching credential" : "\(matches.count) matching credentials")
-            } footer: {
-                Text("Tap a credential to review what you'll share, then sign + send.")
+                if matches.count > 1 {
+                    Picker("Use credential", selection: $confirmCredId) {
+                        ForEach(matches) { c in Text(credLabel(c)).tag(Optional(c.id)) }
+                    }
+                }
+            } header: { Text("Your matching credential") }
+
+            Section {
+                if claims.isEmpty {
+                    Text("No personal attributes requested.").font(.callout).foregroundStyle(.secondary)
+                } else {
+                    ForEach(claims, id: \.self) { key in
+                        HStack(alignment: .top) {
+                            Text(key).font(.callout.weight(.medium))
+                            Spacer(minLength: 12)
+                            Text(Self.attrValue(selected, key)).font(.callout).foregroundStyle(.secondary)
+                                .multilineTextAlignment(.trailing)
+                        }
+                    }
+                }
+            } header: { Text("You will share") } footer: {
+                Text("Approve signs these attributes and sends them to the verifier over the network. Your keys never leave this device.")
                     .font(.caption)
             }
 
+            if let sendError {
+                Section { Text(sendError).font(.callout).foregroundStyle(.red) }
+            }
+
             Section {
-                Button("Scan again") { phase = .scanning }
+                Button(action: { approve(decision, selected) }) {
+                    HStack {
+                        if sending { ProgressView() } else { Image(systemName: "checkmark.shield.fill") }
+                        Text(sending ? "Sending…" : "Approve & share").frame(maxWidth: .infinity)
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(sending)
+                Button(role: .destructive) { onClose() } label: {
+                    Text("Reject").frame(maxWidth: .infinity)
+                }
+                .disabled(sending)
             }
         }
+    }
+
+    private func approve(_ decision: VerifierRequestValidator.Decision, _ cred: Credential) {
+        sending = true
+        sendError = nil
+        Task {
+            do {
+                let presentation = try await PresentationFactory.build(
+                    credential: cred,
+                    selectedClaims: Set(decision.request.filter.requiredClaims),
+                    challenge: decision.request.challenge,
+                    verifierDid: decision.request.verifierDid,
+                    pendingRequest: decision.request,
+                    store: store)
+                guard let cb = decision.request.response.callbackUrl, let url = URL(string: cb) else {
+                    sendError = "This verifier did not provide a delivery URL."
+                    sending = false
+                    return
+                }
+                let outcome = try await OpenVerifierPost.send(presentation: presentation, to: url)
+                if (200..<300).contains(outcome.status) {
+                    phase = .sent(decision.request.verifierName ?? "the verifier")
+                } else {
+                    sendError = "Verifier responded HTTP \(outcome.status). \(outcome.bodyText.prefix(200))"
+                }
+                sending = false
+            } catch {
+                sendError = (error as? LocalizedError)?.errorDescription ?? "\(error)"
+                sending = false
+            }
+        }
+    }
+
+    private func sentView(_ verifierName: String) -> some View {
+        VStack(spacing: 18) {
+            Image(systemName: "checkmark.seal.fill").font(.system(size: 56)).foregroundStyle(.green)
+            Text("Shared with \(verifierName)").font(.title3.bold())
+            Text("Your verified attributes were sent.").font(.callout).foregroundStyle(.secondary)
+            Button("Done") { onClose() }.buttonStyle(.bordered)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .task {
+            try? await Task.sleep(nanoseconds: 1_400_000_000)
+            onClose()
+        }
+    }
+
+    /// Short label for the credential picker.
+    private func credLabel(_ c: Credential) -> String {
+        let base = SchemaPalette.forSchema(c.header.schema).humanLabel
+        if let nick = store.nickname(for: c.id), !nick.isEmpty { return "\(base) · \(nick)" }
+        return base
+    }
+
+    /// sdnScreen-aware display value (mirrors CommercePaySheet).
+    private static func attrValue(_ c: Credential, _ key: String) -> String {
+        if key == "sdnScreen", let obj = c.claims[key]?.anyValue as? [String: Any] {
+            let result = (obj["result"] as? String) ?? "?"
+            let when = (obj["screenedAt"] as? String).map { String($0.prefix(10)) } ?? ""
+            return when.isEmpty ? "Sanctions: \(result)" : "Sanctions: \(result) (screened \(when))"
+        }
+        return c.claims[key]?.displayText ?? "—"
     }
 
     // MARK: -- trust badge
@@ -279,8 +357,42 @@ struct ScanVerifierSheet: View {
 
     @MainActor
     private func handleScannedCode(_ code: String) {
+        rejectionHint = nil
+        let trimmed = code.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Unified entry: a merchant Verify & Pay code is a short request URL.
+        // Fetch it; if it resolves to a CommerceRequest (has payment terms), open
+        // the single-confirm Verify & Pay sheet. Otherwise it's a plain verifier
+        // request_uri — fall through to the identity validate path.
+        if let url = URL(string: trimmed), let scheme = url.scheme?.lowercased(),
+           scheme == "https" || scheme == "http" {
+            phase = .validating(payload: code)
+            Task {
+                if let commerce = try? await CommerceTransport.fetchRequest(url: url) {
+                    commercePay = CommercePayContext(request: commerce, baseURL: Self.origin(of: url))
+                    return
+                }
+                await validate(code)
+            }
+            return
+        }
+        // Legacy serverless multi-frame Verify & Pay code -> redirect.
+        if let frame = try? JSONDecoder().decode(LocalFrameEnvelope.self, from: Data(code.utf8)),
+           frame.v == LocalFrameEnvelope.version {
+            rejectionHint = "This is a Verify & Pay code. Open Wallet → Verify & Pay to scan it."
+            phase = .rejected(nil)
+            return
+        }
         phase = .validating(payload: code)
         Task { await validate(code) }
+    }
+
+    /// scheme://host[:port] of a request URL, where the response is posted.
+    private static func origin(of url: URL) -> URL {
+        var c = URLComponents()
+        c.scheme = url.scheme
+        c.host = url.host
+        c.port = url.port
+        return c.url ?? url
     }
 
     @MainActor
@@ -304,7 +416,10 @@ struct ScanVerifierSheet: View {
         if matches.isEmpty {
             phase = .noMatch(decision)
         } else {
-            phase = .matched(decision, matches)
+            // Every match goes straight to the single Approve/Reject screen.
+            confirmCredId = matches.first?.id
+            sendError = nil
+            phase = .confirm(decision, matches)
         }
     }
 

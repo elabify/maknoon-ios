@@ -44,7 +44,10 @@ struct AppsView: View {
         .onAppear { refresh() }
         .task { await store.appStores.refresh() }
         .sheet(isPresented: $showBrowse) {
-            BrowseAppStoreView().environment(store)
+            BrowseAppStoreView(onOpen: { app in
+                showBrowse = false
+                selectedInstalled = app
+            }).environment(store)
         }
         .sheet(isPresented: $showSettings) {
             SettingsView().environment(store)
@@ -74,9 +77,6 @@ struct AppsView: View {
             }
         } header: {
             Text("Installed")
-        } footer: {
-            Text("Tap + to browse the configured dApps catalogs. The default catalog is Elabify-curated; add others in Settings > Apps.")
-                .font(.caption)
         }
     }
 
@@ -87,7 +87,7 @@ struct AppsView: View {
                 .foregroundStyle(.tertiary)
             Text("No apps installed yet")
                 .font(.callout.weight(.semibold))
-            Text("Tap the + in the top right to browse the Elabify-curated dApps catalog (and any catalogs you have added in Settings > Apps).")
+            Text("Tap the + in the top right to browse the Maknoon dApps catalog (and any catalogs you have added in Settings > Apps).")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -105,9 +105,12 @@ struct AppsView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(app.entry.title).font(.callout.weight(.semibold)).foregroundStyle(.primary)
                 Text(app.entry.summary).font(.caption).foregroundStyle(.secondary)
+                if let v = app.entry.version {
+                    Text("v\(v)").font(.caption2.monospaced()).foregroundStyle(.tertiary)
+                }
             }
             Spacer(minLength: 0)
-            Text(app.entry.statusLabel)
+            Text(app.entry.channelLabel)
                 .font(.caption2.weight(.medium))
                 .foregroundStyle(app.entry.statusColor)
                 .padding(.horizontal, 8)
@@ -138,9 +141,6 @@ struct AppsView: View {
             }
         } header: {
             Text("Connected verifiers")
-        } footer: {
-            Text("Local history. Reset Wallet clears it. Every Share action (copy, QR, callback POST) is recorded.")
-                .font(.caption)
         }
     }
 
@@ -196,9 +196,40 @@ private struct InstalledAppDetailSheet: View {
     @Environment(HolderStore.self) private var store
     @Environment(\.dismiss) private var dismiss
     @State private var openApp = false
+    @State private var granted: Set<String> = []
 
     private var hasOpenAction: Bool {
-        false
+        app.entry.isMiniApp
+    }
+
+    /// Capabilities the user can review + revoke for this app.
+    @ViewBuilder
+    private var capabilitiesSection: some View {
+        let caps = MiniAppCapabilityRegistry.disclosable(app.entry.declaredCapabilityTokens)
+        if !caps.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Permissions").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                ForEach(caps) { c in
+                    Toggle(isOn: Binding(
+                        get: { granted.contains(c.token) },
+                        set: { on in
+                            if on { granted.insert(c.token) } else { granted.remove(c.token) }
+                            store.appStores.setGrantedCapabilities(installedAppId: app.id, granted)
+                        }
+                    )) {
+                        HStack(spacing: 10) {
+                            Image(systemName: c.icon).foregroundStyle(.purple).frame(width: 22)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(c.label).font(.callout)
+                                Text(app.entry.reason(for: c.token)).font(.caption2).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+                Text("Revoking a permission takes effect next time the app runs.")
+                    .font(.caption2).foregroundStyle(.tertiary)
+            }
+        }
     }
 
     var body: some View {
@@ -212,14 +243,16 @@ private struct InstalledAppDetailSheet: View {
                             .frame(width: 56)
                         VStack(alignment: .leading, spacing: 4) {
                             Text(app.entry.title).font(.title3.weight(.semibold))
-                            Text("\(app.entry.statusLabel) - curated by \(app.entry.curatedBy)")
+                            Text("\(app.entry.channelLabel)\(app.entry.version.map { " · v\($0)" } ?? "") - curated by \(app.entry.curatedBy)")
                                 .font(.caption.weight(.medium))
                                 .foregroundStyle(app.entry.statusColor)
                         }
                     }
+                    DAppCompatibilityRow(requires: app.entry.requiresMaknoonVersion)
                     Text(app.entry.summary).font(.callout).foregroundStyle(.secondary)
                     Divider()
                     Text(app.entry.details).font(.callout)
+                    capabilitiesSection
                     if hasOpenAction {
                         Button {
                             openApp = true
@@ -232,6 +265,12 @@ private struct InstalledAppDetailSheet: View {
                     Spacer(minLength: 0)
                     Button(role: .destructive) {
                         store.appStores.uninstall(installedAppId: app.id)
+                        // Remove the app's durable settings (incl. its receipts),
+                        // merchant identity + cached bundle so nothing orphaned survives.
+                        store.miniAppSettings.evict(appId: app.id)
+                        store.merchantIdentity.evict(app.id)
+                        let installedId = app.id
+                        Task { await MiniAppBundleStore.shared.evict(installedAppId: installedId) }
                         dismiss()
                     } label: {
                         Label("Uninstall", systemImage: "minus.circle.fill")
@@ -242,7 +281,8 @@ private struct InstalledAppDetailSheet: View {
                 .padding(20)
             }
             .navigationDestination(isPresented: $openApp) {
-                EmptyView()
+                MiniAppHostView(app: app)
+                    .environment(store)
             }
             .navigationTitle(app.entry.title)
             .navigationBarTitleDisplayMode(.inline)
@@ -250,6 +290,9 @@ private struct InstalledAppDetailSheet: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }
                 }
+            }
+            .onAppear {
+                granted = store.appStores.installedApps.first { $0.id == app.id }?.grantedSet ?? app.grantedSet
             }
         }
     }

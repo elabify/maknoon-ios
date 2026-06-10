@@ -335,97 +335,24 @@ struct PresentAttributesView: View {
         defer { working = false }
 
         do {
-            guard let holderPK = store.holderPublicKey else {
-                throw SandwichError.masterUnavailable
-            }
-            let now = Int64(Date().timeIntervalSince1970)
             let challenge: HexString
             let verifierDidForChallengeMsg: String
             if let pending = pendingRequest {
                 challenge = pending.challenge
                 verifierDidForChallengeMsg = pending.verifierDid
             } else {
-                challenge = "0x" + selfNonceHex()
+                challenge = "0x" + PresentationFactory.selfNonceHex()
                 verifierDidForChallengeMsg = "did:elabify:open"
             }
 
-            let challengeMsgDict: [String: Any] = [
-                "cid":       credential.header.cid,
-                "challenge": challenge,
-                "timestamp": now,
-                "verifier":  verifierDidForChallengeMsg,
-            ]
-            let msgBytes = try canonicalize(challengeMsgDict)
-            let challengeSig = try store.signWithIdentity(msgBytes)
-
-            let entries: [(key: String, value: Any)] = credential.merkleTree.sortedKeys.map { key in
-                (key: key, value: credential.claims[key]?.anyValue ?? NSNull())
-            }
-            let tree = try MerkleTree(entries: entries)
-
-            let requested = Array(selectedClaims).sorted()
-            var disclosed: [DisclosedClaim] = []
-            for key in requested {
-                guard let idx = credential.merkleTree.sortedKeys.firstIndex(of: key),
-                      let value = credential.claims[key] else { continue }
-                let proof = tree.proof(at: idx).map { entry -> ProofEntry in
-                    ProofEntry(sibling: "0x" + bytesToHex(entry.sibling), isRight: entry.isRight)
-                }
-                disclosed.append(DisclosedClaim(
-                    key: key,
-                    value: value,
-                    leafIndex: idx,
-                    proof: proof
-                ))
-            }
-
-            // Embed the Identity-Sandwich delegation cert (Step 2.B) so
-            // the verifier's `delegationValid` check can run. Without
-            // this the server treats the presentation as a pre-sandwich
-            // legacy presentation and reports `delegationValid: null`.
-            let delegation: PresentationDelegation? = store.currentDelegation.map { cert in
-                PresentationDelegation(
-                    ephemeralPk: cert.ephemeralPk,
-                    validFrom: cert.validFrom,
-                    validUntil: cert.validUntil,
-                    scope: cert.scope,
-                    delegationSig: cert.delegationSig
-                )
-            }
-
-            // Optional hardware attestation. When the user has paired
-            // a device, every Presentation carries the cached attestation
-            // so the verifier's `hardwareAttestationValid` check can run.
-            let hardwareAttestation = HardwareWalletManager.loadAttestation()
-
-            // Self-issuer App Attest binding: for a locally-minted credential
-            // (holder is its own issuer), prove a genuine Maknoon app produced
-            // it so a peer can raise the trust tier to "app-verified". Returns
-            // nil on the simulator / unsupported devices (key-only).
-            let holderPkHex = "0x" + bytesToHex(holderPK)
-            var selfAttestation: SelfIssuerAttestation? = nil
-            if credential.header.iss == store.sandwich?.holderDID,
-               let binding = CredentialCanonical.appAttestBindingBytes(
-                   cid: credential.header.cid, root: credential.header.root,
-                   holderPkHex: holderPkHex, schema: credential.header.schema) {
-                selfAttestation = await MaknoonAppAttest.shared.selfIssuerAttestation(
-                    holderDID: credential.header.iss, bindingBytes: binding)
-            }
-
-            let presentation = Presentation(
-                v: 2,
-                header: credential.header,
-                headerSig: credential.headerSig,
+            // Single signing path shared with the mini-app identity bridge.
+            let presentation = try await PresentationFactory.build(
+                credential: credential,
+                selectedClaims: selectedClaims,
                 challenge: challenge,
-                challengeSig: "0x" + bytesToHex(challengeSig),
-                disclosed: disclosed,
-                timestamp: now,
-                holderLongTermPk: holderPkHex,
-                anchor: credential.anchor,
-                verifierRequest: pendingRequest,
-                delegation: delegation,
-                hardwareAttestation: hardwareAttestation,
-                selfIssuerAttestation: selfAttestation
+                verifierDid: verifierDidForChallengeMsg,
+                pendingRequest: pendingRequest,
+                store: store
             )
 
             let encoder = JSONEncoder()
@@ -504,27 +431,9 @@ struct PresentAttributesView: View {
         )
     }
 
-    private func selfNonceHex() -> String {
-        var bytes = Data(count: 32)
-        _ = bytes.withUnsafeMutableBytes { ptr in
-            SecRandomCopyBytes(kSecRandomDefault, 32, ptr.baseAddress!)
-        }
-        return bytes.map { String(format: "%02x", $0) }.joined()
-    }
-
     private func truncated(_ s: String) -> String {
         if s.count <= 36 { return s }
         return s.prefix(18) + "…" + s.suffix(12)
-    }
-
-    private func bytesToHex(_ d: Data) -> String {
-        let alphabet: [Character] = Array("0123456789abcdef")
-        var s = String(); s.reserveCapacity(d.count * 2)
-        for byte in d {
-            s.append(alphabet[Int(byte >> 4)])
-            s.append(alphabet[Int(byte & 0x0f)])
-        }
-        return s
     }
 }
 
@@ -564,9 +473,11 @@ struct DropQrSheet: View {
                             Text(envelope.dropId)
                                 .font(.caption.monospaced())
                                 .textSelection(.enabled)
-                            Text("Expires \(formatTime(envelope.expiresAt))")
-                                .font(.caption2)
-                                .foregroundStyle(.tertiary)
+                            if let exp = envelope.expiresAt {
+                                Text("Expires \(formatTime(exp))")
+                                    .font(.caption2)
+                                    .foregroundStyle(.tertiary)
+                            }
                             Text("Have the verifier scan this QR with their Elabify app. The presentation is fetched once and then gone.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)

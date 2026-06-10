@@ -63,6 +63,10 @@ struct ENSResolver: Sendable {
         let trimmed = s.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !trimmed.isEmpty else { return false }
         if trimmed.hasPrefix("0x") { return false }
+        // Reject URLs / URIs (a scanned QR is often a URL): an ENS name has no
+        // scheme, colon, or path. Without this, a URL like https://x.example.com
+        // is mistaken for a name and ENS resolution fails confusingly.
+        if trimmed.hasPrefix("http") || trimmed.contains("/") || trimmed.contains(":") { return false }
         // Has a dot AND no spaces; the last label is at least 2 chars.
         guard trimmed.contains("."), !trimmed.contains(" ") else { return false }
         let labels = trimmed.split(separator: ".")

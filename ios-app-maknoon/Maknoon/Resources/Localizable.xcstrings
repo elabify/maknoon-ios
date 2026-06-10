@@ -4,6 +4,9 @@
     "—" : {
 
     },
+    "…or scan the customer" : {
+
+    },
     "·" : {
 
     },
@@ -36,16 +39,6 @@
         }
       }
     },
-    "%@ - curated by %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@ - curated by %2$@"
-          }
-        }
-      }
-    },
     "%@ · %@" : {
       "localizations" : {
         "en" : {
@@ -62,6 +55,26 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "%1$@ (%2$@)"
+          }
+        }
+      }
+    },
+    "%@ %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ %2$@"
+          }
+        }
+      }
+    },
+    "%@ %@ · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ %2$@ · %3$@"
           }
         }
       }
@@ -107,6 +120,16 @@
     },
     "%@." : {
 
+    },
+    "%@%@ - curated by %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@%2$@ - curated by %3$@"
+          }
+        }
+      }
     },
     "• \"%@\" is not in the BIP39 list" : {
 
@@ -1281,6 +1304,9 @@
         }
       }
     },
+    "Approve signs these attributes and sends them to the verifier over the network. Your keys never leave this device." : {
+
+    },
     "Approve within %@s" : {
 
     },
@@ -1355,6 +1381,9 @@
           }
         }
       }
+    },
+    "asks each time" : {
+
     },
     "Attributes" : {
       "extractionState" : "manual",
@@ -1588,6 +1617,15 @@
           }
         }
       }
+    },
+    "Beta apps" : {
+
+    },
+    "Beta dApps are experimental and may change or break. They are hidden by default; turn this on to see them in every catalog. Apps you have already installed stay available regardless." : {
+
+    },
+    "Beta dApps are hidden. Turn on “Show beta apps” in Apps settings to see experimental dApps." : {
+
     },
     "Bitcoin" : {
       "extractionState" : "manual",
@@ -2163,6 +2201,9 @@
         }
       }
     },
+    "Charged" : {
+
+    },
     "Chip authenticity" : {
 
     },
@@ -2434,6 +2475,9 @@
           }
         }
       }
+    },
+    "Confirm & Pay" : {
+
     },
     "Confirm passphrase" : {
       "extractionState" : "manual",
@@ -2858,6 +2902,9 @@
         }
       }
     },
+    "Could not render QR" : {
+
+    },
     "Could not render QR for this credential." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3022,6 +3069,9 @@
         }
       }
     },
+    "Creating invoice…" : {
+
+    },
     "Credential" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3172,6 +3222,12 @@
           }
         }
       }
+    },
+    "Customer scans this" : {
+
+    },
+    "Customer scans this with Identity → Scan verifier" : {
+
     },
     "Danger zone" : {
       "extractionState" : "manual",
@@ -5050,6 +5106,9 @@
         }
       }
     },
+    "Finding wallets…" : {
+
+    },
     "Folder" : {
 
     },
@@ -6452,6 +6511,9 @@
         }
       }
     },
+    "is requesting proof from your wallet." : {
+
+    },
     "Issue verified credential" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7158,6 +7220,9 @@
           }
         }
       }
+    },
+    "Loading %@…" : {
+
     },
     "Loading recommended fees…" : {
       "extractionState" : "manual",
@@ -8868,6 +8933,12 @@
         }
       }
     },
+    "No personal attributes — payment only." : {
+
+    },
+    "No personal attributes requested." : {
+
+    },
     "No personal data was shared. The badge proves a credential reference exists; verify on-chain for full proof." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -9040,6 +9111,9 @@
           }
         }
       }
+    },
+    "No wallet of yours can pay the requested asset/network." : {
+
     },
     "No wallets from this device yet" : {
       "extractionState" : "manual",
@@ -9320,6 +9394,9 @@
           }
         }
       }
+    },
+    "One confirmation shares the attributes above and pays from the selected wallet. Your keys never leave this device." : {
+
     },
     "One scan kicks off a Bluetooth session. The Presentation flows directly between the two phones, encrypted with a fresh post-quantum key. No server in the middle." : {
       "extractionState" : "manual",
@@ -9971,6 +10048,9 @@
         }
       }
     },
+    "Pay from" : {
+
+    },
     "Pay to" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -9993,6 +10073,9 @@
           }
         }
       }
+    },
+    "Payment" : {
+
     },
     "Pending" : {
 
@@ -10053,6 +10136,9 @@
 
     },
     "Per-token URL substitutes `{chain}` (the network's Trust Wallet slug, e.g. ethereum, polygon, arbitrum) and `{address}` (checksummed contract). Default points at Trust Wallet's assets repo. Tokens without a logo fall back to a circle showing the first four characters of the symbol." : {
+
+    },
+    "Permissions" : {
 
     },
     "Pick a device" : {
@@ -10516,6 +10602,9 @@
     "PSBT too long for a single QR (%@ chars). Use Copy or Share instead — or split with Animated QR / BBQr in your signer." : {
 
     },
+    "Purpose: %@" : {
+
+    },
     "QR scanning is disabled" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -10711,6 +10800,16 @@
     },
     "Received %@" : {
 
+    },
+    "Receiving %@/%@ frames…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Receiving %1$@/%2$@ frames…"
+          }
+        }
+      }
     },
     "Recent payments" : {
       "extractionState" : "manual",
@@ -10945,6 +11044,9 @@
         }
       }
     },
+    "Reject" : {
+
+    },
     "Remove" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -11178,6 +11280,9 @@
         }
       }
     },
+    "Requested by" : {
+
+    },
     "Requesting camera access…" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -11200,6 +11305,9 @@
           }
         }
       }
+    },
+    "Requesting: %@" : {
+
     },
     "required" : {
       "extractionState" : "manual",
@@ -11269,6 +11377,9 @@
           }
         }
       }
+    },
+    "Requires a screening no older than %@." : {
+
     },
     "Requires biometric or passcode once." : {
 
@@ -11623,6 +11734,9 @@
           }
         }
       }
+    },
+    "Revoking a permission takes effect next time the app runs." : {
+
     },
     "Rotate password" : {
       "extractionState" : "manual",
@@ -12991,6 +13105,9 @@
         }
       }
     },
+    "Shared with %@" : {
+
+    },
     "Shares" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -13862,7 +13979,7 @@
         }
       }
     },
-    "Tap + to browse the configured dApps catalogs. The default catalog is Elabify-curated; add others in Settings > Apps." : {
+    "Tap + to browse the configured dApps catalogs. The default is the Maknoon dApps catalog; add others in Settings > Apps." : {
 
     },
     "Tap + to paste a contract address. The app reads the symbol and decimals from-chain." : {
@@ -14006,7 +14123,7 @@
         }
       }
     },
-    "Tap the + in the top right to browse the Elabify-curated dApps catalog (and any catalogs you have added in Settings > Apps)." : {
+    "Tap the + in the top right to browse the Maknoon dApps catalog (and any catalogs you have added in Settings > Apps)." : {
 
     },
     "Tap the grid to reveal. Tap again to hide before walking away or screen-sharing." : {
@@ -14127,9 +14244,6 @@
         }
       }
     },
-    "The Elabify-curated dApps catalog ships with Maknoon and cannot be removed." : {
-
-    },
     "The file is AES-256-GCM with a key derived from your passphrase (PBKDF2-SHA256, 600,000 iterations) AND signed with your post-quantum master signature (ML-DSA-65). Without the passphrase the file is useless, to an attacker and to you." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -14181,6 +14295,9 @@
           }
         }
       }
+    },
+    "The Maknoon dApps catalog ships with Maknoon and cannot be removed." : {
+
     },
     "The only safe place for these 24 words without encryption is paper or stamped metal, stored OFFLINE, in a locked safe. Never type them into any computer or phone. Never take a photo or screenshot. Anyone with this recovery phrase AND your passphrase can recreate your identity." : {
       "extractionState" : "manual",
@@ -14476,6 +14593,15 @@
         }
       }
     },
+    "This app can" : {
+
+    },
+    "This app wants to see your Ethereum address." : {
+
+    },
+    "This app wants you to sign a message. No transaction will be sent." : {
+
+    },
     "This cannot be undone" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -14723,6 +14849,9 @@
           }
         }
       }
+    },
+    "To" : {
+
     },
     "Token catalog" : {
 
@@ -15559,6 +15688,9 @@
           }
         }
       }
+    },
+    "v%@" : {
+
     },
     "Validate TLS certificate" : {
       "extractionState" : "manual",
@@ -16467,6 +16599,9 @@
         }
       }
     },
+    "You don't have a verified credential matching this request." : {
+
+    },
     "You send" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -16513,6 +16648,9 @@
         }
       }
     },
+    "You will share" : {
+
+    },
     "Your credential has been minted server-side and is being anchored. You can close this screen and continue using the app — the credential will appear on the Identity tab as soon as the issuer's batch flushes. The pending pickup also shows at the top of the Identity tab with a cancel option." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -16535,6 +16673,9 @@
           }
         }
       }
+    },
+    "Your matching credential" : {
+
     },
     "Your notes" : {
       "extractionState" : "manual",
@@ -16632,6 +16773,9 @@
 
     },
     "Your private key owns this address across every Tron compatible network." : {
+
+    },
+    "Your verified attributes were sent." : {
 
     },
     "Your verified credential is being anchored. It appears on the Identity tab as soon as the issuer's batch flushes; a pending row at the top of that tab lets you cancel." : {

@@ -97,7 +97,15 @@ final class BLEPeripheralHost: NSObject, ObservableObject {
     /// session can complete the moment the verifier writes its
     /// encapsulated key.
     func setPresentation(_ presentation: Presentation) throws {
-        sealedPayload = try JSONEncoder().encode(presentation)
+        try setPayload(JSONEncoder().encode(presentation))
+    }
+
+    /// Stage an arbitrary already-encoded payload (e.g. a `CommerceResponse`)
+    /// to be sealed + delivered on handshake, exactly like `setPresentation`.
+    /// Maknoon Pay's full lane (ADR-0031) stages a CommerceResponse here; the
+    /// merchant decodes it instead of a bare Presentation.
+    func setPayload(_ data: Data) {
+        sealedPayload = data
     }
 
     // MARK: -- internals

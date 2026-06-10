@@ -287,7 +287,10 @@ struct VerifierRegistryRecord: Codable, Sendable {
 struct DropEnvelope: Codable, Sendable {
     let v: Int                // 1
     let dropId: String
-    let expiresAt: Int64
+    // Informational only (the drop server enforces expiry). Optional so we can
+    // decode envelopes from holders that omit it, e.g. the React wallet's
+    // `{v:1,dropId}` single QR.
+    let expiresAt: Int64?
 }
 
 // MARK: -- BLE engagement (ADR-0028)

@@ -21,7 +21,7 @@ struct AppStoreSettingsView: View {
             } header: {
                 Text("Default dApps catalog")
             } footer: {
-                Text("The Elabify-curated dApps catalog ships with Maknoon and cannot be removed.")
+                Text("The Maknoon dApps catalog ships with Maknoon and cannot be removed.")
                     .font(.caption)
             }
 
@@ -50,6 +50,18 @@ struct AppStoreSettingsView: View {
                 Text("Additional dApps catalogs")
             } footer: {
                 Text("Add an institution-curated dApps catalog by URL. The catalog is a JSON document Maknoon fetches and renders alongside the built-in one. Useful for issuers and verifier consortia that want to publish their own curated integration list.")
+                    .font(.caption)
+            }
+
+            Section {
+                Toggle("Show beta apps", isOn: Binding(
+                    get: { store.appStores.showBetaApps },
+                    set: { store.appStores.setShowBetaApps($0) }
+                ))
+            } header: {
+                Text("Beta apps")
+            } footer: {
+                Text("Beta dApps are experimental and may change or break. They are hidden by default; turn this on to see them in every catalog. Apps you have already installed stay available regardless.")
                     .font(.caption)
             }
         }

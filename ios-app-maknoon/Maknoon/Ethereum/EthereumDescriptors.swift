@@ -226,4 +226,37 @@ enum EthereumDescriptors {
         // including the 0x02 EIP-1559 envelope prefix.
         return "0x" + output.encoded.map { String(format: "%02x", $0) }.joined()
     }
+
+    /// EIP-191 `personal_sign`: derive the EOA private key under a
+    /// biometric prompt, hash keccak256("\u{19}Ethereum Signed
+    /// Message:\n" + len + message), sign with secp256k1, and return the
+    /// 65-byte 0x-hex signature (r||s||v) with v in {27,28} as web3
+    /// clients expect. The private key is built inside this function and
+    /// never escapes it, mirroring `signTransactionFromSandwich`.
+    static func signPersonalMessageFromSandwich(
+        sandwich: IdentitySandwich,
+        account: UInt32,
+        message: Data,
+        biometricReason: String
+    ) throws -> String {
+        let material = try sandwich.recoveryMaterial(localizedReason: biometricReason)
+        let words = material.words.joined(separator: " ")
+        guard let wallet = HDWallet(
+            mnemonic: words,
+            passphrase: material.hasPassphrase ? material.passphrase : ""
+        ) else {
+            throw EthereumDescriptorError.hdWalletFailed("HDWallet constructor returned nil")
+        }
+        let key = wallet.getDerivedKey(coin: .ethereum, account: account, change: 0, address: 0)
+
+        var prefixed = Data("\u{19}Ethereum Signed Message:\n\(message.count)".utf8)
+        prefixed.append(message)
+        let digest = Hash.keccak256(data: prefixed)
+        guard var sig = key.sign(digest: digest, curve: .secp256k1), sig.count == 65 else {
+            throw EthereumDescriptorError.signingFailed("secp256k1 personal_sign failed")
+        }
+        // TWC returns recid (0/1) in the trailing byte; web3 wants v=27/28.
+        sig[64] = sig[64] + 27
+        return "0x" + sig.map { String(format: "%02x", $0) }.joined()
+    }
 }
