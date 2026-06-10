@@ -1,18 +1,15 @@
-// A single ERC-20 token row inside the EthereumWalletView. Async-
-// loads its balance from the contract on appear; tapping opens a
-// dedicated token Send / Receive sheet pre-bound to this token.
+// A single ERC-20 token row inside the EthereumWalletView. The balance
+// is fetched once at the wallet-view level (which also filters out
+// zero-balance tokens) and passed in; tapping opens a dedicated token
+// Send / Receive sheet pre-bound to this token.
 
 import SwiftUI
 
 struct EthereumTokenRow: View {
     @Environment(HolderStore.self) private var store
-    let wallet: EthereumWallet
     let token: EthereumToken
-    let rpcURL: String
+    let balance: EthereumWeiValue?
     let onTap: () -> Void
-
-    @State private var balance: EthereumWeiValue?
-    @State private var loading: Bool = true
 
     var body: some View {
         Button {
@@ -32,13 +29,9 @@ struct EthereumTokenRow: View {
                     Text(token.name).font(.caption2).foregroundStyle(.secondary)
                 }
                 Spacer()
-                if loading {
-                    ProgressView().controlSize(.small)
-                } else {
-                    Text(balance?.displayUnits(ticker: "", decimals: token.decimals, maxDecimals: 4)
-                            .trimmingCharacters(in: .whitespaces) ?? "—")
-                        .font(.callout.monospaced())
-                }
+                Text(balance?.displayUnits(ticker: "", decimals: token.decimals, maxDecimals: 4)
+                        .trimmingCharacters(in: .whitespaces) ?? "—")
+                    .font(.callout.monospaced())
                 Image(systemName: "chevron.forward")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.tertiary)
@@ -47,17 +40,5 @@ struct EthereumTokenRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .task(id: token.id) { await loadBalance() }
-    }
-
-    @MainActor
-    private func loadBalance() async {
-        loading = true
-        do {
-            balance = try await wallet.tokenBalance(token: token, rpcURL: rpcURL)
-        } catch {
-            balance = nil
-        }
-        loading = false
     }
 }

@@ -12,6 +12,10 @@ struct EthereumWalletView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var balance: EthereumWeiValue?
+    /// Token balances keyed by token.id, refreshed alongside the native
+    /// balance. Drives the held-only token filter so curated defaults
+    /// (USDC seeded on every chain) don't clutter the list at zero.
+    @State private var tokenBalances: [String: EthereumWeiValue] = [:]
     @State private var recentTxs: [EthereumTx] = []
     @State private var recentTokenTxs: [EthereumTokenTransfer] = []
     @State private var syncing: Bool = false
@@ -23,6 +27,7 @@ struct EthereumWalletView: View {
     @State private var showSend = false
     @State private var showAddToken = false
     @State private var showAddWallet = false
+    @State private var showNetworkPicker = false
     @State private var detailToken: EthereumToken?
 
     private var activeWallet: EthereumWalletDescriptor? {
@@ -65,12 +70,6 @@ struct EthereumWalletView: View {
         // existing refresh logic mark-syncs the wallet and
         // updates balance, tx history, and token discovery.
         .refreshable { await refresh() }
-        // Horizontal swipe shortcuts inside the wallet:
-        //   swipe LEFT (finger slides leftward)  → Send
-        //   swipe RIGHT (finger slides rightward) → Receive
-        // Vertical scroll wins for predominantly-vertical drags,
-        // so this doesn't interfere with the scroll view.
-        .simultaneousGesture(walletSwipeGesture)
         // Hide the system back button + swipe-back so an accidental
         // horizontal swipe inside the wallet view doesn't pop back
         // to the wallet list. The custom "Wallets" button on the
@@ -171,6 +170,12 @@ struct EthereumWalletView: View {
                     .environment(store)
             }
         }
+        .sheet(isPresented: $showNetworkPicker) {
+            if let w = activeWallet {
+                EthereumNetworkPickerSheet(walletId: w.id, selected: activeNetwork.networkID)
+                    .environment(store)
+            }
+        }
     }
 
     /// Underlying built-in case for tokens / Add-token sheet,
@@ -188,28 +193,13 @@ struct EthereumWalletView: View {
         return "\(id):\(activeNetwork.networkID.stableId)"
     }
 
-    /// Horizontal swipe handler. 60-pt minimum distance so accidental
-    /// taps + small finger jitters don't trigger; we also require
-    /// the horizontal translation to dominate the vertical so a
-    /// diagonal pan doesn't conflict with the scroll view.
-    private var walletSwipeGesture: some Gesture {
-        DragGesture(minimumDistance: 60, coordinateSpace: .local)
-            .onEnded { value in
-                let dx = value.translation.width
-                let dy = value.translation.height
-                guard abs(dx) > abs(dy) * 1.5 else { return }
-                if dx < -80 {
-                    showSend = true
-                } else if dx > 80 {
-                    showReceive = true
-                }
-            }
-    }
-
     // MARK: -- tokens
 
     private var currentTokens: [EthereumToken] {
+        // Only show tokens the wallet actually holds. Curated defaults
+        // (USDC on every chain) otherwise sit in the list at zero balance.
         return store.ethereumTokenStore.tokens(on: activeNetwork)
+            .filter { (tokenBalances[$0.id] ?? .zero) > .zero }
     }
 
     /// Native + ERC-20 transfers merged into one timestamp-sorted
@@ -234,8 +224,7 @@ struct EthereumWalletView: View {
 
     @ViewBuilder
     private var tokensSection: some View {
-        if activeWallet != nil, let ethereum, activeNetwork.isBuiltin {
-            let rpcURL = activeNetwork.rpcURL
+        if activeWallet != nil, activeNetwork.isBuiltin {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Text("Tokens").font(.headline)
@@ -254,9 +243,8 @@ struct EthereumWalletView: View {
                 } else {
                     ForEach(currentTokens) { token in
                         EthereumTokenRow(
-                            wallet: ethereum,
                             token: token,
-                            rpcURL: rpcURL,
+                            balance: tokenBalances[token.id],
                             onTap: { detailToken = token }
                         )
                         .contextMenu {
@@ -336,37 +324,9 @@ struct EthereumWalletView: View {
     /// to `EthereumWalletStore.currentNetworkByWallet`.
     @ViewBuilder
     private var networkPicker: some View {
-        if let w = activeWallet {
-            Menu {
-                Section("Mainnets") {
-                    ForEach(EthereumNetwork.displayOrdered.filter { !$0.isTestnet }, id: \.self) { net in
-                        Button {
-                            store.ethereumWalletStore.setCurrentNetwork(net, for: w.id)
-                        } label: {
-                            Label(net.displayName, systemImage: activeNetwork.networkID == .builtin(net) ? "checkmark" : "")
-                        }
-                    }
-                }
-                Section("Testnets") {
-                    ForEach(EthereumNetwork.displayOrdered.filter { $0.isTestnet }, id: \.self) { net in
-                        Button {
-                            store.ethereumWalletStore.setCurrentNetwork(net, for: w.id)
-                        } label: {
-                            Label(net.displayName, systemImage: activeNetwork.networkID == .builtin(net) ? "checkmark" : "")
-                        }
-                    }
-                }
-                if !store.ethereumCustomNetworks.networks.isEmpty {
-                    Section("Custom") {
-                        ForEach(store.ethereumCustomNetworks.networks) { custom in
-                            Button {
-                                store.ethereumWalletStore.setCurrentNetworkID(.custom(custom.id), for: w.id)
-                            } label: {
-                                Label(custom.name, systemImage: activeNetwork.networkID == .custom(custom.id) ? "checkmark" : "")
-                            }
-                        }
-                    }
-                }
+        if activeWallet != nil {
+            Button {
+                showNetworkPicker = true
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "network").foregroundStyle(Color.indigo)
@@ -393,6 +353,7 @@ struct EthereumWalletView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .padding(.horizontal, 16)
             }
+            .buttonStyle(.plain)
         }
     }
 
@@ -633,6 +594,16 @@ struct EthereumWalletView: View {
     private func openAndSync() async {
         guard let descriptor = activeWallet else { return }
         ethereum = EthereumWallet(descriptor: descriptor)
+        // This runs only on a wallet/network switch (via .task(id: refreshKey)),
+        // so clear the previous context's data before re-fetching. Otherwise a
+        // failed/slow fetch on the new network leaves the old chain's balance and
+        // transactions on screen (e.g. switching zkSync -> Ethereum still showing
+        // zkSync txs). Manual refresh calls refresh() directly and won't clear.
+        balance = nil
+        recentTxs = []
+        recentTokenTxs = []
+        tokenBalances = [:]
+        lastError = nil
         await refresh()
     }
 
@@ -702,6 +673,10 @@ struct EthereumWalletView: View {
             balance = try await ethereum.balance(rpcURL: rpcURL)
             store.ethereumWalletStore.markSynced(id: descriptor.id)
         } catch {
+            // A superseded fetch (switching wallet/network restarts the
+            // .task and cancels this one) is not a failure: bail without
+            // surfacing it, the new sync is already running.
+            if isSupersededFetch(error) { syncing = false; return }
             let msg = (error as? LocalizedError)?.errorDescription ?? "\(error)"
             partialErrors.append("Balance: \(msg)")
         }
@@ -722,10 +697,14 @@ struct EthereumWalletView: View {
                 confirmedTxHashes: confirmedHashes
             )
         } catch {
-            // Don't clear recentTxs on failure — we keep showing
-            // whatever history we already have.
+            if isSupersededFetch(error) { syncing = false; return }
+            // History comes from free public block explorers that flake
+            // often (HTML 404/502 pages, rate limits). It's supplementary:
+            // keep whatever we already have and don't raise the balance
+            // error banner over a transient explorer hiccup. Balance (the
+            // load-bearing read, above) still surfaces real failures.
             let msg = (error as? LocalizedError)?.errorDescription ?? "\(error)"
-            partialErrors.append("History: \(msg)")
+            LogStore.shared.warn("eth.wallet", "history \(network.displayName): \(msg)")
         }
         // Fetch ERC-20 transfer events once and use them both to
         // populate the tx list (so incoming USDC etc. shows up) and
@@ -745,10 +724,29 @@ struct EthereumWalletView: View {
             tokenTransfers = recentTokenTxs
         }
         await autoDiscoverTokens(from: tokenTransfers, network: network)
+        // Refresh token balances last: auto-discover may have just added
+        // tokens, and the list only shows entries with a positive balance.
+        await refreshTokenBalances(network: network, rpcURL: rpcURL)
         if !partialErrors.isEmpty {
             lastError = partialErrors.joined(separator: "\n")
         }
         syncing = false
+    }
+
+    /// Fetch the balance of every token configured on `network` so the
+    /// list can hide zero-balance entries. Best-effort: a token whose
+    /// balance read fails is simply omitted (treated as zero) rather than
+    /// surfacing an error, since balance/history above are the primary reads.
+    @MainActor
+    private func refreshTokenBalances(network: ResolvedNetwork, rpcURL: String) async {
+        guard let ethereum else { return }
+        var fresh: [String: EthereumWeiValue] = [:]
+        for token in store.ethereumTokenStore.tokens(on: network) {
+            if let bal = try? await ethereum.tokenBalance(token: token, rpcURL: rpcURL) {
+                fresh[token.id] = bal
+            }
+        }
+        tokenBalances = fresh
     }
 }
 
@@ -818,7 +816,7 @@ struct EthereumTxRow: View {
     private var direction: TxDirection {
         let me = myAddress.lowercased()
         let from = tx.from.lowercased()
-        let to = tx.to.lowercased()
+        let to = (tx.to ?? "").lowercased()
         if from == me && to == me { return .self }
         if from == me { return .out }
         if to == me { return .in }
@@ -864,11 +862,13 @@ struct EthereumTxRow: View {
     }
 
     private var counterparty: String {
+        // A null `to` means contract creation (no recipient address).
+        guard let to = tx.to, !to.isEmpty else { return "Contract creation" }
         switch direction {
         case .in:    return "From \(short(tx.from))"
-        case .out:   return "To \(short(tx.to))"
+        case .out:   return "To \(short(to))"
         case .self:  return "Self"
-        case .other: return "\(short(tx.from)) → \(short(tx.to))"
+        case .other: return "\(short(tx.from)) → \(short(to))"
         }
     }
 

@@ -70,10 +70,25 @@ final class EthereumSettings: @unchecked Sendable {
     init() { load() }
 
     func rpcURL(for network: EthereumNetwork) -> String {
-        if let override = rpcURLByNetwork[network], !override.isEmpty {
+        // Honor a custom override only if it is a usable http(s) URL.
+        // A malformed override (no scheme, whitespace) would otherwise be
+        // handed to URLSession and fail every read with -1000 (bad URL),
+        // wedging the chain. Fall back to the built-in default instead.
+        if let override = rpcURLByNetwork[network], Self.isValidRPC(override) {
             return override
         }
         return network.defaultRPCURL
+    }
+
+    /// A custom RPC endpoint is usable only if it parses as an absolute
+    /// http(s) URL with a host. URL(string:) is lenient and accepts
+    /// scheme-less strings, but URLSession then rejects them with -1000.
+    static func isValidRPC(_ raw: String) -> Bool {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let url = URL(string: trimmed),
+              let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https",
+              let host = url.host, !host.isEmpty else { return false }
+        return true
     }
 
     func explorerURL(for network: EthereumNetwork) -> String {
@@ -106,7 +121,11 @@ final class EthereumSettings: @unchecked Sendable {
     }
 
     func setRPC(_ url: String, for network: EthereumNetwork) {
-        rpcURLByNetwork[network] = url
+        // Store only a valid http(s) endpoint; anything else (empty,
+        // scheme-less, garbage) clears the override so the network uses
+        // its built-in default rather than failing reads with -1000.
+        let trimmed = url.trimmingCharacters(in: .whitespacesAndNewlines)
+        rpcURLByNetwork[network] = Self.isValidRPC(trimmed) ? trimmed : ""
         persist()
     }
 

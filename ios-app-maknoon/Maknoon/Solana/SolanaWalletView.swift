@@ -29,12 +29,20 @@ struct SolanaWalletView: View {
     @State private var showWallets = false
     @State private var showAllTxs = false
     @State private var showAddWallet = false
-    @State private var showAddToken = false
+    /// Drives the Add-SPL-token sheet. Using `.sheet(item:)` (not
+    /// `isPresented`) guarantees the prefilled mint is carried atomically:
+    /// `.sheet(isPresented:)` rendered the sheet body before the separate
+    /// mint state propagated, leaving the field blank when launched from
+    /// the "Add as custom" banner.
+    @State private var addTokenRequest: AddTokenRequest?
     @State private var detailToken: SolanaSPLToken?
-    /// Mint that the dashboard is about to surface as "Unknown
-    /// token, add as custom?" via the AddTokenSheet pre-populated
-    /// with that mint.
-    @State private var unknownMintToAdd: String?
+
+    /// Request to open the Add-SPL-token sheet, optionally pre-filled with
+    /// a detected mint (banner) or empty (manual "+").
+    private struct AddTokenRequest: Identifiable {
+        let id = UUID()
+        let mint: String?
+    }
 
     private var activeWallet: SolanaWalletDescriptor? {
         store.solanaWalletStore.activeWallet
@@ -167,15 +175,11 @@ struct SolanaWalletView: View {
             }
             .environment(store)
         }
-        .sheet(isPresented: $showAddToken) {
+        .sheet(item: $addTokenRequest) { req in
             SolanaAddTokenSheet(
                 network: activeNetwork,
-                prefilledMint: unknownMintToAdd
+                prefilledMint: req.mint
             ) {
-                // Clear the pending unknown after the sheet closes so
-                // the dashboard banner stops re-suggesting the same
-                // mint until the next refresh discovers it again.
-                unknownMintToAdd = nil
                 Task { await refresh() }
             }
             .environment(store)
@@ -496,7 +500,7 @@ struct SolanaWalletView: View {
                 Text("Tokens").font(.headline)
                 Spacer()
                 Button {
-                    showAddToken = true
+                    addTokenRequest = AddTokenRequest(mint: nil)
                 } label: {
                     Label("Add", systemImage: "plus.circle")
                         .labelStyle(.iconOnly)
@@ -571,8 +575,7 @@ struct SolanaWalletView: View {
                             .textSelection(.enabled)
                         HStack(spacing: 12) {
                             Button("Add as custom…") {
-                                unknownMintToAdd = mint
-                                showAddToken = true
+                                addTokenRequest = AddTokenRequest(mint: mint)
                             }
                             .font(.caption)
                             Button("Ignore") {

@@ -267,11 +267,16 @@ struct LightningWalletView: View {
         do {
             balanceSat = try await client.balanceSat()
         } catch {
+            // A superseded fetch (pull-to-refresh racing the .task / a
+            // concurrent refresh) cancels the in-flight request; that's
+            // not a failure, so bail quietly and let the newer one run.
+            if isSupersededFetch(error) { syncing = false; return }
             lastError = (error as? LocalizedError)?.errorDescription ?? "\(error)"
         }
         do {
             txs = try await client.history(limit: 50)
         } catch {
+            if isSupersededFetch(error) { syncing = false; return }
             // Don't clear the previous history on transient failure.
             let msg = (error as? LocalizedError)?.errorDescription ?? "\(error)"
             lastError = (lastError.map { "\($0)\n" } ?? "") + "History: \(msg)"

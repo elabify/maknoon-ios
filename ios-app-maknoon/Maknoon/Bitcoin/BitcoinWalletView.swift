@@ -569,6 +569,9 @@ struct BitcoinWalletView: View {
             )
             store.bitcoinWalletStore.markSynced(id: descriptor.id)
         } catch {
+            // A superseded sync (pull-to-refresh racing the .task / a
+            // concurrent refresh) is cancellation, not a failure.
+            if isSupersededFetch(error) { syncing = false; return }
             lastError = "Sync failed: \(error)"
         }
         syncing = false

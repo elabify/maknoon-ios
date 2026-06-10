@@ -11,7 +11,10 @@ struct EthereumTx: Codable, Hashable, Identifiable, Sendable {
     let blockNumber: String
     let timeStamp: String
     let from: String
-    let to: String
+    // Optional: contract-creation transactions have a null `to` on
+    // Etherscan/Blockscout. Keeping this non-optional made one such tx
+    // fail the whole-array decode, silently emptying the history list.
+    let to: String?
     let value: String          // wei as decimal string
     let gas: String?
     let gasPrice: String?
@@ -70,6 +73,24 @@ enum EthereumTxItem: Identifiable, Hashable, Sendable {
     }
 }
 
+/// A clean, user-facing failure for the history feed. Public block
+/// explorers (free Blockscout instances especially) intermittently answer
+/// with HTML error pages, 404s, or 502 gateway bodies. Surfacing the raw
+/// URLSession / JSONDecoder error (e.g. "DecodingError.dataCorrupted: Data
+/// was corrupted") is confusing, so we map those to this instead.
+enum EthereumExplorerError: LocalizedError {
+    case unavailable(host: String, status: Int?)
+    var errorDescription: String? {
+        switch self {
+        case .unavailable(let host, let status):
+            if let status {
+                return "Transaction history is temporarily unavailable (\(host) returned HTTP \(status))."
+            }
+            return "Transaction history is temporarily unavailable from \(host)."
+        }
+    }
+}
+
 struct EthereumExplorerClient: Sendable {
     let apiURL: URL
     let apiKey: String?
@@ -86,6 +107,34 @@ struct EthereumExplorerClient: Sendable {
         self.apiURL = u
         self.apiKey = apiKey
         self.chainId = chainId
+    }
+
+    /// Fetch + validate an explorer response before decoding. Checks the
+    /// HTTP status and rejects non-JSON bodies, converting flaky-explorer
+    /// responses (HTML 404/502, gateway pages) into a clean
+    /// `EthereumExplorerError` instead of letting a raw decode error leak.
+    private func fetchValidated(_ url: URL, label: String) async throws -> Data {
+        let data: Data
+        let resp: URLResponse
+        do {
+            (data, resp) = try await URLSession.shared.data(from: url)
+        } catch {
+            LogStore.shared.warn("eth.explorer", "\(label) \(apiURL.host ?? "?"): \(error.localizedDescription)")
+            throw error
+        }
+        if let http = resp as? HTTPURLResponse, !(200..<300 ~= http.statusCode) {
+            LogStore.shared.warn("eth.explorer", "\(label) \(apiURL.host ?? "?"): HTTP \(http.statusCode)")
+            throw EthereumExplorerError.unavailable(host: apiURL.host ?? "explorer", status: http.statusCode)
+        }
+        // Reject HTML/text bodies up front: a JSON response begins with
+        // '{' or '[' once leading whitespace is dropped.
+        let firstByte = data.first { $0 != UInt8(ascii: " ") && $0 != UInt8(ascii: "\n")
+            && $0 != UInt8(ascii: "\r") && $0 != UInt8(ascii: "\t") }
+        guard firstByte == UInt8(ascii: "{") || firstByte == UInt8(ascii: "[") else {
+            LogStore.shared.warn("eth.explorer", "\(label) \(apiURL.host ?? "?"): non-JSON body")
+            throw EthereumExplorerError.unavailable(host: apiURL.host ?? "explorer", status: nil)
+        }
+        return data
     }
 
     /// Common query items used by every Etherscan-family request.
@@ -117,14 +166,14 @@ struct EthereumExplorerClient: Sendable {
         items.append(contentsOf: commonQueryItems())
         components.queryItems = items
 
-        let (data, _): (Data, URLResponse)
+        let data = try await fetchValidated(components.url!, label: "tokentx")
+        let env: TokenTxEnvelope
         do {
-            (data, _) = try await URLSession.shared.data(from: components.url!)
+            env = try JSONDecoder().decode(TokenTxEnvelope.self, from: data)
         } catch {
-            LogStore.shared.error("eth.explorer", "tokentx \(apiURL.host ?? "?"): \(error.localizedDescription)")
-            throw error
+            LogStore.shared.warn("eth.explorer", "tokentx \(apiURL.host ?? "?"): decode failed")
+            throw EthereumExplorerError.unavailable(host: apiURL.host ?? "explorer", status: nil)
         }
-        let env = try JSONDecoder().decode(TokenTxEnvelope.self, from: data)
         if env.status != "1" {
             if env.message?.contains("No transactions") == true { return [] }
             let reason = env.resultMessage ?? env.message ?? "Unknown explorer error"
@@ -155,14 +204,14 @@ struct EthereumExplorerClient: Sendable {
         items.append(contentsOf: commonQueryItems())
         components.queryItems = items
 
-        let (data, _): (Data, URLResponse)
+        let data = try await fetchValidated(components.url!, label: "txlist")
+        let env: EtherscanEnvelope
         do {
-            (data, _) = try await URLSession.shared.data(from: components.url!)
+            env = try JSONDecoder().decode(EtherscanEnvelope.self, from: data)
         } catch {
-            LogStore.shared.error("eth.explorer", "txlist \(apiURL.host ?? "?"): \(error.localizedDescription)")
-            throw error
+            LogStore.shared.warn("eth.explorer", "txlist \(apiURL.host ?? "?"): decode failed")
+            throw EthereumExplorerError.unavailable(host: apiURL.host ?? "explorer", status: nil)
         }
-        let env = try JSONDecoder().decode(EtherscanEnvelope.self, from: data)
         if env.status != "1" {
             // status=0 with message=No transactions found is a normal
             // empty result; surface only "real" errors.
@@ -198,8 +247,8 @@ private struct TokenTxEnvelope: Decodable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         self.status = try c.decodeIfPresent(String.self, forKey: .status)
         self.message = try c.decodeIfPresent(String.self, forKey: .message)
-        if let arr = try? c.decode([EthereumTokenTransfer].self, forKey: .result) {
-            self.resultArray = arr
+        if let arr = try? c.decode([Throwable<EthereumTokenTransfer>].self, forKey: .result) {
+            self.resultArray = arr.compactMap { $0.value }
             self.resultMessage = nil
         } else if let s = try? c.decode(String.self, forKey: .result) {
             self.resultArray = nil
@@ -227,8 +276,11 @@ private struct EtherscanEnvelope: Decodable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         self.status = try c.decodeIfPresent(String.self, forKey: .status)
         self.message = try c.decodeIfPresent(String.self, forKey: .message)
-        if let arr = try? c.decode([EthereumTx].self, forKey: .result) {
-            self.resultArray = arr
+        // Lossy: decode element-by-element so one malformed tx (an
+        // unexpected null/shape on a single row) drops just that row
+        // instead of emptying the entire history list.
+        if let arr = try? c.decode([Throwable<EthereumTx>].self, forKey: .result) {
+            self.resultArray = arr.compactMap { $0.value }
             self.resultMessage = nil
         } else if let s = try? c.decode(String.self, forKey: .result) {
             self.resultArray = nil
@@ -237,5 +289,15 @@ private struct EtherscanEnvelope: Decodable {
             self.resultArray = nil
             self.resultMessage = nil
         }
+    }
+}
+
+/// Decodes any `Decodable` without throwing: a per-element failure is
+/// captured as `nil` rather than aborting the surrounding array decode.
+/// Used for lossy `result` arrays so a single bad row can't empty the list.
+private struct Throwable<T: Decodable>: Decodable {
+    let value: T?
+    init(from decoder: Decoder) throws {
+        value = try? T(from: decoder)
     }
 }
