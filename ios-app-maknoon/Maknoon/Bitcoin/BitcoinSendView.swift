@@ -68,6 +68,8 @@ struct BitcoinSendView: View {
         case failed(message: String, debugCode: String?, recoverable: Bool)
     }
     @State private var sendState: SendState = .idle
+    /// Re-typed each signing for a host-entry hidden wallet; never stored.
+    @State private var signingPassphrase: String = ""
     @State private var pendingReadyOp: PendingHardwareOperation?
 
     // Coin-control selection. Empty unless the user opened the
@@ -252,11 +254,13 @@ struct BitcoinSendView: View {
                 DeviceReadyConfirmationSheet(
                     device: op.device,
                     purpose: op.purpose,
+                    requiresPassphrase: store.bitcoinWalletStore.activeWallet?.hidden?.needsHostPassphrase == true,
                     onContinue: {
                         dismissSendViewKeyboard()
                         Task { await signOnly() }
                     },
-                    onCancel: {}
+                    onCancel: {},
+                    onPassphrase: { signingPassphrase = $0 }
                 )
             }
             .sheet(isPresented: $showOfflineSheet) {
@@ -836,7 +840,10 @@ struct BitcoinSendView: View {
                     device: device,
                     fingerprintHex: fingerprintHex,
                     accountXpub: xpub,
-                    network: descriptor.network
+                    network: descriptor.network,
+                    hidden: descriptor.hidden,
+                    derivationPath: descriptor.derivationPath,
+                    hostEntered: signingPassphrase
                 )
             case (.hardwareBLE, _):
                 throw BitcoinWallet.WalletError.bleSigningNotYetImplemented

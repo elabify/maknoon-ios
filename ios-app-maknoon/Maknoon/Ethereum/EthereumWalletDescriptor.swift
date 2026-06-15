@@ -29,13 +29,28 @@ struct EthereumWalletDescriptor: Codable, Identifiable, Hashable, Sendable {
     /// the view layer can read it uniformly.
     var cachedAddress: String?
 
+    /// Trezor hidden (BIP39 passphrase) wallet binding. `nil` for the
+    /// standard wallet and for every Ledger / software wallet. When
+    /// set, a signing flow must re-open the same hidden THP session
+    /// (re-derives in the right seed) before the device will produce a
+    /// signature for this address. Optional + defaulted so existing
+    /// persisted descriptors decode unchanged.
+    var hidden: HardwarePassphraseRef?
+
+    /// Custom BIP32 derivation path for a hardware wallet added at a
+    /// non-standard path (nil = the chain standard from `account`). When
+    /// set, signing re-derives here via the client path override.
+    var derivationPath: String?
+
     init(
         id: UUID = UUID(),
         label: String,
         kind: EthereumWalletKind,
         createdAt: Date = .init(),
         lastSyncAt: Date? = nil,
-        cachedAddress: String? = nil
+        cachedAddress: String? = nil,
+        hidden: HardwarePassphraseRef? = nil,
+        derivationPath: String? = nil
     ) {
         self.id = id
         self.label = label
@@ -43,6 +58,8 @@ struct EthereumWalletDescriptor: Codable, Identifiable, Hashable, Sendable {
         self.createdAt = createdAt
         self.lastSyncAt = lastSyncAt
         self.cachedAddress = cachedAddress
+        self.hidden = hidden
+        self.derivationPath = derivationPath
     }
 
     /// Resolved address regardless of kind. Falls back to the

@@ -145,6 +145,13 @@ struct AddBitcoinWalletSheet: View {
     @State private var selectedDeviceId: UUID?
     @State private var showSoftwareDiscovery: Bool = false
     @State private var account: UInt32 = 0
+    /// Trezor-only hidden-wallet selector for the direct-add path.
+    /// `.standard` reproduces exact Ledger behavior (empty passphrase).
+    @State private var useCustomPath: Bool = false
+    @State private var customPath: String = ""
+    @State private var hwPassphrase: HiddenWalletSelection = .standard
+    /// Host-typed passphrase, used only when `hwPassphrase == .hostTyped`.
+    @State private var hwHostPassphrase: String = ""
     /// Software-path account index, kept separate from the hardware
     /// `account` so each path has its own default. Seeded to the next
     /// free account on the selected network so the default never
@@ -292,10 +299,30 @@ struct AddBitcoinWalletSheet: View {
             }
             Stepper("Account #\(account)", value: $account, in: 0...20)
             TextField(autoLabel(for: dev), text: $label)
+            if dev.kind == .trezor {
+                Picker("Wallet", selection: $hwPassphrase) {
+                    ForEach(HiddenWalletSelection.allCases) { mode in
+                        Text(mode.rawValue).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+                if hwPassphrase == .hostTyped {
+                    SecureField("Passphrase", text: $hwHostPassphrase)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                }
+            }
+            DerivationPathAdvancedField(
+                standardPath: BIP32Path.standardBitcoin(account: account, coinType: network.coinType),
+                useCustom: $useCustomPath,
+                customPath: $customPath
+            )
         } header: {
             Text("New Bitcoin wallet")
         } footer: {
-            Text("Leave the label blank to use \"\(autoLabel(for: dev))\".")
+            Text(dev.kind == .trezor
+                ? hwPassphrase.footer
+                : "Leave the label blank to use \"\(autoLabel(for: dev))\".")
                 .font(.caption)
         }
     }
@@ -429,6 +456,10 @@ struct AddBitcoinWalletSheet: View {
                 errorText = "Pick a device first."
                 return
             }
+            if dev.kind == .trezor, !hwPassphrase.isReady(hostPassphrase: hwHostPassphrase) {
+                errorText = "Enter the hidden-wallet passphrase first."
+                return
+            }
             if HardwareOperationPurpose.shouldPresent(for: dev.kind) {
                 pendingReadyOp = PendingHardwareOperation(
                     device: dev,
@@ -493,13 +524,34 @@ struct AddBitcoinWalletSheet: View {
             errorText = "Pick a device first."
             return
         }
+        // Persist the hidden-wallet binding (writes a host-typed
+        // passphrase to the Keychain). nil for the standard wallet and
+        // for every Ledger add.
+        let hidden = dev.kind == .trezor
+            ? HardwarePassphraseRef.persist(selection: hwPassphrase)
+            : nil
+        // Custom derivation path (both vendors). nil = standard BIP84.
+        // The purpose (44/49/84) selects the script type.
+        let pathOverride = DerivationPathAdvancedField.resolve(useCustom: useCustomPath, customPath: customPath)
+        if let p = pathOverride, !BIP32Path.isValid(p) {
+            errorText = "Not a valid derivation path: \(p)"
+            return
+        }
+        var suffix = hidden == nil ? "" : " (Hidden)"
+        if pathOverride != nil { suffix += " (Custom path)" }
         let trimmed = label.trimmingCharacters(in: .whitespaces)
         let suffixedLabel = trimmed.isEmpty
-            ? autoLabel(for: dev)
-            : "\(trimmed) #\(account)"
+            ? "\(autoLabel(for: dev))\(suffix)"
+            : "\(trimmed) #\(account)\(suffix)"
 
         let kindForFactory: HardwareWalletKind = dev.kind == .ledger ? .ledger : .trezor
         let client = HardwareWalletFactory.make(kind: kindForFactory)
+        // A Trezor hidden wallet derives in its own passphrase session.
+        // Ledger / mock clients ignore this.
+        if let trezor = client as? TrezorBLE {
+            trezor.applyPassphraseMode(hwPassphrase.choice(hostPassphrase: hwHostPassphrase))
+        }
+        client.setDerivationPathOverride(pathOverride)
         // Pin the BLE session across identify + fingerprint + xpub so
         // they share one connection. The Ledger doesn't reliably
         // survive 3 back-to-back reconnects on the same device.
@@ -533,7 +585,9 @@ struct AddBitcoinWalletSheet: View {
             let descriptor = BitcoinWalletDescriptor(
                 label: suffixedLabel,
                 kind: .hardware(deviceId: dev.id, accountFingerprint: fingerprint, accountXpub: xpub),
-                network: network
+                network: network,
+                hidden: hidden,
+                derivationPath: pathOverride
             )
             store.bitcoinWalletStore.add(descriptor, makeActive: true)
             store.devices.addBitcoinWallet(deviceId: dev.id, walletId: descriptor.id)

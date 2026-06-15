@@ -33,19 +33,21 @@ enum DeviceKind: String, Codable, CaseIterable, Sendable {
     /// fingerprint as the device's stable serial.
     case seedsigner
 
-    /// Device kinds the user can register today. The `trezor` case
-    /// stays defined so previously-registered Trezor records still
-    /// decode, but it is not offered for new registration until its
-    /// BLE client ships.
+    /// Device kinds the user can register today, sorted alphabetically
+    /// by display name for the registration picker. Trezor is offered
+    /// now that its THP v2 BLE client ships; registration runs a
+    /// read-only handshake probe to confirm the connection.
     static var registrableCases: [DeviceKind] {
-        allCases.filter { $0 != .trezor }
+        allCases.sorted {
+            $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending
+        }
     }
 
     var displayName: String {
         switch self {
         case .yubikey:    return "YubiKey"
         case .ledger:     return "Ledger Nano X"
-        case .trezor:     return "Trezor Safe 5"
+        case .trezor:     return "Trezor"
         case .seedsigner: return "SeedSigner"
         }
     }
@@ -77,7 +79,7 @@ enum DeviceKind: String, Codable, CaseIterable, Sendable {
         switch self {
         case .yubikey:    return [.identity]
         case .ledger:     return [.identity, .bitcoin, .ethereum, .solana, .tron]
-        case .trezor:     return [.identity, .bitcoin, .ethereum, .solana]
+        case .trezor:     return [.identity, .bitcoin, .ethereum, .solana, .tron]
         case .seedsigner: return [.bitcoin]
         }
     }

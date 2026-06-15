@@ -35,6 +35,8 @@ struct BumpFeeSheet: View {
     @State private var customSatsPerVb: String = "20"
     @State private var feeRecommended: FeeRecommended?
     @State private var sendState: BumpState = .idle
+    /// Re-typed each signing for a host-entry hidden wallet; never stored.
+    @State private var signingPassphrase: String = ""
     @State private var pendingReadyOp: PendingHardwareOperation?
     @State private var status: String?
 
@@ -107,11 +109,13 @@ struct BumpFeeSheet: View {
                 DeviceReadyConfirmationSheet(
                     device: op.device,
                     purpose: op.purpose,
+                    requiresPassphrase: store.bitcoinWalletStore.activeWallet?.hidden?.needsHostPassphrase == true,
                     onContinue: {
                         dismissSendViewKeyboard()
                         Task { await signOnly() }
                     },
-                    onCancel: {}
+                    onCancel: {},
+                    onPassphrase: { signingPassphrase = $0 }
                 )
             }
         }
@@ -277,7 +281,10 @@ struct BumpFeeSheet: View {
                     device: device,
                     fingerprintHex: fingerprintHex,
                     accountXpub: xpub,
-                    network: descriptor.network
+                    network: descriptor.network,
+                    hidden: descriptor.hidden,
+                    derivationPath: descriptor.derivationPath,
+                    hostEntered: signingPassphrase
                 )
             default:
                 throw BitcoinWallet.WalletError.hardwareSigningNotImplemented

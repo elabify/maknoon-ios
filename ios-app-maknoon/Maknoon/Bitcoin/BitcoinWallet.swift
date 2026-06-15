@@ -120,7 +120,8 @@ actor BitcoinWallet {
             descriptorPair = try BitcoinDescriptors.watchOnlyFromXpub(
                 xpub: xpub,
                 fingerprint: fingerprint,
-                network: descriptor.network
+                network: descriptor.network,
+                scriptType: BIP32Path.bitcoinScriptType(forPath: descriptor.derivationPath ?? "") ?? .nativeSegwit
             )
         }
 

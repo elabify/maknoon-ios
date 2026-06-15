@@ -18,6 +18,7 @@ struct DiscoverTronWalletsView: View {
             case .hardware(let id): return "hardware:\(id.uuidString)"
             }
         }
+        var isSoftware: Bool { if case .software = self { return true }; return false }
     }
 
     @Environment(HolderStore.self) private var store
@@ -29,16 +30,40 @@ struct DiscoverTronWalletsView: View {
     @State private var scanning: Bool = false
     @State private var progress: [String] = []
     @State private var discovered: [Hit] = []
-    @State private var selection: Set<UInt32> = []
+    @State private var selection: Set<String> = []
     @State private var error: String?
     @State private var addReport: [String]?
+    /// Trezor-only hidden-wallet selector. `.standard` reproduces exact
+    /// Ledger behavior (empty passphrase).
+    @State private var hwPassphrase: HiddenWalletSelection = .standard
+    /// Host-typed passphrase, used only when `hwPassphrase == .hostTyped`.
+    @State private var hwHostPassphrase: String = ""
+    /// Hardware-only: also sweep well-known alternative derivation paths.
+    @State private var alsoTryAltPaths: Bool = false
+
+    /// Hidden wallets are a Trezor-only feature; the selector is gated
+    /// to Trezor hardware sources.
+    private var isTrezorSource: Bool {
+        if case .hardware(let id) = source {
+            return store.devices.find(id: id)?.kind == .trezor
+        }
+        return false
+    }
+
+    private var isHardwareSource: Bool {
+        if case .hardware = source { return true }
+        return false
+    }
 
     struct Hit: Hashable, Identifiable {
         let account: UInt32
         let address: String
         let sun: Int64
         let txCount: Int
-        var id: UInt32 { account }
+        /// Non-standard path this was derived at, when sweeping
+        /// alternatives; nil for the standard path.
+        var derivationPath: String?
+        var id: String { "\(account):\(derivationPath ?? "std")" }
         var hasActivity: Bool { sun > 0 || txCount > 0 }
     }
 
@@ -55,6 +80,37 @@ struct DiscoverTronWalletsView: View {
                     .font(.caption)
             }
 
+            if isTrezorSource && !scanning && discovered.isEmpty && progress.isEmpty {
+                Section {
+                    Picker("Wallet", selection: $hwPassphrase) {
+                        ForEach(HiddenWalletSelection.allCases) { mode in
+                            Text(mode.rawValue).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    if hwPassphrase == .hostTyped {
+                        SecureField("Passphrase", text: $hwHostPassphrase)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                    }
+                } header: {
+                    Text("Hidden wallet")
+                } footer: {
+                    Text(hwPassphrase.footer).font(.caption)
+                }
+            }
+
+            if isHardwareSource && !scanning && discovered.isEmpty && progress.isEmpty {
+                Section {
+                    Toggle("Try alternative derivation paths", isOn: $alsoTryAltPaths)
+                } header: {
+                    Text("Advanced")
+                } footer: {
+                    Text("Also checks well-known non-standard paths (Ledger, TIP-01, …) so a wallet created in another app is found.")
+                        .font(.caption)
+                }
+            }
+
             if !scanning && discovered.isEmpty && progress.isEmpty {
                 Section {
                     Button {
@@ -62,7 +118,8 @@ struct DiscoverTronWalletsView: View {
                     } label: {
                         Label("Start scan", systemImage: "magnifyingglass")
                     }
-                    .disabled(store.sandwich == nil)
+                    .disabled((source.isSoftware && store.sandwich == nil)
+                        || !hwPassphrase.isReady(hostPassphrase: hwHostPassphrase))
                 } footer: {
                     Text("Requires biometric or passcode once.")
                         .font(.caption)
@@ -87,10 +144,10 @@ struct DiscoverTronWalletsView: View {
                 Section {
                     ForEach(discovered) { hit in
                         Toggle(isOn: Binding(
-                            get: { selection.contains(hit.account) },
+                            get: { selection.contains(hit.id) },
                             set: { include in
-                                if include { selection.insert(hit.account) }
-                                else { selection.remove(hit.account) }
+                                if include { selection.insert(hit.id) }
+                                else { selection.remove(hit.id) }
                             }
                         )) {
                             VStack(alignment: .leading, spacing: 2) {
@@ -148,7 +205,9 @@ struct DiscoverTronWalletsView: View {
 
     private func detailLine(_ hit: Hit) -> String {
         let trx = Double(hit.sun) / 1_000_000.0
-        return String(format: "%.6f TRX · %d recent tx", trx, hit.txCount)
+        var s = String(format: "%.6f TRX · %d recent tx", trx, hit.txCount)
+        if let path = hit.derivationPath { s += " · \(path)" }
+        return s
     }
 
     @MainActor
@@ -188,9 +247,18 @@ struct DiscoverTronWalletsView: View {
                 return
             }
             let kind: HardwareWalletKind = dev.kind == .ledger ? .ledger : .trezor
-            hardwareClient = HardwareWalletFactory.make(kind: kind)
-            hardwareClient?.beginSession()
+            let client = HardwareWalletFactory.make(kind: kind)
+            // A Trezor hidden wallet derives in its own passphrase
+            // session. Ledger / mock clients ignore this.
+            if let trezor = client as? TrezorBLE {
+                trezor.applyPassphraseMode(hwPassphrase.choice(hostPassphrase: hwHostPassphrase))
+            }
+            client.beginSession()
+            hardwareClient = client
         }
+        // A fresh hidden wallet has no activity to find, so keep account
+        // 0 in the results when a passphrase is in play.
+        let keepEmptyFirst = isTrezorSource && hwPassphrase != .standard
 
         scanning = true
         progress = []
@@ -203,75 +271,114 @@ struct DiscoverTronWalletsView: View {
             hardwareClient?.endSession()
         }
 
+        // Standard path only (nil marker), or each alternative template
+        // per account. An account counts as empty for the gap limit only
+        // when no template had activity.
+        let templateList: [String?] = (isHardwareSource && alsoTryAltPaths)
+            ? BIP32Path.alternativeTemplates(.tron).map { Optional($0) }
+            : [nil]
+
         var hits: [Hit] = []
+        // Dedup by address: alternative templates can collide on a path
+        // (or a device may ignore the override), so each address yields
+        // one selectable row.
+        var seenAddresses = Set<String>()
+        // Dedup resolved paths: some templates fill to the SAME path at a
+        // given account (e.g. Tron's standard and the SDK variant both
+        // give m/44'/195'/0'/0/0 at account 0), so we never derive or
+        // show the same path twice.
+        var seenPaths = Set<String>()
+        var firstEntry: Hit?
         var account: UInt32 = 0
         var consecutiveEmpty = 0
         while consecutiveEmpty < Self.emptyAccountGapLimit {
             progress.append("Account \(account): scanning…")
-            let addr: String
-            do {
-                switch source {
-                case .software:
-                    let path = TronDescriptors.derivationPath(account: account)
-                    let priv = hdWallet!.getKeyByCurve(curve: .secp256k1, derivationPath: path)
-                    addr = WalletCore.CoinType.tron.deriveAddress(privateKey: priv)
-                case .hardware:
-                    addr = try await hardwareClient!.getTronAddress(account: account)
+            var accountHadActivity = false
+            for tmpl in templateList {
+                let pathOverride = tmpl.map { BIP32Path.fill($0, account: account) }
+                guard seenPaths.insert(pathOverride ?? "std").inserted else { continue }
+                let addr: String
+                do {
+                    switch source {
+                    case .software:
+                        let path = pathOverride ?? TronDescriptors.derivationPath(account: account)
+                        let priv = hdWallet!.getKeyByCurve(curve: .secp256k1, derivationPath: path)
+                        addr = WalletCore.CoinType.tron.deriveAddress(privateKey: priv)
+                    case .hardware:
+                        hardwareClient!.setDerivationPathOverride(pathOverride)
+                        addr = try await hardwareClient!.getTronAddress(account: account)
+                    }
+                } catch {
+                    // A device may forbid a foreign path (Trezor rejects
+                    // non-standard Tron paths). Skip it; not a failure.
+                    let what = pathOverride ?? "standard path"
+                    progress.append("Account \(account): \(what) not supported, skipped")
+                    continue
                 }
-            } catch {
-                let msg = (error as? LocalizedError)?.errorDescription ?? "\(error)"
-                progress.append("Account \(account): \(msg)")
-                consecutiveEmpty += 1
-                account += 1
-                continue
-            }
-            do {
-                let sun = try await rpc.getBalance(addressBase58: addr)
-                let txs = (try? await rpc.getTransactionsByAddress(addressBase58: addr, limit: 1)) ?? []
-                let hit = Hit(account: account, address: addr, sun: sun, txCount: txs.count)
-                if hit.hasActivity {
-                    hits.append(hit)
-                    consecutiveEmpty = 0
-                    let trx = Double(sun) / 1_000_000.0
-                    progress.append(String(format: "Account %d: %.6f TRX, active", account, trx))
-                } else {
-                    consecutiveEmpty += 1
-                    progress.append("Account \(account): empty")
+                do {
+                    let sun = try await rpc.getBalance(addressBase58: addr)
+                    let txs = (try? await rpc.getTransactionsByAddress(addressBase58: addr, limit: 1)) ?? []
+                    let hit = Hit(account: account, address: addr, sun: sun, txCount: txs.count, derivationPath: pathOverride)
+                    if account == 0, firstEntry == nil { firstEntry = hit }
+                    if hit.hasActivity {
+                        accountHadActivity = true
+                        if seenAddresses.insert(addr).inserted {
+                            hits.append(hit)
+                        }
+                        let trx = Double(sun) / 1_000_000.0
+                        progress.append(String(format: "Account %d: %.6f TRX, active", account, trx))
+                    } else {
+                        progress.append("Account \(account): empty")
+                    }
+                } catch {
+                    let msg = (error as? LocalizedError)?.errorDescription ?? "\(error)"
+                    progress.append("Account \(account): \(msg)")
                 }
-            } catch {
-                consecutiveEmpty += 1
-                let msg = (error as? LocalizedError)?.errorDescription ?? "\(error)"
-                progress.append("Account \(account): \(msg)")
             }
+            if accountHadActivity { consecutiveEmpty = 0 } else { consecutiveEmpty += 1 }
             account += 1
         }
+        hardwareClient?.setDerivationPathOverride(nil)
+        if keepEmptyFirst, hits.isEmpty, let first = firstEntry {
+            hits.append(first)
+        }
         discovered = hits
-        let existing = existingAccountIndices()
-        for hit in hits where !existing.contains(hit.account) {
-            selection.insert(hit.account)
+        for hit in hits where !alreadyAdded(hit) {
+            selection.insert(hit.id)
         }
         progress.append("Stopped after \(Self.emptyAccountGapLimit) consecutive empty accounts.")
     }
 
-    private func existingAccountIndices() -> Set<UInt32> {
+    /// Whether a discovered account is already registered (by account
+    /// for software, by ADDRESS for hardware, so a hidden wallet's
+    /// distinct address at the same index is not hidden behind the
+    /// standard wallet).
+    private func alreadyAdded(_ hit: Hit) -> Bool {
         switch source {
         case .software:
-            return Set(store.tronWalletStore.wallets.compactMap { w in
-                if case let .software(a) = w.kind { return a }
-                return nil
-            })
+            return store.tronWalletStore.wallets.contains { w in
+                if case let .software(a) = w.kind { return a == hit.account }
+                return false
+            }
         case .hardware(let deviceId):
-            return Set(store.tronWalletStore.wallets.compactMap { w in
-                if case let .hardware(d, a, _) = w.kind, d == deviceId { return a }
-                return nil
-            })
+            return store.tronWalletStore.wallets.contains { w in
+                if case let .hardware(d, _, addr) = w.kind { return d == deviceId && addr == hit.address }
+                return false
+            }
         }
     }
 
     @MainActor
     private func addSelected() {
         var report: [String] = []
-        for hit in discovered where selection.contains(hit.account) {
+        // Persist the hidden-wallet binding once for this sweep (writes
+        // a host-typed passphrase to the Keychain). nil for software and
+        // for every Ledger / standard sweep.
+        let hidden = isTrezorSource
+            ? HardwarePassphraseRef.persist(selection: hwPassphrase)
+            : nil
+        let suffix = hidden == nil ? "" : " (Hidden)"
+        for hit in discovered where selection.contains(hit.id) {
             let kind: TronWalletKind
             let labelPrefix: String
             let dedupHit: TronWalletDescriptor?
@@ -291,8 +398,10 @@ struct DiscoverTronWalletsView: View {
                 )
                 let devLabel = store.devices.find(id: deviceId)?.label ?? "Hardware"
                 labelPrefix = "\(devLabel)"
+                // Dedup by address: a hidden wallet shares the account
+                // index but derives a distinct address.
                 dedupHit = store.tronWalletStore.wallets.first(where: {
-                    if case let .hardware(d, a, _) = $0.kind { return d == deviceId && a == hit.account }
+                    if case let .hardware(d, _, addr) = $0.kind { return d == deviceId && addr == hit.address }
                     return false
                 })
             }
@@ -300,8 +409,11 @@ struct DiscoverTronWalletsView: View {
                 report.append("Account \(hit.account), already labelled \"\(existing.label)\", skipped.")
                 continue
             }
-            let label = "\(labelPrefix) #\(hit.account)"
-            let descriptor = TronWalletDescriptor(label: label, kind: kind)
+            let pathSuffix = hit.derivationPath != nil ? " (Custom path)" : ""
+            let label = "\(labelPrefix) #\(hit.account)\(suffix)\(pathSuffix)"
+            let descriptor = TronWalletDescriptor(
+                label: label, kind: kind, hidden: hidden, derivationPath: hit.derivationPath
+            )
             store.tronWalletStore.add(descriptor, initialNetwork: network, makeActive: false)
             if case .hardware(let deviceId) = source {
                 store.devices.addTronWallet(deviceId: deviceId, walletId: descriptor.id)

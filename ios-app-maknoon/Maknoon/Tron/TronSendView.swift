@@ -46,6 +46,8 @@ struct TronSendView: View {
     // State machine
     @State private var state: SendState = .idle
     @State private var lastError: String?
+    /// Re-typed each signing for a host-entry hidden wallet; never stored.
+    @State private var signingPassphrase: String = ""
 
     // Sheets / overlays
     @State private var selectedToken: TronTRC20Token? = nil
@@ -131,11 +133,13 @@ struct TronSendView: View {
                 DeviceReadyConfirmationSheet(
                     device: op.device,
                     purpose: op.purpose,
+                    requiresPassphrase: descriptor?.hidden?.needsHostPassphrase == true,
                     onContinue: {
                         dismissSendViewKeyboard()
                         Task { await signNow() }
                     },
-                    onCancel: {}
+                    onCancel: {},
+                    onPassphrase: { signingPassphrase = $0 }
                 )
             }
             .sheet(isPresented: $showContacts) {
@@ -711,6 +715,12 @@ struct TronSendView: View {
                     }
                     let hwKind: HardwareWalletKind = dev.kind == .ledger ? .ledger : .trezor
                     let ledger = HardwareWalletFactory.make(kind: hwKind)
+                    // A Trezor hidden wallet must re-open its passphrase
+                    // session. Ledger / mock clients ignore this.
+                    if let trezor = ledger as? TrezorBLE {
+                        trezor.applyPassphraseMode(try HardwarePassphraseRef.resolveChoice(descriptor.hidden, hostEntered: signingPassphrase))
+                    }
+                    ledger.setDerivationPathOverride(descriptor.derivationPath)
                     ledger.beginSession()
                     defer { ledger.endSession() }
                     let identified = try await ledger.identifyDevice()
@@ -768,6 +778,12 @@ struct TronSendView: View {
                 }
                 let hwKind: HardwareWalletKind = dev.kind == .ledger ? .ledger : .trezor
                 let ledger = HardwareWalletFactory.make(kind: hwKind)
+                // A Trezor hidden wallet must re-open its passphrase
+                // session. Ledger / mock clients ignore this.
+                if let trezor = ledger as? TrezorBLE {
+                    trezor.applyPassphraseMode(try HardwarePassphraseRef.resolveChoice(descriptor.hidden, hostEntered: signingPassphrase))
+                }
+                ledger.setDerivationPathOverride(descriptor.derivationPath)
                 ledger.beginSession()
                 defer { ledger.endSession() }
                 let identified = try await ledger.identifyDevice()

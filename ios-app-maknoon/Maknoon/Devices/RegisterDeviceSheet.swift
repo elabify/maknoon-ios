@@ -20,6 +20,8 @@ struct RegisterDeviceSheet: View {
     /// bind subsequent connects to this specific physical device.
     /// Nil for non-BLE transports (YubiKey USB, SeedSigner camera).
     @State private var peripheralUUID: UUID? = nil
+    /// Bridges Trezor CodeEntry pairing to a 6-digit code prompt.
+    @StateObject private var pairingCoordinator = TrezorPairingCoordinator()
 
     enum Phase { case ready, connecting, captured }
 
@@ -72,6 +74,12 @@ struct RegisterDeviceSheet: View {
                 }
             }
             .onDisappear { cancelInFlight() }
+            .sheet(isPresented: $pairingCoordinator.awaitingCode) {
+                TrezorCodeEntrySheet(
+                    onSubmit: { pairingCoordinator.submit($0) },
+                    onCancel: { pairingCoordinator.cancel() }
+                )
+            }
         }
     }
 
@@ -135,7 +143,7 @@ struct RegisterDeviceSheet: View {
         case .ledger:
             Text("Unlock the Ledger Nano X so we can locally confirm the device serial.").font(.callout)
         case .trezor:
-            Text("Unlock your Trezor Safe 5 so Maknoon can read its serial over Bluetooth.").font(.callout)
+            Text("Unlock your Trezor so Maknoon can read its serial over Bluetooth.").font(.callout)
         case .seedsigner:
             // Routed to SeedSignerPairingSheet directly from
             // DevicesView; this sheet should never present the
@@ -220,10 +228,31 @@ struct RegisterDeviceSheet: View {
                 serial = s
                 peripheralUUID = wallet.currentBLEPeripheralUUID
             case .trezor:
+                // Trezor needs THP CodeEntry pairing to reach an
+                // encrypted session and read its real device_id; the
+                // pairing coordinator surfaces the 6-digit code prompt.
+                // On the simulator the factory returns the mock, which
+                // has no real serial, so fall back to identifyDevice().
                 let wallet = HardwareWalletFactory.make(kind: .trezor)
-                let s = try await wallet.identifyDevice()
-                serial = s
-                peripheralUUID = wallet.currentBLEPeripheralUUID
+                if let trezor = wallet as? TrezorBLE {
+                    // Reuse the persistent host key + any stored
+                    // credential so re-registering a paired device skips
+                    // the on-device code; persist the fresh credential
+                    // so later identity/signing ops reconnect silently.
+                    let hostKey = try TrezorCredentialStore.hostStaticKey()
+                    let stored = (try? TrezorCredentialStore.loadCredential()) ?? nil
+                    let result = try await trezor.establishPairedSession(
+                        hostStaticPriv: hostKey,
+                        codeProvider: pairingCoordinator,
+                        storedCredential: stored
+                    )
+                    serial = result.serial
+                    peripheralUUID = result.peripheralUUID
+                    try? TrezorCredentialStore.saveCredential(result.credential)
+                } else {
+                    serial = try await wallet.identifyDevice()
+                    peripheralUUID = wallet.currentBLEPeripheralUUID
+                }
             case .seedsigner:
                 throw HardwareWalletError.transport("SeedSigner uses the dedicated pairing screen.")
             }

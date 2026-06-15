@@ -28,6 +28,10 @@ enum HardwareWalletManager {
         masterPubkey: Data
     ) async throws -> HardwareAttestation {
         let wallet = HardwareWalletFactory.make(kind: kind)
+        // Pin the session so pair() + signMessage() reuse one
+        // connection (one handshake) instead of reconnecting per op.
+        wallet.beginSession()
+        defer { wallet.endSession() }
         let attestorPubkey = try await wallet.pair()
 
         // The canonical signed payload. Same field ordering as the

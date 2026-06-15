@@ -28,6 +28,13 @@ struct AddBitcoinWalletFromDeviceView: View {
     @State private var network: BitcoinNetwork = .mainnet
     @State private var accountIndex: UInt32 = 0
     @State private var label: String = ""
+    /// Trezor-only hidden-wallet selector. `.standard` reproduces exact
+    /// Ledger behavior (empty passphrase).
+    @State private var useCustomPath: Bool = false
+    @State private var customPath: String = ""
+    @State private var hwPassphrase: HiddenWalletSelection = .standard
+    /// Host-typed passphrase, used only when `hwPassphrase == .hostTyped`.
+    @State private var hwHostPassphrase: String = ""
     @State private var status: String?
     @State private var phase: Phase = .ready
     @State private var errorText: String?
@@ -62,8 +69,30 @@ struct AddBitcoinWalletFromDeviceView: View {
                 }
                 Stepper("Account index: \(accountIndex)", value: $accountIndex, in: 0...20)
                 TextField("Label (optional)", text: $label)
+                if device.kind == .trezor {
+                    Picker("Wallet", selection: $hwPassphrase) {
+                        ForEach(HiddenWalletSelection.allCases) { mode in
+                            Text(mode.rawValue).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    if hwPassphrase == .hostTyped {
+                        SecureField("Passphrase", text: $hwHostPassphrase)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                    }
+                }
+                DerivationPathAdvancedField(
+                    standardPath: BIP32Path.standardBitcoin(account: accountIndex, coinType: network.coinType),
+                    useCustom: $useCustomPath,
+                    customPath: $customPath
+                )
             } header: {
                 Text("Wallet")
+            } footer: {
+                if device.kind == .trezor {
+                    Text(hwPassphrase.footer).font(.caption)
+                }
             }
 
             Section {
@@ -172,8 +201,27 @@ struct AddBitcoinWalletFromDeviceView: View {
             guard device.kind == .ledger || device.kind == .trezor else {
                 throw HardwareWalletError.transport("This device kind doesn't support live xpub fetching. Add it from its dedicated pairing screen instead.")
             }
+            // A host-typed hidden wallet needs its passphrase before we
+            // can derive its (distinct) xpub.
+            if device.kind == .trezor, !hwPassphrase.isReady(hostPassphrase: hwHostPassphrase) {
+                throw HardwareWalletError.transport("Enter the hidden-wallet passphrase first.")
+            }
+            let pathOverride = DerivationPathAdvancedField.resolve(useCustom: useCustomPath, customPath: customPath)
+            if let p = pathOverride, !BIP32Path.isValid(p) {
+                throw HardwareWalletError.transport("Not a valid derivation path: \(p)")
+            }
             let kindForFactory: HardwareWalletKind = device.kind == .ledger ? .ledger : .trezor
             let client = HardwareWalletFactory.make(kind: kindForFactory)
+            // A Trezor hidden wallet derives in its own passphrase
+            // session. Ledger / mock clients ignore this.
+            if let trezor = client as? TrezorBLE {
+                trezor.applyPassphraseMode(hwPassphrase.choice(hostPassphrase: hwHostPassphrase))
+            }
+            client.setDerivationPathOverride(pathOverride)
+            // Pin the BLE session so identify + fingerprint + xpub share
+            // one connection (and one seeded session).
+            client.beginSession()
+            defer { client.endSession() }
             let liveSerial = try await client.identifyDevice()
             guard liveSerial == device.serial else {
                 throw HardwareWalletError.transport("Connected device has serial \(liveSerial) which does not match the registered serial \(device.serial). Reconnect the correct device or re-register this one.")
@@ -194,14 +242,24 @@ struct AddBitcoinWalletFromDeviceView: View {
 
             phase = .building
 
+            // Persist the hidden-wallet binding (writes a host-typed
+            // passphrase to the Keychain). nil for the standard wallet
+            // and for every Ledger add.
+            let hidden = device.kind == .trezor
+                ? HardwarePassphraseRef.persist(selection: hwPassphrase)
+                : nil
+            var suffix = hidden == nil ? "" : " (Hidden)"
+            if pathOverride != nil { suffix += " (Custom path)" }
             let trimmed = label.trimmingCharacters(in: .whitespaces)
             let baseLabel = trimmed.isEmpty ? "\(device.label) \(network.displayName)" : trimmed
-            let suffixedLabel = "\(baseLabel) #\(accountIndex)"
+            let suffixedLabel = "\(baseLabel) #\(accountIndex)\(suffix)"
 
             let wallet = BitcoinWalletDescriptor(
                 label: suffixedLabel,
                 kind: .hardware(deviceId: device.id, accountFingerprint: fingerprint, accountXpub: xpub),
-                network: network
+                network: network,
+                hidden: hidden,
+                derivationPath: pathOverride
             )
             store.bitcoinWalletStore.add(wallet, makeActive: false)
             store.devices.addBitcoinWallet(deviceId: device.id, walletId: wallet.id)

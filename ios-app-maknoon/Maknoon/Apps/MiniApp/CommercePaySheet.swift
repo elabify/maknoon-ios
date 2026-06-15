@@ -9,6 +9,7 @@
 // are shown but flagged "not yet payable on this device".
 
 import SwiftUI
+import WalletCore
 
 struct CommercePaySheet: View {
     let store: HolderStore
@@ -28,8 +29,30 @@ struct CommercePaySheet: View {
     @State private var blockedReason: String?
     /// Non-nil while the pre-tap "ready your hardware device" sheet is showing.
     @State private var pendingReadyOp: PendingHardwareOperation?
+    /// Re-typed each signing for a host-entry hidden wallet; never stored.
+    @State private var signingPassphrase: String = ""
+    /// Set once the payment is signed (and the presentation built) but
+    /// not yet sent. Hardware shows a Broadcast button on it; software
+    /// broadcasts straight through. Holds everything `runBroadcast` needs.
+    @State private var pendingBroadcast: PendingBroadcast?
 
-    enum Phase: Equatable { case loading, ready, working, done(String) }
+    private var selectedHidden: HardwarePassphraseRef? {
+        candidates.first(where: { $0.id == selectedId })?.descriptor.hidden
+    }
+
+    /// A signed-but-unsent payment: the identity disclosure plus the
+    /// signed raw tx and its (deterministic, pre-broadcast) hash, so the
+    /// merchant can be sent the identity BEFORE any money moves on-chain.
+    struct PendingBroadcast {
+        let presentation: Presentation
+        let rawTx: String
+        let txHash: String
+        let rail: PaymentRail
+        let rpcURLString: String
+        let requestId: String
+    }
+
+    enum Phase: Equatable { case loading, ready, working, signed, broadcasting, done(String) }
 
     struct Candidate: Identifiable {
         let id = UUID()
@@ -70,33 +93,67 @@ struct CommercePaySheet: View {
 
                 Section { walletRows } header: { Text("Pay from") }
 
+                if phase == .signed {
+                    Section {
+                        Label("Signed. Tap Broadcast to send.", systemImage: "checkmark.seal")
+                            .font(.callout)
+                    } footer: {
+                        Text("Broadcast sends your identity to the merchant first; the payment is only sent on-chain once the merchant has received it.")
+                            .font(.caption)
+                    }
+                }
                 if let error { Section { Text(error).font(.caption).foregroundStyle(.red) } }
                 if case .done(let tx) = phase {
                     Section { Label("Paid · \(tx.prefix(14))…", systemImage: "checkmark.seal.fill").foregroundStyle(.green) }
                 }
+                actionSection
             }
             .navigationTitle("Verify & Pay")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { onClose() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    if case .done = phase {
-                        Button("Done") { onClose() }
-                    } else {
-                        Button(action: confirm) {
-                            if phase == .working { ProgressView() } else { Text("Confirm & Pay") }
-                        }
-                        .disabled(!canConfirm)
-                    }
-                }
-            }
             .task { await load() }
             .sheet(item: $pendingReadyOp) { op in
                 DeviceReadyConfirmationSheet(
                     device: op.device,
                     purpose: op.purpose,
-                    onContinue: { pay() },
-                    onCancel: {})
+                    requiresPassphrase: selectedHidden?.needsHostPassphrase == true,
+                    onContinue: { prepare() },
+                    onCancel: {},
+                    onPassphrase: { signingPassphrase = $0 })
+            }
+        }
+    }
+
+    // MARK: - Actions (all at the bottom of the form, no toolbar buttons)
+
+    /// The one action area, pinned at the bottom of the form. The primary
+    /// button advances with the phase: Confirm & Pay -> Broadcast -> Close.
+    /// Cancel sits beneath it until the payment is done (then Close is the
+    /// only action).
+    @ViewBuilder private var actionSection: some View {
+        Section {
+            switch phase {
+            case .working:
+                HStack { ProgressView(); Text("Preparing…").foregroundStyle(.secondary) }
+            case .broadcasting:
+                HStack { ProgressView(); Text("Sending identity, then payment…").foregroundStyle(.secondary) }
+            case .signed:
+                Button(action: broadcastNow) {
+                    Text("Broadcast").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                Button("Cancel") { onClose() }.frame(maxWidth: .infinity)
+            case .done:
+                Button(action: onClose) {
+                    Text("Close").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+            default:   // .loading, .ready
+                Button(action: confirm) {
+                    Text("Confirm & Pay").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(!canConfirm)
+                Button("Cancel") { onClose() }.frame(maxWidth: .infinity)
             }
         }
     }
@@ -233,11 +290,11 @@ struct CommercePaySheet: View {
         }
     }
 
-    // MARK: - Confirm (disclose + sign + broadcast + post)
+    // MARK: - Confirm (disclose + sign), then Broadcast (send identity, then pay)
 
     /// Confirm tap. For a hardware wallet, first show the "ready your device"
-    /// sheet (so the user can wake + unlock the Ledger and open the Ethereum app
-    /// before BLE opens); on Continue it runs `pay()`. Software pays immediately.
+    /// sheet (so the user can wake + unlock the device); on Continue it runs
+    /// `prepare()`. Software prepares immediately.
     private func confirm() {
         guard let cand = candidates.first(where: { $0.id == selectedId }) else {
             error = "Select a wallet to pay from."
@@ -247,18 +304,22 @@ struct CommercePaySheet: View {
            let dev = store.devices.find(id: deviceId) {
             pendingReadyOp = PendingHardwareOperation(device: dev, purpose: .ethereumSign)
         } else {
-            pay()
+            prepare()
         }
     }
 
-    /// Disclose the identity, sign the payment (software or hardware), broadcast,
-    /// then seal + post the response for the merchant to poll.
-    private func pay() {
+    /// Phase 1: disclose the identity + sign the payment (no money moves
+    /// yet). The signed tx and its deterministic pre-broadcast hash are
+    /// stashed in `pendingBroadcast`. A hardware wallet then waits for the
+    /// user to tap Broadcast; a software wallet (signed inline) runs the
+    /// broadcast straight through.
+    private func prepare() {
         guard let matched, let cand = candidates.first(where: { $0.id == selectedId }),
               let from = cand.descriptor.address, let amount = cand.rail.amount else {
             error = "Couldn't prepare the payment."
             return
         }
+        let isSoftware = { if case .software = cand.descriptor.kind { return true } else { return false } }()
         phase = .working
         error = nil
         Task {
@@ -274,23 +335,78 @@ struct CommercePaySheet: View {
                     store: store)
                 let rpc = store.ethereumSettings.rpcURL(for: cand.network)
                 let raw = try await signedRawTransfer(cand: cand, from: from, amount: amount, rpcURLString: rpc)
-                let txHash = try await CommerceEVMPayment.broadcast(raw, rpcURLString: rpc)
-                let requestId = request.verifierRequest.requestId
-                let serverResponse = CommerceServerResponse(
-                    requestId: requestId, presentation: presentation,
-                    payment: .init(rail: cand.rail, txHash: txHash))
-                // Seal to the merchant's published key so the relay stays blind.
-                guard let pub = request.paymentTerms.responseKey else {
-                    throw CommerceTransportError.decode("merchant did not provide an encryption key")
+                // The EIP-1559 tx hash is keccak256 of the signed raw tx, so
+                // it is known BEFORE broadcast. That lets us hand the merchant
+                // the identity + (future) txHash and only then move money.
+                let pending = PendingBroadcast(
+                    presentation: presentation,
+                    rawTx: raw,
+                    txHash: Self.ethTxHash(rawHex: raw),
+                    rail: cand.rail,
+                    rpcURLString: rpc,
+                    requestId: request.verifierRequest.requestId)
+                pendingBroadcast = pending
+                if isSoftware {
+                    await runBroadcast(pending)   // one-tap, like other software sends
+                } else {
+                    phase = .signed               // hardware waits for the Broadcast tap
                 }
-                let sealed = try CommerceSeal.seal(serverResponse, toPublicKeyBase64: pub, requestId: requestId)
-                try await CommerceTransport.postResponse(baseURL: responseBaseURL, sealed)
-                phase = .done(txHash)
             } catch {
                 self.error = "\(error.localizedDescription)"
                 phase = .ready
             }
         }
+    }
+
+    /// Broadcast tap (hardware) or straight-through call (software).
+    private func broadcastNow() {
+        guard let pending = pendingBroadcast else { return }
+        Task { await runBroadcast(pending) }
+    }
+
+    /// Phase 2: send the identity to the merchant FIRST, then move money
+    /// on-chain only if the merchant actually received it. If the identity
+    /// post fails we never broadcast, so the payer never pays into a void.
+    @MainActor
+    private func runBroadcast(_ pending: PendingBroadcast) async {
+        phase = .broadcasting
+        error = nil
+        do {
+            // 1. Send the identity. Seal to the merchant's published key so
+            //    the relay stays blind.
+            guard let pub = request.paymentTerms.responseKey else {
+                throw CommerceTransportError.decode("merchant did not provide an encryption key")
+            }
+            let serverResponse = CommerceServerResponse(
+                requestId: pending.requestId, presentation: pending.presentation,
+                payment: .init(rail: pending.rail, txHash: pending.txHash))
+            let sealed = try CommerceSeal.seal(serverResponse, toPublicKeyBase64: pub, requestId: pending.requestId)
+            try await CommerceTransport.postResponse(baseURL: responseBaseURL, sealed)
+            // 2. Identity received -> send the payment on-chain.
+            let onChain = try await CommerceEVMPayment.broadcast(pending.rawTx, rpcURLString: pending.rpcURLString)
+            phase = .done(onChain)
+        } catch {
+            self.error = "\(error.localizedDescription)"
+            // Keep the signed tx so the user can retry Broadcast; nothing was
+            // paid unless the identity post AND the broadcast both succeeded.
+            phase = pendingBroadcast != nil ? .signed : .ready
+        }
+    }
+
+    /// Deterministic EIP-1559 transaction hash = keccak256(signed raw tx).
+    /// Computed locally so the merchant can be handed the txHash before the
+    /// tx is broadcast.
+    private static func ethTxHash(rawHex: String) -> String {
+        let hex = rawHex.hasPrefix("0x") ? String(rawHex.dropFirst(2)) : rawHex
+        var bytes = [UInt8]()
+        bytes.reserveCapacity(hex.count / 2)
+        var i = hex.startIndex
+        while i < hex.endIndex {
+            let j = hex.index(i, offsetBy: 2, limitedBy: hex.endIndex) ?? hex.endIndex
+            if let b = UInt8(hex[i..<j], radix: 16) { bytes.append(b) }
+            i = j
+        }
+        return "0x" + Hash.keccak256(data: Data(bytes)).map { String(format: "%02x", $0) }.joined()
     }
 
     /// Route the payment signing on the wallet kind, returning the raw signed
@@ -306,7 +422,10 @@ struct CommercePaySheet: View {
         case .hardware(let deviceId, let account, _):
             return try await signOnHardware(deviceId: deviceId, account: account, from: from,
                                             recipient: cand.rail.address, amount: amount,
-                                            asset: cand.asset, rpcURLString: rpcURLString)
+                                            asset: cand.asset, rpcURLString: rpcURLString,
+                                            hidden: cand.descriptor.hidden,
+                                            derivationPath: cand.descriptor.derivationPath,
+                                            hostEntered: signingPassphrase)
         }
     }
 
@@ -315,13 +434,31 @@ struct CommercePaySheet: View {
     /// then reassemble the signed envelope. Mirrors EthereumSendView.signOnHardware.
     private func signOnHardware(deviceId: UUID, account: UInt32, from: String,
                                 recipient: String, amount: String,
-                                asset: CommerceEVMPayment.Asset, rpcURLString: String) async throws -> String {
+                                asset: CommerceEVMPayment.Asset, rpcURLString: String,
+                                hidden: HardwarePassphraseRef? = nil,
+                                derivationPath: String? = nil,
+                                hostEntered: String? = nil) async throws -> String {
         guard let dev = store.devices.find(id: deviceId) else {
             throw CommercePayError("Hardware device record is missing. Re-register it in Settings → Devices.")
         }
         let plan = try await CommerceEVMPayment.buildPlan(
             from: from, rpcURLString: rpcURLString, recipient: recipient, amount: amount, asset: asset)
         let hardware = HardwareWalletFactory.make(kind: dev.kind == .ledger ? .ledger : .trezor)
+        // A hidden (passphrase) or custom-path wallet must re-derive in
+        // its own session before signing; standard wallets resolve to
+        // `.standard` / nil. Ledger / mock clients ignore the passphrase.
+        if let trezor = hardware as? TrezorBLE {
+            trezor.applyPassphraseMode(try HardwarePassphraseRef.resolveChoice(hidden, hostEntered: hostEntered))
+        }
+        hardware.setDerivationPathOverride(derivationPath)
+        // Pin one BLE/THP session across identify + sign. Without it,
+        // identify tears the link down and the sign reconnects
+        // immediately (the plan is built before identify, so there is no
+        // network round-trip in between), racing the half-closed BLE
+        // link so the fresh THP handshake reads a stale frame ("handshake
+        // init response has the wrong size"). Pinning keeps the link up.
+        hardware.beginSession()
+        defer { hardware.endSession() }
         let connected = try await hardware.identifyDevice()
         guard connected == dev.serial else {
             throw IdentityWrapError.deviceSerialMismatch(expected: dev.serial, actual: connected)

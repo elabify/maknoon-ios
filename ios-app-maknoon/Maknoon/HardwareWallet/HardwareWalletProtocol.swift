@@ -20,7 +20,7 @@ enum HardwareWalletKind: String, CaseIterable, Codable, Sendable {
 
     var displayName: String {
         switch self {
-        case .trezor: return "Trezor Safe 5"
+        case .trezor: return "Trezor"
         case .ledger: return "Ledger Nano X"
         case .mock:   return "Demo (no hardware)"
         }
@@ -89,6 +89,13 @@ protocol HardwareWallet: Sendable {
     /// (mock, Trezor stub) inherit the no-op default below.
     func beginSession()
     func endSession()
+
+    /// Override the BIP32 derivation path for the next seed-deriving
+    /// op(s); nil = the chain's standard path from `account`. MUST be a
+    /// protocol requirement (not extension-only) so a call through the
+    /// `HardwareWallet` type dispatches to the Ledger / Trezor override
+    /// rather than the no-op default. Mock / YubiKey inherit the no-op.
+    func setDerivationPathOverride(_ path: String?)
 
     /// Fetch the Ethereum EOA address for a given BIP44 account
     /// index (m/44'/60'/<account>'/0/0). Returns the EIP-55
@@ -188,6 +195,12 @@ extension HardwareWallet {
     }
     func beginSession() {}
     func endSession() {}
+    /// Override the BIP32 derivation path for the NEXT seed-deriving
+    /// op(s) on this client. `nil` (the default) uses the chain's
+    /// standard path from `account`. Set right before an add / discover
+    /// / sign op for a custom- or alternative-path wallet. Vendors that
+    /// don't support custom paths (Mock, YubiKey) inherit this no-op.
+    func setDerivationPathOverride(_ path: String?) {}
     func getEthereumAddress(account: UInt32) async throws -> String {
         throw HardwareWalletError.notImplemented(kind)
     }

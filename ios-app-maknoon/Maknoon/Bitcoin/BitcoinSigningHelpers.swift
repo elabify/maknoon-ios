@@ -75,8 +75,12 @@ enum BitcoinSigningHelpers {
         device: RegisteredDevice,
         fingerprintHex: String,
         accountXpub: String,
-        network: BitcoinNetwork
+        network: BitcoinNetwork,
+        hidden: HardwarePassphraseRef? = nil,
+        derivationPath: String? = nil,
+        hostEntered: String? = nil
     ) async throws -> String {
+        let coinType: UInt32 = network == .mainnet ? 0 : 1
         switch device.kind {
         case .ledger:
             let ledger = HardwareWalletFactory.make(kind: .ledger)
@@ -87,8 +91,26 @@ enum BitcoinSigningHelpers {
             // paired Ledger nearby can't accidentally pick up the
             // request (multi-device safety, Week 8 work).
             ledger.targetPeripheralUUID = device.peripheralUUID
-            let coinType: UInt32 = network == .mainnet ? 0 : 1
+            ledger.setDerivationPathOverride(derivationPath)
             return try await ledger.signBitcoinPSBT(
+                unsignedBase64: unsignedBase64,
+                fingerprintHex: fingerprintHex,
+                accountXpub: accountXpub,
+                account: 0,
+                coinType: coinType
+            )
+        case .trezor:
+            let trezor = HardwareWalletFactory.make(kind: .trezor)
+            guard let trezor = trezor as? TrezorBLE else {
+                throw BitcoinWallet.WalletError.sendFailed("Expected TrezorBLE instance, got \(type(of: trezor))")
+            }
+            trezor.targetPeripheralUUID = device.peripheralUUID
+            // A hidden wallet must re-open its passphrase session so the
+            // device derives the matching keys; standard wallets resolve
+            // to `.standard`.
+            trezor.applyPassphraseMode(try HardwarePassphraseRef.resolveChoice(hidden, hostEntered: hostEntered))
+            trezor.setDerivationPathOverride(derivationPath)
+            return try await trezor.signBitcoinPSBT(
                 unsignedBase64: unsignedBase64,
                 fingerprintHex: fingerprintHex,
                 accountXpub: accountXpub,

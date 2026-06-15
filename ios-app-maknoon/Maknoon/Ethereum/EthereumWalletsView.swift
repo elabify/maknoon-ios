@@ -148,6 +148,14 @@ struct AddEthereumWalletSheet: View {
     @State private var label = ""
     @State private var selectedDeviceId: UUID?
     @State private var account: UInt32 = 0
+    /// Trezor-only hidden-wallet selector for the direct-add path.
+    /// `.standard` reproduces exact Ledger behavior (empty passphrase).
+    @State private var hwPassphrase: HiddenWalletSelection = .standard
+    /// Host-typed passphrase, used only when `hwPassphrase == .hostTyped`.
+    @State private var hwHostPassphrase: String = ""
+    /// Advanced custom derivation path (both vendors). Blank = standard.
+    @State private var useCustomPath: Bool = false
+    @State private var customPath: String = ""
     /// Software-path account index, kept separate from the hardware
     /// `account` so each path has its own default. Seeded once to the
     /// next free account so the default never duplicates an existing
@@ -382,10 +390,30 @@ struct AddEthereumWalletSheet: View {
             }
             Stepper("Account #\(account)", value: $account, in: 0...255)
             TextField(autoLabel(for: dev), text: $label)
+            if dev.kind == .trezor {
+                Picker("Wallet", selection: $hwPassphrase) {
+                    ForEach(HiddenWalletSelection.allCases) { mode in
+                        Text(mode.rawValue).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+                if hwPassphrase == .hostTyped {
+                    SecureField("Passphrase", text: $hwHostPassphrase)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                }
+            }
+            DerivationPathAdvancedField(
+                standardPath: BIP32Path.standardEthereum(account: account),
+                useCustom: $useCustomPath,
+                customPath: $customPath
+            )
         } header: {
             Text("New Ethereum wallet")
         } footer: {
-            Text("Leave the label blank to use \"\(autoLabel(for: dev))\". The address is the same on every EVM network; \"Open on\" picks which one the wallet opens to first.")
+            Text(dev.kind == .trezor
+                ? hwPassphrase.footer
+                : "Leave the label blank to use \"\(autoLabel(for: dev))\". The address is the same on every EVM network; \"Open on\" picks which one the wallet opens to first.")
                 .font(.caption)
         }
     }
@@ -473,11 +501,22 @@ struct AddEthereumWalletSheet: View {
                 errorText = "Pick a device first."
                 return
             }
+            // A host-typed hidden wallet needs its passphrase before we
+            // can derive its (distinct) address.
+            if dev.kind == .trezor, !hwPassphrase.isReady(hostPassphrase: hwHostPassphrase) {
+                errorText = "Enter the hidden-wallet passphrase first."
+                return
+            }
             // Pre-flight the dedup check so the user gets an instant
             // "already exists" error instead of being walked through
             // the readiness sheet + BLE roundtrip before the same
-            // collision is caught inside createHardware.
-            if let existing = existingHardwareWallet(deviceId: dev.id, account: account) {
+            // collision is caught inside createHardware. Skipped for a
+            // hidden wallet: it derives a different address at the same
+            // account index, so the standard wallet there is not a
+            // collision. The address-based check in createHardware
+            // catches a true duplicate after derivation.
+            if hwPassphrase == .standard,
+               let existing = existingHardwareWallet(deviceId: dev.id, account: account) {
                 errorText = "A wallet for \(dev.label) at account #\(account) already exists, labelled \"\(existing.label)\". Use Discover existing wallets if you're trying to recover a different account."
                 return
             }
@@ -551,20 +590,43 @@ struct AddEthereumWalletSheet: View {
             errorText = "Pick a device first."
             return
         }
+        // Persist the hidden-wallet binding (writes a host-typed
+        // passphrase to the Keychain). nil for the standard wallet and
+        // for every Ledger add. Built before the BLE roundtrip so a
+        // Keychain failure surfaces immediately.
+        let hidden = dev.kind == .trezor
+            ? HardwarePassphraseRef.persist(selection: hwPassphrase)
+            : nil
+        // Custom derivation path (both vendors). nil = standard.
+        let pathOverride = DerivationPathAdvancedField.resolve(useCustom: useCustomPath, customPath: customPath)
+        if let p = pathOverride, !BIP32Path.isValid(p) {
+            errorText = "Not a valid derivation path: \(p)"
+            return
+        }
+        var suffix = hidden == nil ? "" : " (Hidden)"
+        if pathOverride != nil { suffix += " (Custom path)" }
         let trimmed = label.trimmingCharacters(in: .whitespaces)
         let suffixedLabel = trimmed.isEmpty
-            ? autoLabel(for: dev)
-            : "\(trimmed) #\(account)"
+            ? "\(autoLabel(for: dev))\(suffix)"
+            : "\(trimmed) #\(account)\(suffix)"
 
-        // Second-line defence in case the user races the form (rapid
-        // double-tap of Create) and the pre-flight dedup in create()
-        // missed it.
-        if let existing = existingHardwareWallet(deviceId: dev.id, account: account) {
+        // Second-line defence for the standard wallet in case the user
+        // races the form (rapid double-tap). A hidden or custom-path
+        // wallet shares the account index, so it's deduped by address
+        // after derivation.
+        if hidden == nil, pathOverride == nil,
+           let existing = existingHardwareWallet(deviceId: dev.id, account: account) {
             errorText = "A wallet for \(dev.label) at account #\(account) already exists, labelled \"\(existing.label)\"."
             return
         }
         let kind: HardwareWalletKind = dev.kind == .ledger ? .ledger : .trezor
         let hardware = HardwareWalletFactory.make(kind: kind)
+        // A hidden wallet must derive in its own passphrase session.
+        // Ledger / mock clients ignore this.
+        if let trezor = hardware as? TrezorBLE {
+            trezor.applyPassphraseMode(hwPassphrase.choice(hostPassphrase: hwHostPassphrase))
+        }
+        hardware.setDerivationPathOverride(pathOverride)
         // Pin the BLE session for identify + getEthereumAddress so
         // they share one connection.
         hardware.beginSession()
@@ -577,10 +639,23 @@ struct AddEthereumWalletSheet: View {
                 )
             }
             let address = try await hardware.getEthereumAddress(account: account)
+            // Address-based dedup: catches a hidden wallet that resolves
+            // to an address already on file (e.g. same passphrase added
+            // twice, or a passphrase that happens to match the standard
+            // wallet because it was left empty).
+            if let existing = store.ethereumWalletStore.wallets.first(where: {
+                guard case let .hardware(d, _, addr) = $0.kind else { return false }
+                return d == dev.id && addr.caseInsensitiveCompare(address) == .orderedSame
+            }) {
+                errorText = "This wallet (\(address.prefix(6))…\(address.suffix(4))) already exists, labelled \"\(existing.label)\"."
+                return
+            }
             let descriptor = EthereumWalletDescriptor(
                 label: suffixedLabel,
                 kind: .hardware(deviceId: dev.id, account: account, address: address),
-                cachedAddress: address
+                cachedAddress: address,
+                hidden: hidden,
+                derivationPath: pathOverride
             )
             store.ethereumWalletStore.add(descriptor, initialNetwork: initialNetwork, makeActive: true)
             store.devices.addEthereumWallet(deviceId: dev.id, walletId: descriptor.id)

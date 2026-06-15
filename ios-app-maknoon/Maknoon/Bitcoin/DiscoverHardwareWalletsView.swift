@@ -26,13 +26,23 @@ struct DiscoverHardwareWalletsView: View {
     @State private var scanning: Bool = false
     @State private var progress: [String] = []
     @State private var found: [Discovered] = []
-    @State private var selection: Set<UInt32> = []
+    @State private var selection: Set<String> = []
     @State private var errorText: String?
     /// Populated when the user taps Start Scan. Drives the pre-tap
     /// "open the Bitcoin app on the device" sheet.
     @State private var pendingReadyOp: PendingHardwareOperation?
     /// Per-account report shown after Add Selected runs.
     @State private var addReport: [String]?
+    /// Trezor-only hidden-wallet selector. `.standard` reproduces exact
+    /// Ledger behavior (empty passphrase).
+    @State private var hwPassphrase: HiddenWalletSelection = .standard
+    /// Host-typed passphrase, used only when `hwPassphrase == .hostTyped`.
+    @State private var hwHostPassphrase: String = ""
+    /// Also sweep well-known alternative paths: BIP44 (legacy), BIP49
+    /// (nested segwit), BIP84 (native segwit) per account.
+    @State private var alsoTryAltPaths: Bool = false
+
+    private var isTrezor: Bool { device.kind == .trezor }
 
     /// BIP44 gap-limit at the ACCOUNT level. Stop scanning once this
     /// many consecutive empty accounts are encountered. The default
@@ -48,7 +58,10 @@ struct DiscoverHardwareWalletsView: View {
         let fingerprint: String
         let txCount: Int
         let balanceSat: UInt64
-        var id: UInt32 { account }
+        /// Non-standard account path this was found at, when sweeping
+        /// alternatives; nil for the standard BIP84 path.
+        var derivationPath: String?
+        var id: String { "\(account):\(derivationPath ?? "std")" }
     }
 
     var body: some View {
@@ -61,6 +74,37 @@ struct DiscoverHardwareWalletsView: View {
             } footer: {
                 Text("Maknoon will walk BIP44 accounts on this device + network until \(Self.emptyAccountGapLimit) consecutive empty accounts are found, then stop. Each account is a full Electrum scan and can take several seconds.")
                     .font(.caption)
+            }
+
+            if isTrezor && !scanning && found.isEmpty && progress.isEmpty {
+                Section {
+                    Picker("Wallet", selection: $hwPassphrase) {
+                        ForEach(HiddenWalletSelection.allCases) { mode in
+                            Text(mode.rawValue).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    if hwPassphrase == .hostTyped {
+                        SecureField("Passphrase", text: $hwHostPassphrase)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                    }
+                } header: {
+                    Text("Hidden wallet")
+                } footer: {
+                    Text(hwPassphrase.footer).font(.caption)
+                }
+            }
+
+            if !scanning && found.isEmpty && progress.isEmpty {
+                Section {
+                    Toggle("Try alternative derivation paths", isOn: $alsoTryAltPaths)
+                } header: {
+                    Text("Advanced")
+                } footer: {
+                    Text("Also checks BIP44 (legacy 1…), BIP49 (nested SegWit 3…) and BIP84 (native SegWit bc1q…) per account, so a wallet from another app is found. Slower: a full scan per script type.")
+                        .font(.caption)
+                }
             }
 
             if !scanning && found.isEmpty && progress.isEmpty {
@@ -80,6 +124,7 @@ struct DiscoverHardwareWalletsView: View {
                     } label: {
                         Label("Start scan", systemImage: "magnifyingglass")
                     }
+                    .disabled(!hwPassphrase.isReady(hostPassphrase: hwHostPassphrase))
                 }
             }
 
@@ -101,10 +146,10 @@ struct DiscoverHardwareWalletsView: View {
                 Section {
                     ForEach(found) { acct in
                         Toggle(isOn: Binding(
-                            get: { selection.contains(acct.account) },
+                            get: { selection.contains(acct.id) },
                             set: { include in
-                                if include { selection.insert(acct.account) }
-                                else { selection.remove(acct.account) }
+                                if include { selection.insert(acct.id) }
+                                else { selection.remove(acct.id) }
                             }
                         )) {
                             VStack(alignment: .leading, spacing: 2) {
@@ -112,6 +157,9 @@ struct DiscoverHardwareWalletsView: View {
                                     .font(.callout.weight(.semibold))
                                 Text("\(acct.txCount) tx · \(formatSats(acct.balanceSat, ticker: network.ticker))")
                                     .font(.caption).foregroundStyle(.secondary)
+                                if let path = acct.derivationPath {
+                                    Text(path).font(.caption2.monospaced()).foregroundStyle(.tertiary)
+                                }
                             }
                         }
                     }
@@ -173,6 +221,15 @@ struct DiscoverHardwareWalletsView: View {
 
         let kindForFactory: HardwareWalletKind = device.kind == .ledger ? .ledger : .trezor
         let client = HardwareWalletFactory.make(kind: kindForFactory)
+        // A Trezor hidden wallet derives in its own passphrase session.
+        // Ledger / mock clients ignore this.
+        if let trezor = client as? TrezorBLE {
+            trezor.applyPassphraseMode(hwPassphrase.choice(hostPassphrase: hwHostPassphrase))
+        }
+        // A fresh hidden wallet has no on-chain activity, so the sweep
+        // would surface nothing; keep account 0 so the user can still
+        // add it. Standard sweeps are unaffected.
+        let keepEmptyFirst = isTrezor && hwPassphrase != .standard
 
         let electrumURL = store.bitcoinSettings.electrumURL(for: network)
 
@@ -192,61 +249,99 @@ struct DiscoverHardwareWalletsView: View {
             }
             let fingerprint = try await client.getBitcoinMasterFingerprint(networkCoinType: network.coinType)
 
+            // Standard path only (nil), or the BIP44/49/84 templates per
+            // account when sweeping alternatives.
+            let templateList: [String?] = alsoTryAltPaths
+                ? BIP32Path.alternativeTemplates(.bitcoin).map { Optional($0) }
+                : [nil]
+            // Dedup resolved paths + xpubs so a template that collides or
+            // a device that ignores the override never yields a dup row.
+            var seenPaths = Set<String>()
+            var seenXpubs = Set<String>()
+
             // BIP44-style gap-limit at the ACCOUNT level: keep walking
             // 0, 1, 2, ... until we hit emptyAccountGapLimit empty
-            // accounts in a row, then stop. This avoids the old
-            // hard-coded 5-account ceiling cutting off long histories.
+            // accounts in a row, then stop.
             var account: UInt32 = 0
             var consecutiveEmpty = 0
+            var firstEntry: Discovered?
             while consecutiveEmpty < Self.emptyAccountGapLimit {
-                progress.append("Reading \(network.displayName) account \(account) xpub…")
-                let xpub = try await client.getBitcoinAccountXpub(
-                    account: account, networkCoinType: network.coinType
-                )
+                var accountHadActivity = false
+                for tmpl in templateList {
+                    let pathOverride = tmpl.map {
+                        BIP32Path.fill($0, account: account, coinType: network.coinType)
+                    }
+                    guard seenPaths.insert(pathOverride ?? "std").inserted else { continue }
+                    client.setDerivationPathOverride(pathOverride)
 
-                progress.append("Scanning \(network.displayName) account \(account)…")
-                let pair = try BitcoinDescriptors.watchOnlyFromCachedKey(
-                    accountFingerprint: fingerprint,
-                    accountXpub: xpub,
-                    network: network
-                )
-                let persister = try Persister.newInMemory()
-                let probe = try Wallet(
-                    descriptor: pair.external,
-                    changeDescriptor: pair.internal,
-                    network: network.bdk,
-                    persister: persister
-                )
-                let request = try probe.startFullScan().build()
-                let cli = try ElectrumClient(url: electrumURL, socks5: nil)
-                let update = try cli.fullScan(
-                    request: request, stopGap: 20, batchSize: 10, fetchPrevTxouts: false
-                )
-                try probe.applyUpdate(update: update)
-                let txCount = probe.transactions().count
-                let balanceSat = probe.balance().total.toSat()
-                progress.append("  \(network.displayName) account \(account): \(txCount) tx, \(balanceSat) sats")
+                    // Read the account xpub; a device may forbid a foreign
+                    // path (Trezor rejects non-standard purposes), so skip
+                    // that template rather than aborting the sweep.
+                    let xpub: String
+                    do {
+                        progress.append("Reading account \(account) \(pathOverride ?? "BIP84")…")
+                        xpub = try await client.getBitcoinAccountXpub(
+                            account: account, networkCoinType: network.coinType
+                        )
+                    } catch {
+                        progress.append("Account \(account): \(pathOverride ?? "standard path") not supported, skipped")
+                        continue
+                    }
+                    guard seenXpubs.insert(xpub).inserted else { continue }
 
-                if txCount > 0 {
-                    consecutiveEmpty = 0
+                    let scriptType = BIP32Path.bitcoinScriptType(forPath: pathOverride ?? "") ?? .nativeSegwit
+                    let pair = try BitcoinDescriptors.watchOnlyFromCachedKey(
+                        accountFingerprint: fingerprint,
+                        accountXpub: xpub,
+                        network: network,
+                        scriptType: scriptType
+                    )
+                    let persister = try Persister.newInMemory()
+                    let probe = try Wallet(
+                        descriptor: pair.external,
+                        changeDescriptor: pair.internal,
+                        network: network.bdk,
+                        persister: persister
+                    )
+                    let request = try probe.startFullScan().build()
+                    let cli = try ElectrumClient(url: electrumURL, socks5: nil)
+                    let update = try cli.fullScan(
+                        request: request, stopGap: 20, batchSize: 10, fetchPrevTxouts: false
+                    )
+                    try probe.applyUpdate(update: update)
+                    let txCount = probe.transactions().count
+                    let balanceSat = probe.balance().total.toSat()
+                    progress.append("  account \(account) \(pathOverride ?? "BIP84"): \(txCount) tx, \(balanceSat) sats")
+
                     let d = Discovered(
                         account: account, xpub: xpub, fingerprint: fingerprint,
-                        txCount: txCount, balanceSat: balanceSat
+                        txCount: txCount, balanceSat: balanceSat, derivationPath: pathOverride
                     )
-                    found.append(d)
-                    // Pre-select any account that doesn't already
-                    // exist for this (device, network).
-                    let exists = store.bitcoinWalletStore.wallets.contains { w in
-                        guard w.network == network,
-                              case let .hardware(deviceId, _, walletXpub) = w.kind,
-                              deviceId == device.id else { return false }
-                        return walletXpub == xpub
+                    if account == 0, firstEntry == nil { firstEntry = d }
+
+                    if txCount > 0 {
+                        accountHadActivity = true
+                        found.append(d)
+                        // Dedup is by xpub, so a hidden / alt-path wallet's
+                        // distinct xpub is never confused with the standard.
+                        let exists = store.bitcoinWalletStore.wallets.contains { w in
+                            guard w.network == network,
+                                  case let .hardware(deviceId, _, walletXpub) = w.kind,
+                                  deviceId == device.id else { return false }
+                            return walletXpub == xpub
+                        }
+                        if !exists { selection.insert(d.id) }
                     }
-                    if !exists { selection.insert(account) }
-                } else {
-                    consecutiveEmpty += 1
                 }
+                if accountHadActivity { consecutiveEmpty = 0 } else { consecutiveEmpty += 1 }
                 account += 1
+            }
+            client.setDerivationPathOverride(nil)
+            // Surface account 0 for a fresh hidden wallet even with no
+            // activity, so it can be added from the sweep too.
+            if keepEmptyFirst, found.isEmpty, let first = firstEntry {
+                found.append(first)
+                selection.insert(first.id)
             }
             progress.append("Stopped after \(Self.emptyAccountGapLimit) consecutive empty accounts.")
         } catch {
@@ -256,7 +351,14 @@ struct DiscoverHardwareWalletsView: View {
 
     private func addSelected() {
         var report: [String] = []
-        for d in found where selection.contains(d.account) {
+        // Persist the hidden-wallet binding once for this sweep (writes
+        // a host-typed passphrase to the Keychain). nil for the standard
+        // wallet and for every Ledger sweep.
+        let hidden = isTrezor
+            ? HardwarePassphraseRef.persist(selection: hwPassphrase)
+            : nil
+        let baseSuffix = hidden == nil ? "" : " (Hidden)"
+        for d in found where selection.contains(d.id) {
             let existing = store.bitcoinWalletStore.wallets.first { w in
                 guard w.network == network,
                       case let .hardware(deviceId, _, walletXpub) = w.kind,
@@ -267,12 +369,15 @@ struct DiscoverHardwareWalletsView: View {
                 report.append("Account \(d.account) (\(network.displayName)), already labelled \"\(existing.label)\", skipped.")
                 continue
             }
+            let suffix = baseSuffix + (d.derivationPath != nil ? " (Custom path)" : "")
             let baseLabel = "\(device.label) \(network.displayName)"
-            let label = "\(baseLabel) #\(d.account)"
+            let label = "\(baseLabel) #\(d.account)\(suffix)"
             let descriptor = BitcoinWalletDescriptor(
                 label: label,
                 kind: .hardware(deviceId: device.id, accountFingerprint: d.fingerprint, accountXpub: d.xpub),
-                network: network
+                network: network,
+                hidden: hidden,
+                derivationPath: d.derivationPath
             )
             store.bitcoinWalletStore.add(descriptor, makeActive: false)
             store.devices.addBitcoinWallet(deviceId: device.id, walletId: descriptor.id)

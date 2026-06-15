@@ -43,6 +43,8 @@ struct EthereumSendView: View {
     @State private var tokenBalance: EthereumWeiValue?
     @State private var loadingFees: Bool = true
     @State private var submitting: Bool = false
+    /// Re-typed each signing for a host-entry hidden wallet; never stored.
+    @State private var signingPassphrase: String = ""
     /// Hardware path only: raw signed tx returned by the device,
     /// held until the user taps Broadcast. Mirrors the BTC / SOL /
     /// TRX flow so the user gets one explicit "I'm about to put
@@ -209,11 +211,13 @@ struct EthereumSendView: View {
                 DeviceReadyConfirmationSheet(
                     device: op.device,
                     purpose: op.purpose,
+                    requiresPassphrase: activeDescriptor?.hidden?.needsHostPassphrase == true,
                     onContinue: {
                         dismissSendViewKeyboard()
                         Task { await broadcast() }
                     },
-                    onCancel: {}
+                    onCancel: {},
+                    onPassphrase: { signingPassphrase = $0 }
                 )
             }
             } // ScrollViewReader
@@ -786,12 +790,35 @@ struct EthereumSendView: View {
     /// wallet's BIP44 account index, get V/R/S back, reassemble
     /// the signed envelope.
     @MainActor
-    private func signOnHardware(plan: EthereumTxPlan, deviceId: UUID, account: UInt32) async throws -> String {
+    private func signOnHardware(
+        plan: EthereumTxPlan,
+        deviceId: UUID,
+        account: UInt32,
+        hidden: HardwarePassphraseRef? = nil,
+        derivationPath: String? = nil,
+        hostEntered: String? = nil
+    ) async throws -> String {
         guard let dev = store.devices.find(id: deviceId) else {
             throw EthereumWallet.WalletError.rpcFailure("Hardware device record \(deviceId) is missing. Re-register the device in Settings → Devices.")
         }
         let hwKind: HardwareWalletKind = dev.kind == .ledger ? .ledger : .trezor
         let hardware = HardwareWalletFactory.make(kind: hwKind)
+        // A Trezor hidden wallet must re-open the same passphrase
+        // session it was discovered in, or the device derives a
+        // different (wrong) key and the signature won't match the
+        // wallet's address. Ledger / mock clients ignore this.
+        if let trezor = hardware as? TrezorBLE {
+            trezor.applyPassphraseMode(try HardwarePassphraseRef.resolveChoice(hidden, hostEntered: hostEntered))
+        }
+        hardware.setDerivationPathOverride(derivationPath)
+        // Pin one BLE/THP session across identify + sign. Without it,
+        // identify tears the link down and the sign reconnects
+        // immediately (no network round-trip in between, unlike Solana),
+        // racing the half-closed BLE link so the fresh THP handshake
+        // reads a stale frame ("handshake init response has the wrong
+        // size"). Pinning keeps the link up across both ops.
+        hardware.beginSession()
+        defer { hardware.endSession() }
         let connected = try await hardware.identifyDevice()
         guard connected == dev.serial else {
             throw IdentityWrapError.deviceSerialMismatch(expected: dev.serial, actual: connected)
@@ -950,7 +977,10 @@ struct EthereumSendView: View {
                 )
             case .hardware(let deviceId, let account, _):
                 let rawTx = try await signOnHardware(
-                    plan: plan, deviceId: deviceId, account: account
+                    plan: plan, deviceId: deviceId, account: account,
+                    hidden: descriptor.hidden,
+                    derivationPath: descriptor.derivationPath,
+                    hostEntered: signingPassphrase
                 )
                 // Hardware path: stash the signed tx and let the
                 // user tap Broadcast. Same pattern as BTC / SOL /

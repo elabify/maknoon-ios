@@ -251,6 +251,31 @@ actor SolanaWallet {
         try await rpc.sendTransaction(signedBase64: signedBase64)
     }
 
+    /// Rent-exempt minimum (lamports) for a plain 0-byte system
+    /// account. Network-invariant under Solana's standard rent config.
+    /// 0.00089088 SOL.
+    static let rentExemptMinimumLamports: UInt64 = 890_880
+
+    /// Pre-flight guard for a native SOL transfer: a transfer that
+    /// would create a brand-new recipient account (one that doesn't
+    /// exist on-chain yet) must leave it at or above the rent-exempt
+    /// minimum, or the cluster rejects the whole tx with
+    /// `InsufficientFundsForRent { account_index: 1 }` at simulation.
+    /// Throws a clear, actionable error in that case so the user sees
+    /// "send a bit more" instead of a raw RPC code. No-op once the
+    /// recipient exists (any amount is then valid), and fail-open if
+    /// the existence probe itself errors (let the real send surface it).
+    func assertRentExemptForNativeTransfer(recipient: String, lamports: UInt64) async throws {
+        guard lamports < Self.rentExemptMinimumLamports else { return }
+        let exists = (try? await rpc.accountExists(address: recipient)) ?? true
+        guard !exists else { return }
+        throw SolanaDescriptorError.signingFailed(
+            "\(recipient.prefix(6))… is a brand-new account. Solana requires at least "
+            + "0.00089088 SOL to create it (rent exemption). Send at least that much, "
+            + "or fund the address another way first."
+        )
+    }
+
     /// Hardware SPL token transfer. The Ledger holds the private
     /// key; Maknoon builds the unsigned SPL transfer message,
     /// ships it to the device, and assembles the signed wire form

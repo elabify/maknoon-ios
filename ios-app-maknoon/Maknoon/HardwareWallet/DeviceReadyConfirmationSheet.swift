@@ -62,8 +62,24 @@ struct DeviceReadyConfirmationSheet: View {
     @Environment(\.dismiss) private var dismiss
     let device: RegisteredDevice
     let purpose: HardwareOperationPurpose
+    /// When true, a hidden (host-entry) wallet is being signed: show the
+    /// passphrase field here and require it before Continue. The typed
+    /// value is handed back via `onPassphrase` and never stored.
+    var requiresPassphrase: Bool = false
     let onContinue: () -> Void
     let onCancel: () -> Void
+    /// Called with the passphrase the user typed, just before
+    /// `onContinue`, when `requiresPassphrase` is set. Nil otherwise.
+    var onPassphrase: ((String) -> Void)? = nil
+
+    /// Re-typed each presentation; the sheet is rebuilt by
+    /// `.sheet(item:)` so this never carries over between signings.
+    @State private var passphrase: String = ""
+
+    private var passphraseMissing: Bool {
+        requiresPassphrase
+            && passphrase.trimmingCharacters(in: .whitespaces).isEmpty
+    }
 
     var body: some View {
         NavigationStack {
@@ -85,13 +101,26 @@ struct DeviceReadyConfirmationSheet: View {
                     Text(instructions)
                         .font(.callout)
                 }
+                if requiresPassphrase {
+                    Section {
+                        SecureField("Hidden-wallet passphrase", text: $passphrase)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .submitLabel(.done)
+                    } header: {
+                        Text("Hidden wallet")
+                    } footer: {
+                        Text("Re-enter this hidden wallet's passphrase to sign. It is never saved.")
+                            .font(.caption)
+                    }
+                }
                 Section {
                     Text(timeoutHint)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
-            .navigationTitle("Get the device ready")
+            .navigationTitle("Prepare Device")
             .navigationBarTitleDisplayMode(.inline)
             // Half-sheet popup so this feels closer to an alert than
             // a full-screen takeover, while still preserving the
@@ -109,10 +138,12 @@ struct DeviceReadyConfirmationSheet: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Continue") {
+                        if requiresPassphrase { onPassphrase?(passphrase) }
                         onContinue()
                         dismiss()
                     }
                     .fontWeight(.semibold)
+                    .disabled(passphraseMissing)
                 }
             }
         }

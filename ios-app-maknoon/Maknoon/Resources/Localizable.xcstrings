@@ -134,6 +134,16 @@
     "• \"%@\" is not in the BIP39 list" : {
 
     },
+    "≈ %@ %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "≈ %1$@ %2$@"
+          }
+        }
+      }
+    },
     "0 (any)" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1137,6 +1147,18 @@
         }
       }
     },
+    "Also checks BIP44 (legacy 1…), BIP49 (nested SegWit 3…) and BIP84 (native SegWit bc1q…) per account, so a wallet from another app is found. Slower: a full scan per script type." : {
+
+    },
+    "Also checks well-known non-standard paths (e.g. Ledger Live's m/44'/501'/N') so a wallet created in another app is found." : {
+
+    },
+    "Also checks well-known non-standard paths (Ledger Live, MEW legacy, …) so a wallet created in another app is found. Slower: more lookups per account." : {
+
+    },
+    "Also checks well-known non-standard paths (Ledger, TIP-01, …) so a wallet created in another app is found." : {
+
+    },
     "Also scan Testnet3 + Signet" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1791,6 +1813,9 @@
         }
       }
     },
+    "Broadcast" : {
+
+    },
     "Broadcast %@ ago" : {
 
     },
@@ -1816,6 +1841,9 @@
           }
         }
       }
+    },
+    "Broadcast sends your identity to the merchant first; the payment is only sent on-chain once the merchant has received it." : {
+
     },
     "Broadcast transaction" : {
       "extractionState" : "manual",
@@ -2201,9 +2229,6 @@
         }
       }
     },
-    "Charged" : {
-
-    },
     "Chip authenticity" : {
 
     },
@@ -2571,6 +2596,9 @@
         }
       }
     },
+    "Connect a supported transport so Maknoon can read its serial." : {
+
+    },
     "Connect and add wallet" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2639,9 +2667,6 @@
           }
         }
       }
-    },
-    "Connect over the device's transport (BLE for Ledger; NFC or USB-C for YubiKey) so Maknoon can read its serial. The device does not need to be promoted into Identity or any network yet, that happens in a separate step." : {
-
     },
     "Connected verifiers" : {
       "extractionState" : "manual",
@@ -4605,6 +4630,9 @@
         }
       }
     },
+    "Enter the 6-digit pairing code shown on your Trezor." : {
+
+    },
     "Enter the passphrase you used when you encrypted this backup, then pick the file. Decryption and verification happen entirely on this phone." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5059,6 +5087,9 @@
           }
         }
       }
+    },
+    "Fiat value" : {
+
     },
     "File feature requests and bug reports on GitHub." : {
       "extractionState" : "manual",
@@ -5596,6 +5627,9 @@
           }
         }
       }
+    },
+    "Hidden wallet" : {
+
     },
     "Hide before screen-sharing or putting the phone down." : {
       "extractionState" : "manual",
@@ -6979,18 +7013,6 @@
     "Leave empty to use the public default at %@. Hitting rate caps? Plug in an Alchemy / Infura / Ankr / QuickNode URL." : {
 
     },
-    "Leave the label blank to use \"%@\"." : {
-
-    },
-    "Leave the label blank to use \"%@\". The address is the same on every EVM network; \"Open on\" picks which one the wallet opens to first." : {
-
-    },
-    "Leave the label blank to use \"%@\". The address is the same on every Solana cluster; \"Open on\" picks which one the wallet opens to first." : {
-
-    },
-    "Leave the label blank to use \"%@\". The address is the same on every Tron network; \"Open on\" picks which one the wallet opens to first." : {
-
-    },
     "Lets you bump the fee later if the transaction gets stuck in the mempool. Industry default is ON; disable only if your recipient has explicitly asked for a non-RBF transaction." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7315,9 +7337,6 @@
           }
         }
       }
-    },
-    "Local history. Reset Wallet clears it. Every Share action (copy, QR, callback POST) is recorded." : {
-
     },
     "Local history. Reset Wallet clears it. Phase 0 records every Share terminal action (copy, QR, callback POST)." : {
       "extractionState" : "manual",
@@ -9743,6 +9762,9 @@
         }
       }
     },
+    "Pairing code" : {
+
+    },
     "Parse" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -10475,6 +10497,9 @@
     "Pre-verification did not complete automatically (%@). An operator will review your packet shortly." : {
 
     },
+    "Preparing…" : {
+
+    },
     "Present" : {
 
     },
@@ -10650,6 +10675,9 @@
           }
         }
       }
+    },
+    "Re-enter this hidden wallet's passphrase to sign. It is never saved." : {
+
     },
     "Reading mint decimals on chain…" : {
 
@@ -12898,6 +12926,9 @@
         }
       }
     },
+    "Sending identity, then payment…" : {
+
+    },
     "Separate words with spaces. They must match the recovery phrase exactly." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -13978,9 +14009,6 @@
           }
         }
       }
-    },
-    "Tap + to browse the configured dApps catalogs. The default is the Maknoon dApps catalog; add others in Settings > Apps." : {
-
     },
     "Tap + to paste a contract address. The app reads the symbol and decimals from-chain." : {
       "extractionState" : "manual",
@@ -15257,9 +15285,6 @@
     "Unlock the Trezor and approve the account public key request on the device." : {
 
     },
-    "Unlock your Trezor Safe 5 so Maknoon can read its serial over Bluetooth." : {
-
-    },
     "Unlock your Trezor Safe 5. Maknoon will connect over BLE and read the device's Features payload to obtain its serial. Trezor BLE support is still being wired; this step currently returns a not-yet-implemented error." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -15282,6 +15307,9 @@
           }
         }
       }
+    },
+    "Unlock your Trezor so Maknoon can read its serial over Bluetooth." : {
+
     },
     "Unpair" : {
       "extractionState" : "manual",

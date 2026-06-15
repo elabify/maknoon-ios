@@ -23,6 +23,14 @@ struct AddSolanaWalletSheet: View {
     @State private var label: String = ""
     @State private var initialNetwork: SolanaNetwork = .mainnet
     @State private var account: UInt32 = 0
+    /// Trezor-only hidden-wallet selector. `.standard` reproduces exact
+    /// Ledger behavior (empty passphrase).
+    @State private var hwPassphrase: HiddenWalletSelection = .standard
+    /// Host-typed passphrase, used only when `hwPassphrase == .hostTyped`.
+    @State private var hwHostPassphrase: String = ""
+    /// Advanced custom derivation path (both vendors). Blank = standard.
+    @State private var useCustomPath: Bool = false
+    @State private var customPath: String = ""
     /// Software-path account index, kept separate from the hardware
     /// `account` so each path has its own default. Seeded once to the
     /// next free account so the default never duplicates an existing
@@ -249,10 +257,30 @@ struct AddSolanaWalletSheet: View {
             }
             Stepper("Account #\(account)", value: $account, in: 0...255)
             TextField(autoLabel(for: dev), text: $label)
+            if dev.kind == .trezor {
+                Picker("Wallet", selection: $hwPassphrase) {
+                    ForEach(HiddenWalletSelection.allCases) { mode in
+                        Text(mode.rawValue).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+                if hwPassphrase == .hostTyped {
+                    SecureField("Passphrase", text: $hwHostPassphrase)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                }
+            }
+            DerivationPathAdvancedField(
+                standardPath: BIP32Path.standardSolana(account: account),
+                useCustom: $useCustomPath,
+                customPath: $customPath
+            )
         } header: {
             Text("New Solana wallet")
         } footer: {
-            Text("Leave the label blank to use \"\(autoLabel(for: dev))\". The address is the same on every Solana cluster; \"Open on\" picks which one the wallet opens to first.")
+            Text(dev.kind == .trezor
+                ? hwPassphrase.footer
+                : "Leave the label blank to use \"\(autoLabel(for: dev))\". The address is the same on every Solana cluster; \"Open on\" picks which one the wallet opens to first.")
                 .font(.caption)
         }
     }
@@ -401,17 +429,44 @@ struct AddSolanaWalletSheet: View {
             errorText = "Pick a device first."
             return
         }
+        if dev.kind == .trezor, !hwPassphrase.isReady(hostPassphrase: hwHostPassphrase) {
+            errorText = "Enter the hidden-wallet passphrase first."
+            return
+        }
+        // Persist the hidden-wallet binding (writes a host-typed
+        // passphrase to the Keychain). nil for the standard wallet and
+        // for every Ledger add.
+        let hidden = dev.kind == .trezor
+            ? HardwarePassphraseRef.persist(selection: hwPassphrase)
+            : nil
+        let pathOverride = DerivationPathAdvancedField.resolve(useCustom: useCustomPath, customPath: customPath)
+        if let p = pathOverride, !BIP32Path.isValid(p) {
+            errorText = "Not a valid derivation path: \(p)"
+            return
+        }
+        var suffix = hidden == nil ? "" : " (Hidden)"
+        if pathOverride != nil { suffix += " (Custom path)" }
         let trimmed = label.trimmingCharacters(in: .whitespaces)
         let suffixedLabel = trimmed.isEmpty
-            ? autoLabel(for: dev)
-            : "\(trimmed) #\(account)"
+            ? "\(autoLabel(for: dev))\(suffix)"
+            : "\(trimmed) #\(account)\(suffix)"
 
-        if let existing = existingHardwareWallet(deviceId: dev.id, account: account) {
+        // A hidden or custom-path wallet shares the account index with
+        // the standard one but derives a different address, so the
+        // account-based pre-check is skipped for it; the address-based
+        // check below catches a true duplicate after derivation.
+        if hidden == nil, pathOverride == nil,
+           let existing = existingHardwareWallet(deviceId: dev.id, account: account) {
             errorText = "A wallet for \(dev.label) at account #\(account) already exists, labelled \"\(existing.label)\"."
             return
         }
         let kind: HardwareWalletKind = dev.kind == .ledger ? .ledger : .trezor
         let hardware = HardwareWalletFactory.make(kind: kind)
+        // A Trezor hidden wallet derives in its own passphrase session.
+        if let trezor = hardware as? TrezorBLE {
+            trezor.applyPassphraseMode(hwPassphrase.choice(hostPassphrase: hwHostPassphrase))
+        }
+        hardware.setDerivationPathOverride(pathOverride)
         hardware.beginSession()
         defer { hardware.endSession() }
         do {
@@ -422,9 +477,20 @@ struct AddSolanaWalletSheet: View {
                 )
             }
             let publicKey = try await hardware.getSolanaAddress(account: account)
+            // Address-based dedup catches a hidden wallet that resolves
+            // to an address already on file.
+            if let existing = store.solanaWalletStore.wallets.first(where: {
+                guard case let .hardware(d, _, pk) = $0.kind else { return false }
+                return d == dev.id && pk == publicKey
+            }) {
+                errorText = "This wallet (\(publicKey.prefix(6))…) already exists, labelled \"\(existing.label)\"."
+                return
+            }
             let descriptor = SolanaWalletDescriptor(
                 label: suffixedLabel,
-                kind: .hardware(deviceId: dev.id, account: account, publicKeyBase58: publicKey)
+                kind: .hardware(deviceId: dev.id, account: account, publicKeyBase58: publicKey),
+                hidden: hidden,
+                derivationPath: pathOverride
             )
             store.solanaWalletStore.add(descriptor, initialNetwork: initialNetwork)
             store.devices.addSolanaWallet(deviceId: dev.id, walletId: descriptor.id)

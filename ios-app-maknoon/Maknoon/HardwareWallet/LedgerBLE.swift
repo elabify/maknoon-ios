@@ -69,6 +69,16 @@ final class LedgerBLE: NSObject, HardwareWallet, @unchecked Sendable {
     /// `connect()` to bind to a specific physical Ledger.
     var targetPeripheralUUID: UUID?
 
+    /// Custom BIP32 path for the next seed-deriving op(s); nil = the
+    /// chain's standard path from `account`. When set, the per-chain
+    /// methods route to the SDK's `*AtPath` variants. Set by add /
+    /// discover / sign flows for custom- or alternative-path wallets.
+    var pendingDerivationPath: String?
+
+    func setDerivationPathOverride(_ path: String?) {
+        pendingDerivationPath = path
+    }
+
     private var central: CBCentralManager?
     private var peripheral: CBPeripheral?
     private var writeChar: CBCharacteristic?
@@ -496,7 +506,13 @@ final class LedgerBLE: NSObject, HardwareWallet, @unchecked Sendable {
         defer { resetSession() }
         try await ensureConnected()
         do {
-            let addr = try await ethereumSDK().getAddressForAccount(account: account, display: false)
+            let sdk = ethereumSDK()
+            let addr: EthereumAddress
+            if let path = pendingDerivationPath {
+                addr = try await sdk.getAddressAtPath(path: path, display: false)
+            } else {
+                addr = try await sdk.getAddressForAccount(account: account, display: false)
+            }
             return addr.address
         } catch {
             throw mapEthereumSDKError(error, command: "GET_PUBLIC_KEY")
@@ -540,10 +556,12 @@ final class LedgerBLE: NSObject, HardwareWallet, @unchecked Sendable {
             }
         }
         do {
-            let sig = try await sdk.signTransactionForAccount(
-                account: account,
-                envelope: envelope
-            )
+            let sig: EthereumSignature
+            if let path = pendingDerivationPath {
+                sig = try await sdk.signTransactionAtPath(path: path, envelope: envelope)
+            } else {
+                sig = try await sdk.signTransactionForAccount(account: account, envelope: envelope)
+            }
             return (sig.v, Data(sig.r), Data(sig.s))
         } catch {
             throw mapEthereumSDKError(error, command: "SIGN_TRANSACTION")
@@ -624,7 +642,9 @@ final class LedgerBLE: NSObject, HardwareWallet, @unchecked Sendable {
         defer { resetSession() }
         try await ensureConnected()
         do {
-            let path = "m/84'/\(networkCoinType)'/\(account)'"
+            // Custom path (any BIP44/49/84 account path) overrides the
+            // standard BIP84 account path when set.
+            let path = pendingDerivationPath ?? "m/84'/\(networkCoinType)'/\(account)'"
             return try await bitcoinSDK().getExtendedPubkey(path: path, display: false)
         } catch {
             throw mapBitcoinSDKError(error, command: "GET_EXTENDED_PUBKEY", coinType: networkCoinType)
@@ -673,7 +693,13 @@ final class LedgerBLE: NSObject, HardwareWallet, @unchecked Sendable {
         defer { resetSession() }
         try await ensureConnected()
         do {
-            let addr = try await solanaSDK().getAddressForAccount(account: account, display: false)
+            let sdk = solanaSDK()
+            let addr: SolanaAddress
+            if let path = pendingDerivationPath {
+                addr = try await sdk.getAddressAtPath(path: path, display: false)
+            } else {
+                addr = try await sdk.getAddressForAccount(account: account, display: false)
+            }
             return addr.base58
         } catch {
             throw mapSolanaSDKError(error, command: "GET_PUBKEY")
@@ -684,10 +710,13 @@ final class LedgerBLE: NSObject, HardwareWallet, @unchecked Sendable {
         defer { resetSession() }
         try await ensureConnected()
         do {
-            let sig = try await solanaSDK().signTransactionForAccount(
-                account: account,
-                message: unsignedTx
-            )
+            let sdk = solanaSDK()
+            let sig: SolanaSignature
+            if let path = pendingDerivationPath {
+                sig = try await sdk.signTransactionAtPath(path: path, message: unsignedTx)
+            } else {
+                sig = try await sdk.signTransactionForAccount(account: account, message: unsignedTx)
+            }
             return Data(sig.bytes)
         } catch {
             throw mapSolanaSDKError(error, command: "SIGN_MESSAGE")
@@ -744,7 +773,13 @@ final class LedgerBLE: NSObject, HardwareWallet, @unchecked Sendable {
         defer { resetSession() }
         try await ensureConnected()
         do {
-            let addr = try await tronSDK().getAddressForAccount(account: account, display: false)
+            let sdk = tronSDK()
+            let addr: TronAddress
+            if let path = pendingDerivationPath {
+                addr = try await sdk.getAddressAtPath(path: path, display: false)
+            } else {
+                addr = try await sdk.getAddressForAccount(account: account, display: false)
+            }
             return addr.base58check
         } catch {
             throw mapTronSDKError(error, command: "GET_PUBLIC_KEY")
@@ -769,10 +804,13 @@ final class LedgerBLE: NSObject, HardwareWallet, @unchecked Sendable {
         defer { resetSession() }
         try await ensureConnected()
         do {
-            let sig = try await tronSDK().signTransactionForAccount(
-                account: account,
-                rawData: rawTxProto
-            )
+            let sdk = tronSDK()
+            let sig: TronSignature
+            if let path = pendingDerivationPath {
+                sig = try await sdk.signTransactionAtPath(path: path, rawData: rawTxProto)
+            } else {
+                sig = try await sdk.signTransactionForAccount(account: account, rawData: rawTxProto)
+            }
             return (sig.v, Data(sig.r), Data(sig.s))
         } catch {
             throw mapTronSDKError(error, command: "SIGN")
@@ -832,10 +870,26 @@ final class LedgerBLE: NSObject, HardwareWallet, @unchecked Sendable {
     ) async throws -> String {
         defer { resetSession() }
         try await ensureConnected()
-        let keyOrigin = "[\(fingerprintHex)/84'/\(coinType)'/\(account)']\(accountXpub)"
+        // A custom path selects both the key-origin and the descriptor
+        // template by its purpose (BIP44 pkh / BIP49 sh(wpkh) / BIP84
+        // wpkh); the standard wallet stays BIP84.
+        let originPath: String
+        let template: String
+        if let custom = pendingDerivationPath {
+            originPath = custom.hasPrefix("m/") ? String(custom.dropFirst(2)) : custom
+            switch BIP32Path.bitcoinScriptType(forPath: custom) ?? .nativeSegwit {
+            case .legacy:       template = "pkh(@0/**)"
+            case .nestedSegwit: template = "sh(wpkh(@0/**))"
+            case .nativeSegwit: template = "wpkh(@0/**)"
+            }
+        } else {
+            originPath = "84'/\(coinType)'/\(account)'"
+            template = "wpkh(@0/**)"
+        }
+        let keyOrigin = "[\(fingerprintHex)/\(originPath)]\(accountXpub)"
         let policy = WalletPolicy(
             name: "",
-            descriptorTemplate: "wpkh(@0/**)",
+            descriptorTemplate: template,
             keys: [keyOrigin],
             hmac: nil
         )

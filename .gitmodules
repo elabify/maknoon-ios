@@ -13,3 +13,6 @@
 [submodule "ledger-tron-rs"]
 	path = ledger-tron-rs
 	url = https://github.com/elabify/maknoon-ledger-tron-rs.git
+[submodule "trezor-core-rs"]
+	path = trezor-core-rs
+	url = https://github.com/elabify/maknoon-trezor-core-rs.git

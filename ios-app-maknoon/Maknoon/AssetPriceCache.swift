@@ -1,4 +1,4 @@
-// Per-asset price cache backed by CoinGecko's /simple/price
+ // Per-asset price cache backed by CoinGecko's /simple/price
 // endpoint. Aggressively cached (5-min TTL) so we stay under the
 // free-tier rate limit, and persists the last successful response
 // to UserDefaults so offline launches show stale fiat numbers

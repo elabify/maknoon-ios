@@ -165,6 +165,13 @@ targets:
         type: file
       - path: ../ledger-tron-rs/ios/bindings/ledger_tron_core.swift
         type: file
+      # Trezor SDK glue (Rust THP v2 core + UniFFI). In-place from the
+      # sibling trezor-core-rs workspace; regenerated via `make ios`
+      # there. Its xcframework is declared as a framework dependency
+      # below. The transport error is named TrezorTransportError so it
+      # never collides with the ledger bindings' TransportError.
+      - path: ../trezor-core-rs/ios/bindings/trezor_core.swift
+        type: file
     info:
       path: Maknoon/Info.plist
       properties:
@@ -290,6 +297,11 @@ targets:
       - framework: ../ledger-eth-rs/ios/LedgerEthCore.xcframework
         embed: false
       - framework: ../ledger-tron-rs/ios/LedgerTronCore.xcframework
+        embed: false
+      # Trezor SDK (Rust THP v2 core + UniFFI Swift bindings). Static
+      # lib + headers + namespaced modulemap; matched Swift glue under
+      # `sources:`. Built from ../trezor-core-rs via `make ios`.
+      - framework: ../trezor-core-rs/ios/TrezorCore.xcframework
         embed: false
       - package: ElabifyCore
         product: ElabifyCore

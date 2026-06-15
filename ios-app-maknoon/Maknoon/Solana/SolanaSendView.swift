@@ -48,6 +48,8 @@ struct SolanaSendView: View {
 
     // State machine
     @State private var state: SendState = .idle
+    /// Re-typed each signing for a host-entry hidden wallet; never stored.
+    @State private var signingPassphrase: String = ""
     @State private var lastError: String?
     @State private var debugCode: String?
 
@@ -139,11 +141,13 @@ struct SolanaSendView: View {
                 DeviceReadyConfirmationSheet(
                     device: op.device,
                     purpose: op.purpose,
+                    requiresPassphrase: descriptor?.hidden?.needsHostPassphrase == true,
                     onContinue: {
                         dismissSendViewKeyboard()
                         Task { await signNow() }
                     },
-                    onCancel: {}
+                    onCancel: {},
+                    onPassphrase: { signingPassphrase = $0 }
                 )
             }
             .sheet(isPresented: $showContacts) {
@@ -771,6 +775,11 @@ struct SolanaSendView: View {
             }
             let lamports = UInt64((sol * 1_000_000_000).rounded())
 
+            // Block a sub-rent-exempt transfer to a brand-new account
+            // before we touch the device, so the user gets a clear
+            // message instead of a raw simulation failure post-sign.
+            try await wallet.assertRentExemptForNativeTransfer(recipient: recipient, lamports: lamports)
+
             if case .hardware(let deviceId, let account, let pubkeyBase58) = descriptor.kind {
                 guard let pubkeyBytes = base58Decode(pubkeyBase58), pubkeyBytes.count == 32 else {
                     throw SolanaDescriptorError.signingFailed(
@@ -883,6 +892,13 @@ struct SolanaSendView: View {
         }
         let hwKind: HardwareWalletKind = dev.kind == .ledger ? .ledger : .trezor
         let ledger = HardwareWalletFactory.make(kind: hwKind)
+        // A Trezor hidden wallet must re-open its passphrase session so
+        // the device derives the matching key; standard wallets resolve
+        // to `.standard`. Ledger / mock clients ignore this.
+        if let trezor = ledger as? TrezorBLE {
+            trezor.applyPassphraseMode(try HardwarePassphraseRef.resolveChoice(descriptor.hidden, hostEntered: signingPassphrase))
+        }
+        ledger.setDerivationPathOverride(descriptor.derivationPath)
         let identified = try await ledger.identifyDevice()
         guard identified == dev.serial else {
             throw HardwareWalletError.transport(

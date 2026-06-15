@@ -29,6 +29,19 @@ struct BitcoinWalletDescriptor: Codable, Identifiable, Hashable, Sendable {
     var cachedAccountFingerprint: String?
     var cachedAccountXpub: String?
 
+    /// Trezor hidden (BIP39 passphrase) wallet binding. `nil` for the
+    /// standard wallet and for every Ledger / software wallet. When
+    /// set, PSBT signing must re-open the same hidden THP session so the
+    /// device derives the matching keys. Optional + defaulted so
+    /// existing persisted descriptors decode unchanged.
+    var hidden: HardwarePassphraseRef?
+
+    /// Custom BIP32 account path for a hardware wallet added at a
+    /// non-standard path (nil = standard BIP84 `m/84'/coin'/account'`).
+    /// Its purpose (44/49/84) selects the script type for the watch-only
+    /// descriptor and signing.
+    var derivationPath: String?
+
     init(
         id: UUID = UUID(),
         label: String,
@@ -37,7 +50,9 @@ struct BitcoinWalletDescriptor: Codable, Identifiable, Hashable, Sendable {
         createdAt: Date = .init(),
         lastSyncAt: Date? = nil,
         cachedAccountFingerprint: String? = nil,
-        cachedAccountXpub: String? = nil
+        cachedAccountXpub: String? = nil,
+        hidden: HardwarePassphraseRef? = nil,
+        derivationPath: String? = nil
     ) {
         self.id = id
         self.label = label
@@ -47,6 +62,8 @@ struct BitcoinWalletDescriptor: Codable, Identifiable, Hashable, Sendable {
         self.lastSyncAt = lastSyncAt
         self.cachedAccountFingerprint = cachedAccountFingerprint
         self.cachedAccountXpub = cachedAccountXpub
+        self.hidden = hidden
+        self.derivationPath = derivationPath
     }
 
     /// BDK SQLite file URL inside Documents/. One database per wallet

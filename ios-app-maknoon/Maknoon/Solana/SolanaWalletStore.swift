@@ -84,18 +84,32 @@ struct SolanaWalletDescriptor: Codable, Identifiable, Hashable, Sendable {
     let createdAt: Date
     var lastSyncAt: Date?
 
+    /// Trezor hidden (BIP39 passphrase) wallet binding. `nil` for the
+    /// standard wallet and for every Ledger / software wallet. When
+    /// set, signing must re-open the same hidden THP session. Optional
+    /// + defaulted so existing persisted descriptors decode unchanged.
+    var hidden: HardwarePassphraseRef?
+
+    /// Custom BIP32 derivation path for a hardware wallet added at a
+    /// non-standard path (nil = standard from `account`).
+    var derivationPath: String?
+
     init(
         id: UUID = UUID(),
         label: String,
         kind: SolanaWalletKind,
         createdAt: Date = .init(),
-        lastSyncAt: Date? = nil
+        lastSyncAt: Date? = nil,
+        hidden: HardwarePassphraseRef? = nil,
+        derivationPath: String? = nil
     ) {
         self.id = id
         self.label = label
         self.kind = kind
         self.createdAt = createdAt
         self.lastSyncAt = lastSyncAt
+        self.hidden = hidden
+        self.derivationPath = derivationPath
     }
 
     // Tolerant decoder: silently drops the obsolete `network`
@@ -110,6 +124,8 @@ struct SolanaWalletDescriptor: Codable, Identifiable, Hashable, Sendable {
         self.kind = try c.decode(SolanaWalletKind.self, forKey: .kind)
         self.createdAt = try c.decode(Date.self, forKey: .createdAt)
         self.lastSyncAt = try c.decodeIfPresent(Date.self, forKey: .lastSyncAt)
+        self.hidden = try c.decodeIfPresent(HardwarePassphraseRef.self, forKey: .hidden)
+        self.derivationPath = try c.decodeIfPresent(String.self, forKey: .derivationPath)
     }
 }
 

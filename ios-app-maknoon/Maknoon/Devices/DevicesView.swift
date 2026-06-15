@@ -39,7 +39,7 @@ struct DevicesView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Connect over the device's transport (BLE for Ledger; NFC or USB-C for YubiKey) so Maknoon can read its serial. The device does not need to be promoted into Identity or any network yet, that happens in a separate step.")
+            Text("Connect a supported transport so Maknoon can read its serial.")
         }
         .sheet(item: $pendingKind) { kind in
             if kind == .seedsigner {

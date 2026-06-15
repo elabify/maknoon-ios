@@ -39,6 +39,7 @@
 		1D62C327CF2D60AE5DAC8598 /* LocalPassportCredentialTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05C1D115C59094CAEA05FDA1 /* LocalPassportCredentialTests.swift */; };
 		1F431B4D55497500D86F57DE /* TronReceiveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 238725740C17047D9618C4F5 /* TronReceiveView.swift */; };
 		21368065EDB2B3CDC778833C /* IdentityBridgeHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DBAC208B2138A44D9547884 /* IdentityBridgeHandler.swift */; };
+		217B4C71E73A31DDAA18E0DE /* TrezorPairing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 421B1C054BCEF0CF8B8992D0 /* TrezorPairing.swift */; };
 		219E3154C0BC894AA013BF74 /* HardwareUnlockView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 274CB5300CF94A36DC590B34 /* HardwareUnlockView.swift */; };
 		23007971E171747E00BA2F00 /* LockScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC64F2BA18F4E17047518E7C /* LockScreen.swift */; };
 		231C4E32BFF323AFE1D22345 /* CommercePaySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDDFA9ACEC935B5415EE980F /* CommercePaySheet.swift */; };
@@ -54,6 +55,8 @@
 		2ADCA446F93548AAD0509242 /* EthereumTransactionListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71402AA84744709149C20245 /* EthereumTransactionListView.swift */; };
 		2B80CD8755E8AAB6393715F1 /* SolanaSPLTokenRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEBD8E4610A32B0087EEF8A8 /* SolanaSPLTokenRow.swift */; };
 		2BA77B964126BACD5E6C5912 /* LocalCredentialFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = F61937B94D18DFDC3AB3B2BA /* LocalCredentialFactory.swift */; };
+		2CA30F3EA7FAD8D6DF5F2DA0 /* HardwarePassphrase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D3179039BD4D8FE5C94458F /* HardwarePassphrase.swift */; };
+		2DEFA83797359A3B26D2EFE9 /* trezor_core.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44135EA2C68B224FAC677C1F /* trezor_core.swift */; };
 		2E14AECC5CC0C148B1D9C5A7 /* TronWalletStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B431975A8CBE6BC4702EA3E5 /* TronWalletStore.swift */; };
 		2EB9CF48EF0A94D42EF3D58D /* PassportPassiveAuthVerifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0C094977DB720F5C670FC9E /* PassportPassiveAuthVerifier.swift */; };
 		2EDB01D26C26A185756C5C53 /* SeedSignerPairingSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 439A785FCEAD59A4CA6049DF /* SeedSignerPairingSheet.swift */; };
@@ -81,6 +84,7 @@
 		3CD124068273BA487F94D108 /* AddressBookPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1711296BC2B99CC6229CAD6F /* AddressBookPicker.swift */; };
 		3D1768614CC73470CA5F1D6E /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4D7E0B8A791A0E5C57EE873 /* Models.swift */; };
 		3FEAD09893E62A3241A21F9E /* DiscoverSolanaWalletsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6029C11246370C9FC973A58F /* DiscoverSolanaWalletsView.swift */; };
+		400EF1F4A47B6526713764D8 /* TrezorCredentialStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 898CCFA089CB7E625A85A926 /* TrezorCredentialStore.swift */; };
 		406F754D8FC0BED2EF8D9B09 /* TronWallet.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD7D11A8B1FF116189BAD1D1 /* TronWallet.swift */; };
 		418C3D99C1E3A44D335F9F87 /* LedgerBtcCore.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0429CAD2D40DEF6452BB4348 /* LedgerBtcCore.xcframework */; };
 		41E0468A32A408065681675B /* LightningAccountsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62F9278BFC039C35C7058E4B /* LightningAccountsView.swift */; };
@@ -111,6 +115,7 @@
 		5A9A8D6E5F53C0AA2AF02386 /* VerifierHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7339C03CE5A9DAAAA502341D /* VerifierHistory.swift */; };
 		5AB0B3E1B8D1C7C04C58C801 /* EthereumDescriptors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FC81DD155EE07C3BB52FC27 /* EthereumDescriptors.swift */; };
 		5B316E1677F1693CB3F08AB3 /* AppStoreCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4E25C493329E05C67A668DC /* AppStoreCatalog.swift */; };
+		5B90C901D5E31F5FE931BDBC /* DerivationPath.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2E0D68E099209A66D2DCB65 /* DerivationPath.swift */; };
 		5DEE34B432830C0AD2E6390C /* LocalFramesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13DDE4AC20C980973E6C4CF5 /* LocalFramesTests.swift */; };
 		5E655E9F6BFFC489624F21F3 /* TronTransactionListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1C5DE9E02D39F38885580D8 /* TronTransactionListView.swift */; };
 		5ED14AF7DECE6FC917A897B3 /* RecoveryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2F7AC09291DA964D61A1A1A /* RecoveryView.swift */; };
@@ -264,6 +269,7 @@
 		E305FA5359E58AB783188E7F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3A4132D254F8037570F61CCF /* Assets.xcassets */; };
 		E307E11AB83D74DC69309D28 /* AppAttestVerifierTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD42A4B7BF0A8A1B2374D882 /* AppAttestVerifierTests.swift */; };
 		E340CC00F8B24FB9E44607A5 /* BackupBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18525844CC3667A6E126E365 /* BackupBanner.swift */; };
+		E426F7906BBC09A2C479C754 /* TrezorCore.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2F97C3E9D2E012D741846122 /* TrezorCore.xcframework */; };
 		E42708847A12F989B68BF58D /* BLECentralClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D29AFE40A34755117F5FACB /* BLECentralClient.swift */; };
 		E5C9437E7969F4021A5DAEE1 /* LocalShareQrSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4B3E724F86807A19B2BE982 /* LocalShareQrSheet.swift */; };
 		E5FE78FD036853BCF5785575 /* MiniAppHostView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6388E309980045951A74497 /* MiniAppHostView.swift */; };
@@ -371,6 +377,7 @@
 		2D86DB7FD0E9874D1C3C90E7 /* MiniAppScanSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MiniAppScanSheet.swift; sourceTree = "<group>"; };
 		2DE46BBFD5FD4B83D69F89AF /* SeedSignerSignFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeedSignerSignFlow.swift; sourceTree = "<group>"; };
 		2EA467B33F3A6E3077615D90 /* PendingPickupsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingPickupsStore.swift; sourceTree = "<group>"; };
+		2F97C3E9D2E012D741846122 /* TrezorCore.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = TrezorCore.xcframework; path = "../trezor-core-rs/ios/TrezorCore.xcframework"; sourceTree = "<group>"; };
 		2FC81DD155EE07C3BB52FC27 /* EthereumDescriptors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EthereumDescriptors.swift; sourceTree = "<group>"; };
 		30B7F468C4D22746D1F6AA48 /* PresentationFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresentationFactory.swift; sourceTree = "<group>"; };
 		31A5E06677C85122400D3F55 /* IDDocumentIssuanceClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IDDocumentIssuanceClient.swift; sourceTree = "<group>"; };
@@ -396,10 +403,12 @@
 		40BE5B7A4CE335B15D143AAD /* BLEShareSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BLEShareSheet.swift; sourceTree = "<group>"; };
 		40E4817AD2B82A08B3C8D9C3 /* IDDocumentStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IDDocumentStore.swift; sourceTree = "<group>"; };
 		41D0B6721932CDBCA7A7E1FF /* LightningWalletView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LightningWalletView.swift; sourceTree = "<group>"; };
+		421B1C054BCEF0CF8B8992D0 /* TrezorPairing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrezorPairing.swift; sourceTree = "<group>"; };
 		4320F4D4EC7DFDBAC89DEB32 /* BackupState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupState.swift; sourceTree = "<group>"; };
 		439A785FCEAD59A4CA6049DF /* SeedSignerPairingSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeedSignerPairingSheet.swift; sourceTree = "<group>"; };
 		43F9A1C0B4B24E8C75E42591 /* EthereumTokenRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EthereumTokenRow.swift; sourceTree = "<group>"; };
 		440EAB68D2F42B883FECA1ED /* IdentitySandwich.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdentitySandwich.swift; sourceTree = "<group>"; };
+		44135EA2C68B224FAC677C1F /* trezor_core.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = trezor_core.swift; sourceTree = "<group>"; };
 		448C77471A8896830BAA6871 /* MockHardwareWallet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockHardwareWallet.swift; sourceTree = "<group>"; };
 		44BCDDAE2AE557E3EF301CE5 /* BrowseAppStoreView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowseAppStoreView.swift; sourceTree = "<group>"; };
 		45C01EA7B48067B85FF3CDDB /* IDDocumentDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IDDocumentDetailView.swift; sourceTree = "<group>"; };
@@ -408,6 +417,7 @@
 		4A27BEDA915D75A7B1516BA4 /* BumpFeeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BumpFeeSheet.swift; sourceTree = "<group>"; };
 		4A8232E5ED60359EDE3E8692 /* swift */ = {isa = PBXFileReference; lastKnownFileType = folder; name = swift; path = "../elabify-core/bindings/swift"; sourceTree = SOURCE_ROOT; };
 		4BDA476AC3BC8E238F1E8475 /* KeyStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyStore.swift; sourceTree = "<group>"; };
+		4D3179039BD4D8FE5C94458F /* HardwarePassphrase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HardwarePassphrase.swift; sourceTree = "<group>"; };
 		4E29C53F5B7D656B08F44532 /* AddLightningAccountSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddLightningAccountSheet.swift; sourceTree = "<group>"; };
 		4E36295E34D3E3DECB033209 /* SendViewKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SendViewKit.swift; sourceTree = "<group>"; };
 		4F221DAFF98E6E925AA11A4D /* TrezorBLE.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrezorBLE.swift; sourceTree = "<group>"; };
@@ -478,6 +488,7 @@
 		877085F19D96747208D93D8B /* TronScanAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TronScanAPI.swift; sourceTree = "<group>"; };
 		87B2D1CBB57F8E855F5F3CC6 /* TronTRC20TokenStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TronTRC20TokenStore.swift; sourceTree = "<group>"; };
 		8953A568A62E5FB75EE7A846 /* MiniAppPaymentSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MiniAppPaymentSheet.swift; sourceTree = "<group>"; };
+		898CCFA089CB7E625A85A926 /* TrezorCredentialStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrezorCredentialStore.swift; sourceTree = "<group>"; };
 		89B59F185D51766DCF2E99CB /* DeviceReadyConfirmationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceReadyConfirmationSheet.swift; sourceTree = "<group>"; };
 		89C507C62F88E82A34B59D16 /* BitcoinLabelStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BitcoinLabelStore.swift; sourceTree = "<group>"; };
 		8A027606E15EA04BBD0DDCF7 /* EthereumSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EthereumSettings.swift; sourceTree = "<group>"; };
@@ -505,6 +516,7 @@
 		A1FD48DD113C43FEA00D4EAB /* SolanaSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SolanaSettings.swift; sourceTree = "<group>"; };
 		A26492F32B298FD4FC287C13 /* CurrencySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CurrencySettingsView.swift; sourceTree = "<group>"; };
 		A26BE63FFDA7AB86460B23CE /* CommerceEVMPayment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommerceEVMPayment.swift; sourceTree = "<group>"; };
+		A2E0D68E099209A66D2DCB65 /* DerivationPath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DerivationPath.swift; sourceTree = "<group>"; };
 		A41A784C7482EB5893120D81 /* BitcoinLabelEditSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BitcoinLabelEditSheet.swift; sourceTree = "<group>"; };
 		A601F3DD81F329EFDED94B92 /* SanctionsScreeningClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SanctionsScreeningClient.swift; sourceTree = "<group>"; };
 		A7731704DB7EF3249B51DAC3 /* AppAttestVerifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppAttestVerifier.swift; sourceTree = "<group>"; };
@@ -624,6 +636,7 @@
 				7EEEAEB0D4B8C7D9B535CD3A /* LedgerSolCore.xcframework in Frameworks */,
 				06506A7A55E09C61E5601898 /* LedgerEthCore.xcframework in Frameworks */,
 				0B50330C1027E58CB1A6014F /* LedgerTronCore.xcframework in Frameworks */,
+				E426F7906BBC09A2C479C754 /* TrezorCore.xcframework in Frameworks */,
 				7AC6CD6E0E6DE175AC1D4B40 /* ElabifyCore in Frameworks */,
 				8927DB599E3A1E8FAE4F451F /* BitcoinDevKit in Frameworks */,
 				FE96A62430D9A469B82AC2A6 /* WalletCore in Frameworks */,
@@ -813,12 +826,16 @@
 		57D6DBDEAF6488F9AEBE7CF1 /* HardwareWallet */ = {
 			isa = PBXGroup;
 			children = (
+				A2E0D68E099209A66D2DCB65 /* DerivationPath.swift */,
 				89B59F185D51766DCF2E99CB /* DeviceReadyConfirmationSheet.swift */,
+				4D3179039BD4D8FE5C94458F /* HardwarePassphrase.swift */,
 				FDE37BF5EBEB999A0EDE0DF9 /* HardwareWalletManager.swift */,
 				67A835304185D11EE561B171 /* HardwareWalletProtocol.swift */,
 				AA29AE92BA173E045657FE37 /* LedgerBLE.swift */,
 				448C77471A8896830BAA6871 /* MockHardwareWallet.swift */,
 				4F221DAFF98E6E925AA11A4D /* TrezorBLE.swift */,
+				898CCFA089CB7E625A85A926 /* TrezorCredentialStore.swift */,
+				421B1C054BCEF0CF8B8992D0 /* TrezorPairing.swift */,
 			);
 			path = HardwareWallet;
 			sourceTree = "<group>";
@@ -1078,6 +1095,7 @@
 				3B86778BB5B9C1D79EF1A9BE /* LedgerEthCore.xcframework */,
 				DF773AB794E7D186505D141B /* LedgerSolCore.xcframework */,
 				FE0B3C966F1066EC5B15829D /* LedgerTronCore.xcframework */,
+				2F97C3E9D2E012D741846122 /* TrezorCore.xcframework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -1162,6 +1180,15 @@
 			path = Diagnostics;
 			sourceTree = "<group>";
 		};
+		DE9AE67A5B5B5ADC1CA8EF1D /* bindings */ = {
+			isa = PBXGroup;
+			children = (
+				44135EA2C68B224FAC677C1F /* trezor_core.swift */,
+			);
+			name = bindings;
+			path = "../trezor-core-rs/ios/bindings";
+			sourceTree = "<group>";
+		};
 		E3AB9CAA99A8BDB7D6727768 = {
 			isa = PBXGroup;
 			children = (
@@ -1169,6 +1196,7 @@
 				4F806214C282BF9E71B37917 /* bindings */,
 				E609CA49A28058DDFB26812B /* bindings */,
 				1EDE2A379F92517C4FA6139F /* bindings */,
+				DE9AE67A5B5B5ADC1CA8EF1D /* bindings */,
 				A407236AB32D4C3EEC70F809 /* Maknoon */,
 				4CD651CE85C8A6F7F6768DF9 /* MaknoonTests */,
 				002B4EA087562BA17B204AE7 /* Packages */,
@@ -1393,6 +1421,7 @@
 				883E8715D9728F781111DFDD /* CurrencySettingsView.swift in Sources */,
 				B99D7FB388E38F9C6698C9C7 /* CustomEthereumNetwork.swift in Sources */,
 				6A905A3AA94F8D8546598EB9 /* CustomNetworkEditorSheet.swift in Sources */,
+				5B90C901D5E31F5FE931BDBC /* DerivationPath.swift in Sources */,
 				B6166C906C45B6C65B6DAA66 /* DeviceDetailView.swift in Sources */,
 				921038A5009E2D9B1C68C721 /* DeviceReadyConfirmationSheet.swift in Sources */,
 				7D22C3EDDD1C0DA91619E189 /* DeviceRegistry.swift in Sources */,
@@ -1436,6 +1465,7 @@
 				89D5B1D78C5EA39AE796A7FF /* ExtendedKeyNormalize.swift in Sources */,
 				373E4955E78D61B84274FD04 /* FiatCurrencyCatalog.swift in Sources */,
 				7AD8DDBB23570F67A0880836 /* FiatPreferences.swift in Sources */,
+				2CA30F3EA7FAD8D6DF5F2DA0 /* HardwarePassphrase.swift in Sources */,
 				219E3154C0BC894AA013BF74 /* HardwareUnlockView.swift in Sources */,
 				06F960265F6CB044680355EB /* HardwareWalletManager.swift in Sources */,
 				6D27E662AF795DE108DF276C /* HardwareWalletProtocol.swift in Sources */,
@@ -1551,6 +1581,8 @@
 				EE92BDC7F149CB55D01476E0 /* TokenLogoView.swift in Sources */,
 				DFF6BECACD3E78A4A312FD86 /* TransportSession.swift in Sources */,
 				D5C4BADE7DA0DE9C70D51978 /* TrezorBLE.swift in Sources */,
+				400EF1F4A47B6526713764D8 /* TrezorCredentialStore.swift in Sources */,
+				217B4C71E73A31DDAA18E0DE /* TrezorPairing.swift in Sources */,
 				4A8C783128650728C43D2362 /* TronAddTokenSheet.swift in Sources */,
 				ED2A774E428BDF2B710C69B6 /* TronDescriptors.swift in Sources */,
 				7D63C5715BE1CE0BD05493EC /* TronRPCClient.swift in Sources */,
@@ -1588,6 +1620,7 @@
 				D66C1AB63B461D6710835E88 /* ledger_eth_core.swift in Sources */,
 				AC91E9D23F3C53B898C98312 /* ledger_sol_core.swift in Sources */,
 				100EBC95F73DCE32A26BF315 /* ledger_tron_core.swift in Sources */,
+				2DEFA83797359A3B26D2EFE9 /* trezor_core.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1765,6 +1798,7 @@
 					"\"../ledger-eth-rs/ios\"",
 					"\"../ledger-sol-rs/ios\"",
 					"\"../ledger-tron-rs/ios\"",
+					"\"../trezor-core-rs/ios\"",
 				);
 				INFOPLIST_FILE = Maknoon/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1807,6 +1841,7 @@
 					"\"../ledger-eth-rs/ios\"",
 					"\"../ledger-sol-rs/ios\"",
 					"\"../ledger-tron-rs/ios\"",
+					"\"../trezor-core-rs/ios\"",
 				);
 				INFOPLIST_FILE = Maknoon/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (

@@ -61,12 +61,14 @@ enum BitcoinDescriptors {
     static func watchOnlyFromCachedKey(
         accountFingerprint: String,
         accountXpub: String,
-        network: BitcoinNetwork
+        network: BitcoinNetwork,
+        scriptType: BIP32Path.BitcoinScriptType = .nativeSegwit
     ) throws -> BitcoinDescriptorPair {
         return try watchOnlyFromXpub(
             xpub: accountXpub,
             fingerprint: accountFingerprint,
-            network: network
+            network: network,
+            scriptType: scriptType
         )
     }
 
@@ -150,10 +152,14 @@ enum BitcoinDescriptors {
 
     // MARK: -- watch-only from an existing xpub (hardware wallet path)
 
+    /// Build the external + internal watch-only descriptors for the
+    /// given account xpub. `scriptType` (from the wallet's path purpose)
+    /// selects the BDK template: BIP84 wpkh / BIP49 sh(wpkh) / BIP44 pkh.
     static func watchOnlyFromXpub(
         xpub: String,
         fingerprint: String,
-        network: BitcoinNetwork
+        network: BitcoinNetwork,
+        scriptType: BIP32Path.BitcoinScriptType = .nativeSegwit
     ) throws -> BitcoinDescriptorPair {
         // Normalize SLIP-132 alternates (zpub/ypub/vpub/upub/...)
         // to xpub/tpub. BDK's descriptor parser rejects the
@@ -163,18 +169,25 @@ enum BitcoinDescriptors {
         // wallet hits this path.
         let normalized = ExtendedKeyNormalize.toXpubLegacy(xpub)
         let pub = try DescriptorPublicKey.fromString(publicKey: normalized)
-        let external = try Descriptor.newBip84Public(
-            publicKey: pub,
-            fingerprint: fingerprint,
-            keychainKind: .external,
-            network: network.bdk
-        )
-        let `internal` = try Descriptor.newBip84Public(
-            publicKey: pub,
-            fingerprint: fingerprint,
-            keychainKind: .internal,
-            network: network.bdk
-        )
-        return BitcoinDescriptorPair(external: external, internal: `internal`)
+        func make(_ keychain: KeychainKind) throws -> Descriptor {
+            switch scriptType {
+            case .legacy:
+                return try Descriptor.newBip44Public(
+                    publicKey: pub, fingerprint: fingerprint,
+                    keychainKind: keychain, network: network.bdk
+                )
+            case .nestedSegwit:
+                return try Descriptor.newBip49Public(
+                    publicKey: pub, fingerprint: fingerprint,
+                    keychainKind: keychain, network: network.bdk
+                )
+            case .nativeSegwit:
+                return try Descriptor.newBip84Public(
+                    publicKey: pub, fingerprint: fingerprint,
+                    keychainKind: keychain, network: network.bdk
+                )
+            }
+        }
+        return BitcoinDescriptorPair(external: try make(.external), internal: try make(.internal))
     }
 }

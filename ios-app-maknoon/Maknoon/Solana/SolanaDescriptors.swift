@@ -150,9 +150,15 @@ enum SolanaDescriptors {
         // base64 output to match sendTransaction's encoding (see note
         // in the software-sign path).
         input.txEncoding = .base64
-        // Sender pubkey, required by TransactionCompiler so the
-        // message can name signers before the signature exists.
-        input.feePayer = signerBase58
+        // `sender` (proto field 14) is REQUIRED by TWC's external-signing
+        // path: it names the authority that funds + signs the transfer so
+        // preImageHashes can list the signer before any signature exists.
+        // Without it TWC fails with "Sender address is either not set or
+        // invalid". `feePayer` is NOT a substitute (it's an optional,
+        // *separate* fee-paying account, and TWC rejects it when it equals
+        // an account already in the list); the signer is the fee payer by
+        // default when `feePayer` is unset. Mirrors the SPL builder.
+        input.sender = signerBase58
         if priorityFeeMicroLamports > 0 {
             var pricePriority = SolanaPriorityFeePrice()
             pricePriority.price = priorityFeeMicroLamports
