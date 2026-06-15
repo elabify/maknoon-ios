@@ -45,9 +45,11 @@ struct IdentityView: View {
                     lockedBanner
                 }
 
-                if BackupState.shouldShowReminder() {
-                    BackupReminderBanner(onTap: { showVerify = true })
-                }
+                // The encrypted backup is mandatory at onboarding and is
+                // the primary recovery path, so we no longer nag the user
+                // to back up / verify the 24-word seed phrase here. Seed
+                // reveal + verify stay available on demand in Settings,
+                // Local Key for advanced users.
 
                 // Pending pickups: credentials minted by the issuer
                 // that haven't anchored yet. The PendingPickupsStore
@@ -174,11 +176,6 @@ struct IdentityView: View {
         } message: { folder in
             let count = store.credentialFolderStore.count(in: folder.id)
             Text("\(count) credential\(count == 1 ? "" : "s") will move back to All. The credentials themselves are not deleted.")
-        }
-        .onAppear {
-            if BackupState.shouldShowReminder() {
-                try? BackupState.markReminded()
-            }
         }
     }
 

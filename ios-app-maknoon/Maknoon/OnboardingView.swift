@@ -59,6 +59,7 @@ struct OnboardingView: View {
     @State private var showBackupExporter = false
     @State private var pendingBackupDocument: MaknoonBackupDocument?
     @State private var showOnboardingPassport = false
+    @State private var showHardwarePicker = false
 
     var body: some View {
         NavigationStack {
@@ -107,52 +108,51 @@ struct OnboardingView: View {
     // MARK: -- welcome
 
     private var welcomeView: some View {
-        VStack(spacing: 24) {
-            Spacer()
-            VStack(spacing: 10) {
-                Image("MaknoonLogo")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 120, height: 120)
-                    .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-                    .shadow(color: .black.opacity(0.30), radius: 12, y: 6)
-                Text("Maknoon").font(.title.bold())
-                VStack(spacing: 4) {
-                    Text("Post-Quantum Identity.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    Text("Own Your Credentials, Assets, and Privacy.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                .multilineTextAlignment(.center)
-            }
-            VStack(alignment: .leading, spacing: 12) {
-                bullet("Your master key stays in the secure enclave, protected by your biometric or passcode.")
-                bullet("A recovery phrase backs up your data and migrates you to a new device.")
-                bullet("Identities use a post-quantum key stored in the secure enclave that never leaves your device.")
-                bullet("Third-party hardware devices for identity use and cold wallets.")
-            }
-            .padding(.horizontal, 8)
-            Spacer()
-            VStack(spacing: 10) {
-                Button(action: { startNewIdentity() }) {
-                    Text("Create a new recovery phrase").frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
+        // GeometryReader + minHeight keeps the Spacers centring the content
+        // when there's room (portrait), but lets it scroll instead of
+        // clipping when the viewport is short (landscape).
+        GeometryReader { geo in
+            ScrollView {
+                VStack(spacing: 24) {
+                    Spacer(minLength: 0)
+                    VStack(spacing: 10) {
+                        Image("MaknoonLogo")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 120, height: 120)
+                            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                            .shadow(color: .black.opacity(0.30), radius: 12, y: 6)
+                        Text("Maknoon").font(.title.bold())
+                        VStack(spacing: 4) {
+                            Text("Own your Identity, Assets, and Privacy")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                        .multilineTextAlignment(.center)
+                    }
+                    VStack(alignment: .leading, spacing: 12) {
+                        bullet("Scan a passport into your phone with post-quantum encryption")
+                        bullet("Manage digital assets with a secure hardware wallet")
+                        bullet("Privately use your identity and assets with those you verify and trust")
+                    }
+                    .padding(.horizontal, 8)
+                    Spacer(minLength: 0)
+                    VStack(spacing: 10) {
+                        Button(action: { startNewIdentity() }) {
+                            Text("Create new").frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
 
-                Button(action: { phase = .restore }) {
-                    Text("Restore from recovery phrase").frame(maxWidth: .infinity)
+                        Button(action: { phase = .restoreEncryptedBackup }) {
+                            Text("Restore encrypted backup").frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                    if let errorMessage {
+                        Text(errorMessage).font(.callout).foregroundStyle(.red)
+                    }
                 }
-                .buttonStyle(.bordered)
-
-                Button(action: { phase = .restoreEncryptedBackup }) {
-                    Text("Restore Encrypted Backup").frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
-            }
-            if let errorMessage {
-                Text(errorMessage).font(.callout).foregroundStyle(.red)
+                .frame(minHeight: geo.size.height)
             }
         }
     }
@@ -277,31 +277,9 @@ struct OnboardingView: View {
                 Text("Set a passphrase")
                     .font(.title3.weight(.semibold))
 
-                Text("A passphrase is an extra secret combined with your 24-word recovery phrase. You will need BOTH to recover your identity.")
+                Text("A passphrase is used to backup your identity and any local assets using post-quantum encryption.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
-
-                VStack(alignment: .leading, spacing: 6) {
-                    Label("Stronger security", systemImage: "lock.shield")
-                        .font(.callout.weight(.medium))
-                    Text("Even if someone steals your 24 word recovery phrase backup, they cannot recover your identity without the passphrase.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(12)
-                .background(Color.purple.opacity(0.10))
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-
-                VStack(alignment: .leading, spacing: 6) {
-                    Label("Store separately", systemImage: "key.horizontal")
-                        .font(.callout.weight(.medium))
-                    Text("The recovery phrase belongs on PAPER OR METAL, stored OFFLINE in a locked safe. The passphrase belongs in a PASSWORD MANAGER (Bitwarden or 1Password are recommended). Storing them in the same place defeats the purpose.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(12)
-                .background(Color.orange.opacity(0.10))
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Passphrase").font(.caption).foregroundStyle(.secondary)
@@ -330,7 +308,7 @@ struct OnboardingView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Label("Save it to a password manager NOW", systemImage: "key.horizontal")
                         .font(.callout.weight(.medium))
-                    Text("This is the last time the passphrase will be shown. Add it to a vetted password manager before you continue. Do NOT write it on the same paper as your recovery phrase. If you lose the passphrase you will permanently lose access to your data and assets.")
+                    Text("This is the last time the passphrase will be shown. Add it to a vetted password manager before you continue.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -369,7 +347,7 @@ struct OnboardingView: View {
                 Label("Encrypted backup", systemImage: "lock.doc")
                     .font(.title3.weight(.semibold))
 
-                Text("Maknoon can store a passphrase-encrypted copy in any storage location you prefer. Without the passphrase, the encrypted backup is useless.")
+                Text("Maknoon will store an encrypted backup in any location you prefer using your passphrase. Without the passphrase, the post-quantum encrypted backup is useless and nobody can unlock it.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
 
@@ -385,32 +363,6 @@ struct OnboardingView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(backupWorking)
-
-                Button(action: { beginPostIdentitySteps() }) {
-                    Text("Skip - I will set it up later").frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
-                .disabled(backupWorking)
-
-                VStack(alignment: .leading, spacing: 6) {
-                    Label("Your OFFLINE backup remains primary", systemImage: "exclamationmark.shield")
-                        .font(.callout.weight(.medium))
-                        .foregroundStyle(.orange)
-                    Text("Encrypted cloud backup is a convenience for the new-phone case. Your paper or metal copy of the 24 words stays the primary recovery path.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(12)
-                .background(Color.orange.opacity(0.10))
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("How it works").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                    bulletRow("Recover on a new phone without retyping 24 words.")
-                    bulletRow("Encrypted with AES-256-GCM and authenticated with a post-quantum ML-DSA-65 signature from your master key. Key is derived from your passphrase via PBKDF2 (600,000 iterations).")
-                    bulletRow("Without the passphrase the encrypted backup is useless. With both backup AND passphrase compromised, an attacker recovers your wallet.")
-                    bulletRow("If your key is ever compromised or lost, contact your credential issuer to revoke previously-issued credentials and reissue them to your new identity. However, if your key is compromised or lost, you will permanently lose access to your assets. A separate cold hardware wallet is strongly recommended for assets.")
-                }
             }
         }
         .fileExporter(
@@ -482,8 +434,11 @@ struct OnboardingView: View {
 
     /// Create-a-new-identity entry. Generates 32 bytes of entropy
     /// (no Keychain write yet), derives the 24-word mnemonic, and
-    /// advances to the reveal screen. The actual sandwich (and its
-    /// Keychain writes) is built once the user has set a passphrase.
+    /// advances straight to the passphrase screen. The seed phrase is
+    /// no longer shown or verified during onboarding (it stays
+    /// viewable later in Settings, Local Key); the mandatory encrypted
+    /// backup is the primary recovery path. The actual sandwich (and
+    /// its Keychain writes) is built once the user has set a passphrase.
     private func startNewIdentity() {
         errorMessage = nil
         do {
@@ -495,7 +450,7 @@ struct OnboardingView: View {
             }
             pendingEntropy = Data(entropyBytes)
             pendingWords = BIP39.mnemonicFromSeed(Data(entropyBytes))
-            phase = .reveal
+            phase = .passphraseEntry
         } catch {
             errorMessage = "Could not generate a new identity: \(error.localizedDescription)"
         }
@@ -542,7 +497,7 @@ struct OnboardingView: View {
             VStack(alignment: .leading, spacing: 16) {
                 Label("Scan your passport", systemImage: "person.text.rectangle")
                     .font(.title3.weight(.semibold))
-                Text("This is one of Maknoon's most useful flows. Tap your passport and Maknoon reads its chip on-device and mints an identity credential signed by your post-quantum key, that you can present from your phone. Nothing is uploaded unless you then choose an Elabify-verified credential.")
+                Text("Tap your passport and Maknoon reads its chip on-device and mints an identity credential signed by your post-quantum key, that you can present from your phone. Nothing is uploaded unless you then choose an Elabify-verified credential.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
 
@@ -578,21 +533,21 @@ struct OnboardingView: View {
             VStack(alignment: .leading, spacing: 16) {
                 Label("Create your first wallet", systemImage: "creditcard")
                     .font(.title3.weight(.semibold))
-                Text("Maknoon supports many networks, and even anchors temporary verified credentials on some of them. For holding value, though, we only recommend Bitcoin: it is the only cryptocurrency proven as a long-term store of value. Start with a software Bitcoin wallet, or connect a hardware wallet for cold storage.")
+                Text("Maknoon supports many networks, and even anchors temporary verified credentials on some of them. For holding value, though, we only recommend Bitcoin: it is the only cryptocurrency proven as a long-term store of value. The safest option is a hardware wallet; a software Bitcoin wallet is convenient for small amounts.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
+
+                Button(action: { showHardwarePicker = true }) {
+                    Label("Add a hardware wallet", systemImage: "externaldrive.badge.plus")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
 
                 Button(action: {
                     store.bitcoinWalletStore.seedDefaultIfNeeded()
                     completeOnboarding()
                 }) {
-                    Label("Create Bitcoin wallet", systemImage: "bitcoinsign.circle.fill")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-
-                Button(action: { completeOnboarding() }) {
-                    Label("I'll add a hardware wallet", systemImage: "externaldrive.badge.plus")
+                    Label("Create Bitcoin software wallet", systemImage: "bitcoinsign.circle.fill")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
@@ -602,16 +557,36 @@ struct OnboardingView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Label("For meaningful amounts, use cold storage", systemImage: "snowflake")
+                    Label("For meaningful amounts, use a hardware wallet", systemImage: "snowflake")
                         .font(.callout.weight(.medium))
                         .foregroundStyle(.blue)
-                    Text("A software wallet is convenient for small amounts. A separate hardware wallet (added from Settings, Devices) keeps your keys offline for larger holdings.")
+                    Text("A software wallet is convenient for small amounts. A separate hardware wallet keeps your keys offline for larger holdings.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
                 .padding(12)
                 .background(Color.blue.opacity(0.10))
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            }
+        }
+        .sheet(isPresented: $showHardwarePicker) {
+            NavigationStack {
+                AddHardwareDeviceFlow(
+                    kinds: DeviceKind.walletCapableRegistrableCases,
+                    autoDiscoverBitcoin: true,
+                    onFinished: { registered in
+                        showHardwarePicker = false
+                        if registered { completeOnboarding() }
+                    }
+                )
+                .environment(store)
+                .navigationTitle("Add a hardware wallet")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Cancel") { showHardwarePicker = false }
+                    }
+                }
             }
         }
     }

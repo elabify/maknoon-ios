@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 320" width="500" height="320" role="img" aria-label="Chip-enabled passport, zoomed on its chip symbol">
+  <defs>
+    <clipPath id="globeClip">
+      <circle cx="396" cy="150" r="58"/>
+    </clipPath>
+  </defs>
+
+  <!-- ── Passport (right) ───────────────────────────────────── -->
+  <rect x="300" y="8" width="192" height="304" rx="16" fill="#2a9d8f"/>
+
+  <!-- Title -->
+  <text x="396" y="54" text-anchor="middle"
+        font-family="Helvetica, Arial, sans-serif" font-size="30" font-weight="700"
+        letter-spacing="1" fill="#ffffff">PASSPORT</text>
+
+  <!-- Globe: white outline + grid + continents on the teal sphere -->
+  <g stroke="#ffffff" stroke-width="3" fill="none">
+    <circle cx="396" cy="150" r="58"/>
+  </g>
+  <g stroke="#ffffff" stroke-width="2" fill="none" opacity="0.9">
+    <line x1="338" y1="150" x2="454" y2="150"/>
+    <ellipse cx="396" cy="150" rx="24" ry="58"/>
+    <ellipse cx="396" cy="150" rx="58" ry="24"/>
+  </g>
+  <g clip-path="url(#globeClip)" fill="#ffffff">
+    <path d="M372 110 C360 112 352 122 356 134 C358 142 366 146 372 150 C374 156 370 162 376 166 C382 168 386 160 388 152 C392 146 398 144 396 136 C394 128 386 126 384 120 C382 114 380 108 372 110 Z"/>
+    <path d="M404 158 C398 160 396 168 400 176 C402 184 408 192 414 190 C420 186 418 176 416 168 C414 162 410 156 404 158 Z"/>
+    <path d="M430 118 C437 121 441 130 438 140 C436 148 430 150 428 143 C425 134 424 122 430 118 Z"/>
+  </g>
+
+  <!-- Small chip symbol near the bottom of the cover -->
+  <g>
+    <rect x="373" y="261" width="46" height="24" rx="3" fill="#0e4a44"/>
+    <rect x="373" y="270" width="46" height="6" fill="#2a9d8f"/>
+    <circle cx="396" cy="273" r="9" fill="#2a9d8f"/>
+    <circle cx="396" cy="273" r="5" fill="#0e4a44"/>
+  </g>
+
+  <!-- ── Magnifier (left) ───────────────────────────────────── -->
+  <!-- Handle (points toward the small chip symbol) -->
+  <line x1="214" y1="219" x2="300" y2="255" stroke="#d4d4d4" stroke-width="15" stroke-linecap="round"/>
+  <line x1="300" y1="255" x2="364" y2="270" stroke="#d4d4d4" stroke-width="6" stroke-linecap="round"/>
+
+  <!-- Lens -->
+  <circle cx="135" cy="140" r="112" fill="#ffffff" stroke="#d4d4d4" stroke-width="13"/>
+
+  <!-- Zoomed chip symbol: black rectangle, white band through the
+       middle, and a ringed circle centred on it -->
+  <rect x="60" y="103" width="150" height="74" rx="4" fill="#141414"/>
+  <rect x="60" y="131" width="150" height="18" fill="#ffffff"/>
+  <circle cx="135" cy="140" r="26" fill="#ffffff"/>
+  <circle cx="135" cy="140" r="17" fill="#141414"/>
+</svg>

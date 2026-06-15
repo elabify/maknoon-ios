@@ -305,7 +305,10 @@
         }
       }
     },
-    "A software wallet is convenient for small amounts. A separate hardware wallet (added from Settings, Devices) keeps your keys offline for larger holdings." : {
+    "A passphrase is used to backup your identity and any local assets using post-quantum encryption." : {
+
+    },
+    "A software wallet is convenient for small amounts. A separate hardware wallet keeps your keys offline for larger holdings." : {
 
     },
     "About" : {
@@ -2596,7 +2599,7 @@
         }
       }
     },
-    "Connect a supported transport so Maknoon can read its serial." : {
+    "Connect a supported transport so Maknoon can read the device's serial. Adding it to a network wallet is a separate step from the device's detail screen." : {
 
     },
     "Connect and add wallet" : {
@@ -3047,6 +3050,9 @@
           }
         }
       }
+    },
+    "Create new" : {
+
     },
     "Create or import an identity to see your profile and posts from the relay network." : {
       "extractionState" : "manual",
@@ -4633,6 +4639,9 @@
     "Enter the 6-digit pairing code shown on your Trezor." : {
 
     },
+    "Enter the passphrase you used for this backup, then pick the file. Maknoon decrypts it on this phone to confirm it opens. Nothing on this device is changed." : {
+
+    },
     "Enter the passphrase you used when you encrypted this backup, then pick the file. Decryption and verification happen entirely on this phone." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5771,6 +5780,9 @@
           }
         }
       }
+    },
+    "Hold your phone over top of the NFC enabled passport" : {
+
     },
     "Hold your SeedSigner camera up to the phone when the animated QR appears. Maknoon collects the signed transaction back through this phone's camera." : {
       "extractionState" : "manual",
@@ -7799,7 +7811,7 @@
         }
       }
     },
-    "Maknoon supports many networks, and even anchors temporary verified credentials on some of them. For holding value, though, we only recommend Bitcoin: it is the only cryptocurrency proven as a long-term store of value. Start with a software Bitcoin wallet, or connect a hardware wallet for cold storage." : {
+    "Maknoon supports many networks, and even anchors temporary verified credentials on some of them. For holding value, though, we only recommend Bitcoin: it is the only cryptocurrency proven as a long-term store of value. The safest option is a hardware wallet; a software Bitcoin wallet is convenient for small amounts." : {
 
     },
     "Maknoon talks to these services out of the box. You can override any of them with your own endpoint in Settings → Networks." : {
@@ -7850,6 +7862,9 @@
           }
         }
       }
+    },
+    "Maknoon will store an encrypted backup in any location you prefer using your passphrase. Without the passphrase, the post-quantum encrypted backup is useless and nobody can unlock it." : {
+
     },
     "Maknoon will walk BIP44 accounts on this device + network until %@ consecutive empty accounts are found, then stop. Each account is a full Electrum scan and can take several seconds." : {
 
@@ -9692,6 +9707,9 @@
           }
         }
       }
+    },
+    "Own your Identity, Assets, and Privacy" : {
+
     },
     "Paid" : {
       "extractionState" : "manual",
@@ -11622,6 +11640,9 @@
         }
       }
     },
+    "Restore encrypted backup" : {
+
+    },
     "Restore Encrypted Backup" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -11644,6 +11665,9 @@
           }
         }
       }
+    },
+    "Restore from a 24-word seed phrase only" : {
+
     },
     "Restore from backup file" : {
       "extractionState" : "manual",
@@ -11690,6 +11714,9 @@
           }
         }
       }
+    },
+    "Restoring from a seed phrase alone rebuilds your identity key, but it does NOT restore your verified credentials, settings, or local wallet data. Any verified credentials will be abandoned and must be manually reissued by their issuers." : {
+
     },
     "Results" : {
 
@@ -13211,6 +13238,9 @@
         }
       }
     },
+    "Show or verify your 24-word seed phrase for advanced or offline use. Verify encrypted backup tests that a saved backup file opens with your passphrase, without changing anything on this device." : {
+
+    },
     "Show recovery phrase" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -14177,6 +14207,9 @@
         }
       }
     },
+    "Tap your passport and Maknoon reads its chip on-device and mints an identity credential signed by your post-quantum key, that you can present from your phone. Nothing is uploaded unless you then choose an Elabify-verified credential." : {
+
+    },
     "Testnet" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -14682,7 +14715,7 @@
         }
       }
     },
-    "This is one of Maknoon's most useful flows. Tap your passport and Maknoon reads its chip on-device and mints an identity credential signed by your post-quantum key, that you can present from your phone. Nothing is uploaded unless you then choose an Elabify-verified credential." : {
+    "This is the last time the passphrase will be shown. Add it to a vetted password manager before you continue." : {
 
     },
     "This is the last time the passphrase will be shown. Add it to a vetted password manager before you continue. Do NOT write it on the same paper as your recovery phrase. If you lose the passphrase you will permanently lose access to your data and assets." : {

@@ -225,6 +225,24 @@ struct RecoveryView: View {
             if let errorMessage {
                 Text(errorMessage).font(.callout).foregroundStyle(.red)
             }
+
+            DisclosureGroup("Advanced") {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Restoring from a seed phrase alone rebuilds your identity key, but it does NOT restore your verified credentials, settings, or local wallet data. Any verified credentials will be abandoned and must be manually reissued by their issuers.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    Button(action: { mode = .wordsManual }) {
+                        Text("Restore from a 24-word seed phrase only")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(working)
+                }
+                .padding(.top, 6)
+            }
+            .font(.callout)
+            .tint(.secondary)
         }
         .fileImporter(
             isPresented: $showBackupImporter,
@@ -346,6 +364,13 @@ struct RecoveryView: View {
             //    state: no empty-then-populate flash, and no window where
             //    a store mutation could clobber the freshly written keys.
             store.adopt(sandwich)
+
+            // Best-effort: ask each configured issuer to re-mint the latest
+            // credentials for this (identical) holder DID, replacing the
+            // backup copies and pulling any the backup lacked. Runs in an
+            // unstructured Task so it survives this view being torn down when
+            // the launch router swaps to the main app on adopt.
+            Task { await store.reissueCredentialsAfterRestore() }
 
             if let pendingReport {
                 fileImportReport = IdentifiedImportReport(report: pendingReport)

@@ -348,6 +348,16 @@ enum EncryptedBackup {
         let walletState: [String: String]?
     }
 
+    /// Test that an encrypted backup blob opens with the given
+    /// passphrase WITHOUT applying any of it to the device. Decrypts
+    /// (and, for v3 blobs, verifies the ML-DSA-65 signature) and
+    /// discards the result. Throws the same `BackupError` as
+    /// `decryptFull` on a wrong passphrase or a malformed / tampered
+    /// file. Used by Settings, "Verify encrypted backup".
+    static func verify(_ blobData: Data, passphrase: String) throws {
+        _ = try decryptFull(blobData, passphrase: passphrase)
+    }
+
     static func decryptFull(_ blobData: Data, passphrase: String) throws -> DecryptedBackup {
         let blob = try JSONDecoder().decode(EncryptedBackupBlob.self, from: blobData)
         guard (1...3).contains(blob.v), blob.kdf == "pbkdf2-sha256" else {

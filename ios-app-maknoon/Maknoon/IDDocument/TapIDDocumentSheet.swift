@@ -133,6 +133,28 @@ struct TapIDDocumentSheet: View {
     @ViewBuilder
     private var formStep: some View {
         Form {
+            if parameters.kind == .passport {
+                Section {
+                    VStack(spacing: 12) {
+                        Image("PassportNFC")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxWidth: 280)
+                            .frame(height: 150)
+                            .accessibilityLabel("Chip-enabled passport")
+                        Label(
+                            "Your passport must show this symbol on its cover. Without it, the passport cannot be scanned.",
+                            systemImage: "checkmark.seal"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 4)
+                }
+                .listRowBackground(Color.clear)
+            }
             Section {
                 Text(formIntro)
                     .font(.callout)
@@ -224,7 +246,7 @@ struct TapIDDocumentSheet: View {
     private var formIntro: String {
         switch parameters.kind {
         case .passport:
-            return "Type the details from the inside of your passport, then tap your phone to the photo page when the system NFC sheet appears."
+            return "Type your details from inside of your passport, then place your phone over the passport."
         case .other:
             return "Type the details from the data page of your ID, then tap your phone to it when the system NFC sheet appears."
         }
@@ -248,7 +270,7 @@ struct TapIDDocumentSheet: View {
                 .font(.system(size: 96, weight: .ultraLight))
                 .foregroundStyle(.tint)
                 .symbolEffect(.pulse, options: .repeating)
-            Text("Hold your phone against the photo page")
+            Text("Hold your phone over top of the NFC enabled passport")
                 .font(.headline)
                 .multilineTextAlignment(.center)
             Text("Move slowly until the phone finds the chip. The bottom of an iPhone reads best.")

@@ -486,6 +486,24 @@ final class HolderStore {
 
     func addCredential(_ cred: Credential) {
         if credentials.contains(where: { $0.id == cred.id }) { return }
+        // Supersede an older credential of the SAME type (same issuer,
+        // subject, and schema) when a newer one arrives. This keeps a
+        // refreshed / reissued credential from piling up next to the
+        // stale copy (e.g. restore-time reissuance hands back a fresh
+        // credential with a new cid but the same iss/sub/schema). The
+        // user's nickname is carried over to the replacement.
+        let superseded = credentials.filter {
+            $0.header.iss == cred.header.iss
+            && $0.header.sub == cred.header.sub
+            && $0.header.schema == cred.header.schema
+            && $0.id != cred.id
+            && $0.header.iat <= cred.header.iat
+        }
+        if let inherited = superseded.compactMap({ nickname(for: $0.id) }).first,
+           nickname(for: cred.id) == nil {
+            setNickname(inherited, for: cred.id)
+        }
+        for old in superseded { removeCredential(id: old.id) }
         credentials.append(cred)
         // Default the nickname to the holder's Latin full name when
         // the credential carries givenName + familyName claims (true
@@ -505,6 +523,60 @@ final class HolderStore {
         credentials.removeAll(where: { $0.id == id })
         setNickname(nil, for: id)
         persistCredentials()
+    }
+
+    /// Best-effort restore-time reissuance. After an encrypted-backup
+    /// restore, ask every configured issuer to re-mint the latest
+    /// credential it holds for our (restored, identical) holder DID,
+    /// proving control with a master-key signature over an issuer nonce.
+    /// Each reissued credential's pickup is handed to `pendingPickups`,
+    /// whose background poller fetches it once anchored and imports it
+    /// (superseding the backup copy via `addCredential`). Per-issuer
+    /// failures are non-fatal: the restored backup copies remain valid.
+    @MainActor
+    func reissueCredentialsAfterRestore() async {
+        guard let sandwich = self.sandwich else { return }
+        let holderDID = sandwich.holderDID
+        let pubHex = "0x" + sandwich.masterPublicKey.map { String(format: "%02x", $0) }.joined()
+        let hosts = knownIssuers.hosts
+        for host in hosts {
+            guard let base = URL(string: "https://\(host)") else { continue }
+            do {
+                let nonce = try await IssuerClient.reissueChallenge(host: base, holderDID: holderDID)
+                guard let message = "elabify-reissue:v1:\(holderDID):\(nonce)".data(using: .utf8) else { continue }
+                let sig = try sandwich.signWithMaster(
+                    message,
+                    localizedReason: "Reissue your verified credentials"
+                )
+                let sigHex = "0x" + sig.map { String(format: "%02x", $0) }.joined()
+                let result = try await IssuerClient.reissue(
+                    host: base,
+                    holderDID: holderDID,
+                    masterPublicKeyHex: pubHex,
+                    nonce: nonce,
+                    signatureHex: sigHex
+                )
+                for r in result.reissued {
+                    pendingPickups.add(PendingPickup(
+                        id: r.credentialId,
+                        credentialId: r.credentialId,
+                        pickupURL: r.pickupUrl,
+                        schemaURI: r.schema,
+                        humanLabel: "Verified credential",
+                        startedAt: Date()
+                    ))
+                }
+                LogStore.shared.info(
+                    "reissue",
+                    "\(host): reissued=\(result.reissued.count) skipped=\(result.skipped?.count ?? 0)"
+                )
+            } catch {
+                // Non-fatal: the restored backup credential copies remain
+                // valid; the user can retry later from the issuer.
+                LogStore.shared.error("reissue", "\(host): \(error.localizedDescription)")
+                continue
+            }
+        }
     }
 
     private func persistCredentials() {

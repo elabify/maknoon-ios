@@ -33,6 +33,7 @@ struct SettingsView: View {
     @State private var pendingBackupRetry = false
     @State private var showResetMaknoonConfirm = false
     @State private var showResetMaknoonDone = false
+    @State private var didCopied = false
 
     /// The route carries the decrypted material as an associated value
     /// for the reveal cases. This makes it structurally impossible to
@@ -43,12 +44,14 @@ struct SettingsView: View {
         case showPhrase(MasterRecoveryMaterial)
         case lockdown
         case verifyPhrase
+        case verifyBackup
 
         var id: String {
             switch self {
             case .showPhrase:      return "showPhrase"
             case .lockdown:        return "lockdown"
             case .verifyPhrase:    return "verifyPhrase"
+            case .verifyBackup:    return "verifyBackup"
             }
         }
     }
@@ -84,6 +87,8 @@ struct SettingsView: View {
                     lockdownSheet
                 case .verifyPhrase:
                     verifyPhraseSheet
+                case .verifyBackup:
+                    VerifyBackupSheet(onDismiss: { route = nil })
                 }
             }
             .alert("Settings error", isPresented: .constant(errorMessage != nil)) {
@@ -210,7 +215,24 @@ struct SettingsView: View {
             if let did = store.sandwich?.holderDID {
                 Section("Identity") {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Holder DID").font(.caption).foregroundStyle(.secondary)
+                        HStack {
+                            Text("Holder DID").font(.caption).foregroundStyle(.secondary)
+                            Spacer()
+                            Button {
+                                UIPasteboard.general.string = did
+                                didCopied = true
+                                Task {
+                                    try? await Task.sleep(nanoseconds: 1_500_000_000)
+                                    didCopied = false
+                                }
+                            } label: {
+                                Label(didCopied ? "Copied" : "Copy",
+                                      systemImage: didCopied ? "checkmark" : "doc.on.doc")
+                                    .font(.caption)
+                                    .labelStyle(.titleAndIcon)
+                            }
+                            .buttonStyle(.borderless)
+                        }
                         Text(did)
                             .font(.system(.caption, design: .monospaced))
                             .textSelection(.enabled)
@@ -230,27 +252,35 @@ struct SettingsView: View {
 
     @ViewBuilder
     private var recoverySection: some View {
-        Section("Recovery") {
+        Section {
             if !BackupState.lockdownEnabled {
                 Button {
                     Task { await revealPhrase() }
                 } label: {
-                    Label("Show recovery phrase", systemImage: "doc.text.viewfinder")
+                    Label("Show seed phrase", systemImage: "doc.text.viewfinder")
                 }
-            }
-            if !BackupState.isVerified {
                 Button {
                     route = .verifyPhrase
                 } label: {
-                    Label("Verify recovery phrase", systemImage: "checkmark.shield")
-                        .foregroundStyle(.orange)
+                    Label("Verify seed phrase", systemImage: "checkmark.shield")
                 }
             }
+            // Verifying an encrypted backup only needs the file + the
+            // passphrase, so it stays available even under Lockdown.
+            Button {
+                route = .verifyBackup
+            } label: {
+                Label("Verify encrypted backup", systemImage: "lock.doc")
+            }
             if BackupState.lockdownEnabled {
-                Label("Lockdown enabled. Recovery phrase is no longer viewable on this device.", systemImage: "lock.fill")
+                Label("Lockdown enabled. Seed phrase is no longer viewable on this device.", systemImage: "lock.fill")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+        } header: {
+            Text("Recovery")
+        } footer: {
+            Text("Show or verify your 24-word seed phrase for advanced or offline use. Verify encrypted backup tests that a saved backup file opens with your passphrase, without changing anything on this device.")
         }
     }
 
@@ -645,7 +675,7 @@ struct SettingsView: View {
                     }
                 }
             )
-            .navigationTitle("Verify recovery phrase")
+            .navigationTitle("Verify seed phrase")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -684,7 +714,7 @@ private struct RevealSheet: View {
                 }
                 .padding(.horizontal, 16)
             }
-            .navigationTitle("Recovery phrase")
+            .navigationTitle("Seed phrase")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {

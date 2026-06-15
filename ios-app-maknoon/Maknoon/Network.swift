@@ -48,6 +48,82 @@ enum IssuerClient {
             throw NetworkError.decoding(error)
         }
     }
+
+    // MARK: -- restore-time reissuance
+
+    /// One reissued credential the issuer is re-minting; carries a fresh
+    /// pickup URL the holder polls like any other.
+    struct ReissuePickup: Decodable, Sendable {
+        let schema: String
+        let credentialId: String
+        let pickupUrl: String
+        let estimatedAnchorAt: Int64?
+    }
+
+    struct ReissueResult: Decodable, Sendable {
+        struct Skip: Decodable, Sendable { let schema: String; let reason: String }
+        let reissued: [ReissuePickup]
+        let skipped: [Skip]?
+    }
+
+    private struct ChallengeResult: Decodable { let nonce: String; let expiresAt: Int64 }
+
+    /// POST /v1/issuance/reissue/challenge — get a one-time nonce bound to
+    /// our holder DID. We then sign it with the master key and POST it back.
+    static func reissueChallenge(host issuerBase: URL, holderDID: String) async throws -> String {
+        let result: ChallengeResult = try await post(
+            url: issuerBase.appendingPathComponent("/v1/issuance/reissue/challenge"),
+            body: ["holderDid": holderDID]
+        )
+        return result.nonce
+    }
+
+    /// POST /v1/issuance/reissue — prove control of the holder DID with the
+    /// signed nonce; the issuer re-mints the latest credential per schema it
+    /// holds for this DID and returns their pickup URLs.
+    static func reissue(
+        host issuerBase: URL,
+        holderDID: String,
+        masterPublicKeyHex: String,
+        nonce: String,
+        signatureHex: String
+    ) async throws -> ReissueResult {
+        struct Body: Encodable {
+            let v = 1
+            let holderDid: String
+            let masterPublicKey: String
+            let nonce: String
+            let signature: String
+        }
+        return try await post(
+            url: issuerBase.appendingPathComponent("/v1/issuance/reissue"),
+            body: Body(
+                holderDid: holderDID,
+                masterPublicKey: masterPublicKeyHex,
+                nonce: nonce,
+                signature: signatureHex
+            )
+        )
+    }
+
+    private static func post<Req: Encodable, Resp: Decodable>(url: URL, body: Req) async throws -> Resp {
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        req.httpBody = try JSONEncoder().encode(body)
+        let (data, response) = try await URLSession.shared.data(for: req)
+        guard let http = response as? HTTPURLResponse else { throw NetworkError.http(0, "no response") }
+        guard 200..<300 ~= http.statusCode else {
+            let respBody = String(data: data, encoding: .utf8) ?? ""
+            throw NetworkError.http(http.statusCode, respBody)
+        }
+        do {
+            return try JSONDecoder().decode(Resp.self, from: data)
+        } catch {
+            throw NetworkError.decoding(error)
+        }
+    }
 }
 
 /// Combined decoder for both `state: "ready"` (credential set) and

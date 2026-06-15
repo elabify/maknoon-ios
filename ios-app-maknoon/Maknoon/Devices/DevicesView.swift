@@ -18,8 +18,7 @@ import SwiftUI
 
 struct DevicesView: View {
     @Environment(HolderStore.self) private var store
-    @State private var showRegisterPicker = false
-    @State private var pendingKind: DeviceKind?
+    @State private var showAddDevice = false
     @State private var registerError: String?
 
     var body: some View {
@@ -29,32 +28,17 @@ struct DevicesView: View {
         }
         .navigationTitle("Devices")
         .navigationBarTitleDisplayMode(.inline)
-        .confirmationDialog(
-            "Register a hardware device",
-            isPresented: $showRegisterPicker,
-            titleVisibility: .visible
-        ) {
-            ForEach(DeviceKind.registrableCases, id: \.self) { kind in
-                Button(kind.displayName) { pendingKind = kind }
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Connect a supported transport so Maknoon can read its serial.")
-        }
-        .sheet(item: $pendingKind) { kind in
-            if kind == .seedsigner {
-                SeedSignerPairingSheet { _ in
-                    pendingKind = nil
-                }
-                .environment(store)
-            } else {
-                RegisterDeviceSheet(kind: kind) { result in
-                    pendingKind = nil
-                    if case .failure(let err) = result {
-                        registerError = err.localizedDescription
+        .sheet(isPresented: $showAddDevice) {
+            NavigationStack {
+                AddHardwareDeviceFlow(onFinished: { _ in showAddDevice = false })
+                    .environment(store)
+                    .navigationTitle("Register device")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button("Cancel") { showAddDevice = false }
+                        }
                     }
-                }
-                .environment(store)
             }
         }
     }
@@ -131,7 +115,7 @@ struct DevicesView: View {
                 }
             }
             Button {
-                showRegisterPicker = true
+                showAddDevice = true
             } label: {
                 Label("Register device…", systemImage: "plus.circle")
             }

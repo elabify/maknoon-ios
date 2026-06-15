@@ -43,7 +43,7 @@ settings:
     # isolated SWIFT_VERSION.
     SWIFT_VERSION: "5.10"
     IPHONEOS_DEPLOYMENT_TARGET: "26.0"
-    MARKETING_VERSION: "0.5.1"
+    MARKETING_VERSION: "0.5.2"
     CURRENT_PROJECT_VERSION: "1"
     # MAKNOON_NFC gates NFC code paths (ID document scanning via
     # NFCPassportReader, YubiKey FIDO2 hmac-secret over NFC).

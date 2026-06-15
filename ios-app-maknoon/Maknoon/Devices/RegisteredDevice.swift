@@ -43,10 +43,18 @@ enum DeviceKind: String, Codable, CaseIterable, Sendable {
         }
     }
 
+    /// Registrable kinds that can hold value (sign for at least one
+    /// network), excluding identity-only devices like YubiKey. Used by
+    /// the onboarding "first wallet" hardware picker.
+    static var walletCapableRegistrableCases: [DeviceKind] {
+        let walletCaps: Capabilities = [.bitcoin, .ethereum, .solana, .tron]
+        return registrableCases.filter { !$0.capabilities.isDisjoint(with: walletCaps) }
+    }
+
     var displayName: String {
         switch self {
         case .yubikey:    return "YubiKey"
-        case .ledger:     return "Ledger Nano X"
+        case .ledger:     return "Ledger"
         case .trezor:     return "Trezor"
         case .seedsigner: return "SeedSigner"
         }
