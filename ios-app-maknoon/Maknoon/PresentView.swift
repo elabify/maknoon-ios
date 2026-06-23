@@ -16,6 +16,9 @@ struct PresentAttributesView: View {
     /// and the share targets default to the request's response directive.
     /// Slice 4 wires this; Slice 3 ships with `pendingRequest == nil`.
     var pendingRequest: VerifierRequest? = nil
+    /// Passport Show-QR (ADR-0039): Build QR moves to the top and the helper
+    /// footers are dropped for a lean retail layout.
+    var compact: Bool = false
     /// Present the rotating-QR share sheet. Hoisted to the parent
     /// (`CredentialPresentView`) so the sheet is anchored to the screen's
     /// Form rather than to these Form-nested rows: a `.sheet` attached to
@@ -50,16 +53,25 @@ struct PresentAttributesView: View {
             if let pendingRequest {
                 requestSummarySection(pendingRequest)
             }
-            claimsSection
-            buildSection
-            if built != nil {
-                shareSection
-                if let outcome = callbackOutcome {
-                    callbackOutcomeSection(outcome)
-                }
-                if let err = callbackError {
-                    Section("Callback error") {
-                        Text(err).font(.callout).foregroundStyle(.red)
+            if compact {
+                // Passport: Build Online QR on top (defaults to the secure
+                // link), toggles below, then an Advanced section for the
+                // offline rotating QR + copy. No "Send to URL", no helper text.
+                buildSection
+                claimsSection
+                advancedShareSection
+            } else {
+                claimsSection
+                buildSection
+                if built != nil {
+                    shareSection
+                    if let outcome = callbackOutcome {
+                        callbackOutcomeSection(outcome)
+                    }
+                    if let err = callbackError {
+                        Section("Callback error") {
+                            Text(err).font(.callout).foregroundStyle(.red)
+                        }
                     }
                 }
             }
@@ -130,7 +142,7 @@ struct PresentAttributesView: View {
         return Section {
             ForEach(allKeys, id: \.self) { key in
                 let required = requiredKeys.contains(key)
-                let value = credential.claims[key]?.prettyText ?? "—"
+                let value = credential.claims[key]?.prettyText ?? "-"
                 Toggle(isOn: Binding(
                     get: { selectedClaims.contains(key) },
                     set: { on in
@@ -202,26 +214,69 @@ struct PresentAttributesView: View {
                 .disabled(optionalKeys.isEmpty)
             }
         } footer: {
-            Text("All attributes are selected by default. Tap to remove any field before building the QR; required fields (when the verifier specified them) stay on.")
-                .font(.caption)
+            if !compact {
+                Text("All attributes are selected by default. Tap to remove any field before building the QR; required fields (when the verifier specified them) stay on.")
+                    .font(.caption)
+            }
         }
     }
 
     private var buildSection: some View {
         Section {
-            Button(action: { Task { await build() } }) {
+            Button(action: { Task { if compact { await buildOnlineQR() } else { await build() } } }) {
                 HStack {
                     if working { ProgressView() }
-                    Text(built != nil ? "Re-build QR" : "Build QR")
+                    Text(compact ? "Build Online QR" : (built != nil ? "Re-build QR" : "Build QR"))
                 }
                 .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
-            .disabled(working || selectedClaims.isEmpty)
+            // Zero disclosed claims is allowed (ADR-0039): a zero-attribute QR
+            // still proves a genuine, anchored credential with no PII.
+            .disabled(working)
         } footer: {
-            Text("Signs a Presentation with the disclosed claims. The signature is over a fresh nonce, valid for ~5 minutes.")
-                .font(.caption)
+            if !compact {
+                Text("Signs a Presentation with the disclosed claims. The signature is over a fresh nonce, valid for ~5 minutes.")
+                    .font(.caption)
+            }
         }
+    }
+
+    /// Passport (compact) advanced section: the offline rotating QR and a raw
+    /// copy of the presentation. Each builds on demand. No "Send to URL".
+    private var advancedShareSection: some View {
+        Section {
+            DisclosureGroup("Advanced") {
+                Button { Task { await buildOfflineQR() } } label: {
+                    Label("Build Offline QR", systemImage: "qrcode")
+                }
+                .disabled(working)
+                Button { Task { await buildAndCopy() } } label: {
+                    Label("Copy Presentation", systemImage: "doc.on.clipboard")
+                }
+                .disabled(working)
+            }
+        }
+    }
+
+    /// Build then immediately open the secure-link (drop) QR. The default
+    /// passport flow.
+    @MainActor
+    private func buildOnlineQR() async {
+        await build()
+        if let p = built?.presentation { onPresentDrop(p); recordHistory(presentation: p, via: "drop") }
+    }
+
+    @MainActor
+    private func buildOfflineQR() async {
+        await build()
+        if let p = built?.presentation { onPresentQR(p); recordHistory(presentation: p, via: "qr") }
+    }
+
+    @MainActor
+    private func buildAndCopy() async {
+        await build()
+        if built != nil { copyPresentation() }
     }
 
     private var shareSection: some View {
@@ -285,7 +340,7 @@ struct PresentAttributesView: View {
         } header: {
             Text("Share")
         } footer: {
-            Text("The Presentation is signed and ready. You decide where it goes — Elabify never mediates the verifier relationship.")
+            Text("The Presentation is signed and ready. You decide where it goes, Elabify never mediates the verifier relationship.")
                 .font(.caption)
         }
     }
@@ -387,7 +442,7 @@ struct PresentAttributesView: View {
         guard let url = URL(string: trimmed),
               let scheme = url.scheme?.lowercased(),
               scheme == "http" || scheme == "https" else {
-            callbackError = "Invalid URL — expected http(s)://…"
+            callbackError = "Invalid URL, expected http(s)://…"
             return
         }
         workingShare = .callback
@@ -473,12 +528,17 @@ struct DropQrSheet: View {
                             Text(envelope.dropId)
                                 .font(.caption.monospaced())
                                 .textSelection(.enabled)
+                            Text("Server: \(serverLabel)")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
                             if let exp = envelope.expiresAt {
-                                Text("Expires \(formatTime(exp))")
-                                    .font(.caption2)
-                                    .foregroundStyle(.tertiary)
+                                TimelineView(.periodic(from: .now, by: 1)) { ctx in
+                                    Text("Expires in \(countdown(to: exp, now: ctx.date))")
+                                        .font(.caption2.monospacedDigit())
+                                        .foregroundStyle(.tertiary)
+                                }
                             }
-                            Text("Have the verifier scan this QR with their Elabify app. The presentation is fetched once and then gone.")
+                            Text("To verify, use Elabify Maknoon app identity to verify credential")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                                 .multilineTextAlignment(.center)
@@ -503,7 +563,7 @@ struct DropQrSheet: View {
                     .task { await upload() }
                 }
             }
-            .navigationTitle("Verifier scans this")
+            .navigationTitle("Online QR")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -511,6 +571,19 @@ struct DropQrSheet: View {
                 }
             }
         }
+    }
+
+    /// Host that stored the drop, shown so the verifier knows which server to
+    /// trust for the one-shot fetch.
+    private var serverLabel: String {
+        HolderStore.elabifyDropHost.host ?? HolderStore.elabifyDropHost.absoluteString
+    }
+
+    /// Live "m:ss" remaining until the drop expires; "expired" past the deadline.
+    private func countdown(to expiresAt: Int64, now: Date) -> String {
+        let remaining = Int(TimeInterval(expiresAt) - now.timeIntervalSince1970)
+        if remaining <= 0 { return "expired" }
+        return String(format: "%d:%02d", remaining / 60, remaining % 60)
     }
 
     @MainActor

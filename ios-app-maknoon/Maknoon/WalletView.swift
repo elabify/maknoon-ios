@@ -5,6 +5,43 @@
 import SwiftUI
 import BitcoinDevKit
 
+/// Official chain brand logo (full-color vector asset), used across the wallet
+/// list and dashboards. Android parity (`ic_chain_*`); renders the brand mark
+/// in its own colors, not a tinted SF Symbol.
+struct ChainLogo: View {
+    let asset: String
+    var size: CGFloat
+    init(_ asset: String, size: CGFloat = 28) {
+        self.asset = asset
+        self.size = size
+    }
+    var body: some View {
+        Image(asset)
+            .resizable()
+            .scaledToFit()
+            .frame(width: size, height: size)
+    }
+}
+
+/// Value route for programmatic navigation into a chain's wallet (e.g. after a
+/// Verify & Pay, to show the pending tx). The tap-based rows use NavigationLink;
+/// this drives `walletNavigationPath.append(...)` from elsewhere (ContentView
+/// registers the matching `.navigationDestination`).
+enum WalletChain: Hashable {
+    case bitcoin, lightning, ethereum, solana, tron
+
+    init?(chainKey: String) {
+        switch chainKey.lowercased() {
+        case "bitcoin":   self = .bitcoin
+        case "lightning": self = .lightning
+        case "ethereum":  self = .ethereum
+        case "solana":    self = .solana
+        case "tron":      self = .tron
+        default:          return nil
+        }
+    }
+}
+
 struct WalletView: View {
     @Environment(HolderStore.self) private var store
     @State private var showSettings = false
@@ -116,16 +153,12 @@ struct WalletView: View {
             } label: {
                 bitcoinRow
             }
-        } header: {
-            Text("Bitcoin")
         }
     }
 
     private var bitcoinRow: some View {
         HStack(alignment: .center, spacing: 12) {
-            Image(systemName: "bitcoinsign.circle.fill")
-                .font(.title2)
-                .foregroundStyle(.orange)
+            ChainLogo("ChainBitcoin")
             VStack(alignment: .leading, spacing: 2) {
                 Text(activeLabel).font(.callout.weight(.semibold))
                 Text(activeSubtitle).font(.caption).foregroundStyle(.secondary)
@@ -145,16 +178,12 @@ struct WalletView: View {
             } label: {
                 lightningRow
             }
-        } header: {
-            Text("Bitcoin Lightning")
         }
     }
 
     private var lightningRow: some View {
         HStack(alignment: .center, spacing: 12) {
-            Image(systemName: "bolt.fill")
-                .font(.title2)
-                .foregroundStyle(.yellow)
+            ChainLogo("ChainLightning")
             VStack(alignment: .leading, spacing: 2) {
                 Text(activeLightningLabel).font(.callout.weight(.semibold))
                 Text(activeLightningSubtitle).font(.caption).foregroundStyle(.secondary)
@@ -183,16 +212,12 @@ struct WalletView: View {
             } label: {
                 ethereumRow
             }
-        } header: {
-            Text("Ethereum")
         }
     }
 
     private var ethereumRow: some View {
         HStack(alignment: .center, spacing: 12) {
-            Image(systemName: "diamond.fill")
-                .font(.title2)
-                .foregroundStyle(.indigo)
+            ChainLogo("ChainEthereum")
             VStack(alignment: .leading, spacing: 2) {
                 Text(activeEthereumLabel).font(.callout.weight(.semibold))
                 Text(activeEthereumSubtitle).font(.caption).foregroundStyle(.secondary)
@@ -207,7 +232,7 @@ struct WalletView: View {
     }
 
     private var activeEthereumSubtitle: String {
-        guard store.ethereumWalletStore.activeWallet != nil else { return "—" }
+        guard store.ethereumWalletStore.activeWallet != nil else { return "-" }
         let net = store.ethereumWalletStore.activeNetwork(
             customs: store.ethereumCustomNetworks,
             settings: store.ethereumSettings
@@ -226,16 +251,12 @@ struct WalletView: View {
             } label: {
                 solanaRow
             }
-        } header: {
-            Text("Solana")
         }
     }
 
     private var solanaRow: some View {
         HStack(alignment: .center, spacing: 12) {
-            Image(systemName: "circle.hexagongrid.fill")
-                .font(.title2)
-                .foregroundStyle(.purple)
+            ChainLogo("ChainSolana")
             VStack(alignment: .leading, spacing: 2) {
                 Text(activeSolanaLabel).font(.callout.weight(.semibold))
                 Text(activeSolanaSubtitle).font(.caption).foregroundStyle(.secondary)
@@ -254,16 +275,12 @@ struct WalletView: View {
             } label: {
                 tronRow
             }
-        } header: {
-            Text("Tron")
         }
     }
 
     private var tronRow: some View {
         HStack(alignment: .center, spacing: 12) {
-            Image(systemName: "diamond.fill")
-                .font(.title2)
-                .foregroundStyle(.red)
+            ChainLogo("ChainTron")
             VStack(alignment: .leading, spacing: 2) {
                 Text(activeTronLabel).font(.callout.weight(.semibold))
                 Text(activeTronSubtitle).font(.caption).foregroundStyle(.secondary)
@@ -278,7 +295,7 @@ struct WalletView: View {
     }
 
     private var activeTronSubtitle: String {
-        guard let w = store.tronWalletStore.activeWallet else { return "—" }
+        guard let w = store.tronWalletStore.activeWallet else { return "-" }
         let n = store.tronWalletStore.wallets.count
         let net = store.tronWalletStore.activeNetwork(for: w.id)
         return "\(net.displayName) - \(n == 1 ? "1 wallet" : "\(n) wallets")"
@@ -289,7 +306,7 @@ struct WalletView: View {
     }
 
     private var activeSolanaSubtitle: String {
-        guard let w = store.solanaWalletStore.activeWallet else { return "—" }
+        guard let w = store.solanaWalletStore.activeWallet else { return "-" }
         let n = store.solanaWalletStore.wallets.count
         let net = store.solanaWalletStore.activeNetwork(for: w.id)
         return "\(net.displayName) - \(n == 1 ? "1 wallet" : "\(n) wallets")"
@@ -300,7 +317,7 @@ struct WalletView: View {
     }
 
     private var activeSubtitle: String {
-        guard let w = store.bitcoinWalletStore.activeWallet else { return "—" }
+        guard let w = store.bitcoinWalletStore.activeWallet else { return "-" }
         return "\(w.network.displayName) - \(walletCountLabel)"
     }
 

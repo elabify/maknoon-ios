@@ -39,7 +39,7 @@ struct EthereumTokenTransfer: Codable, Hashable, Sendable {
     let contractAddress: String
     let tokenName: String?
     let tokenSymbol: String?
-    let tokenDecimal: String?      // sic — Etherscan field is singular
+    let tokenDecimal: String?      // sic, Etherscan field is singular
 }
 
 /// Unified history item rendered in the wallet's tx list. Etherscan

@@ -1,11 +1,11 @@
-// User's address book — per-network-type contacts. One entry
+// User's address book: per-network-type contacts. One entry
 // covers every sub-network inside its major type (e.g. an
 // Ethereum entry's address is valid on mainnet, Sepolia, Base,
 // Arbitrum, … because EVM addresses are chain-agnostic).
 //
 // Lightning entries hold LUD-16 lightning addresses
 // (`name@domain.com`), which the Send view resolves via LNURL-
-// pay at send time. BOLT11 invoices aren't stored — they're
+// pay at send time. BOLT11 invoices aren't stored, they're
 // single-use and expire.
 
 import Foundation

@@ -62,7 +62,12 @@ enum PresentationVerifier {
     /// caveats or to escalate to an online verifier.
     static func verifyOffline(
         _ p: Presentation,
-        clockSkewToleranceSec: Int64 = 60,
+        // 5 minutes, matching the server-assisted QR drop's validity window
+        // (PresentationDrop / DropEnvelope.expiresAt): a presentation built for
+        // that QR is good for the same period, so "Verify Someone" accepts the
+        // holder's timestamp within the identical 300s window rather than a
+        // tighter 60s clock-skew bound that would reject a still-valid QR.
+        clockSkewToleranceSec: Int64 = 300,
         nowSec: Int64 = Int64(Date().timeIntervalSince1970)
     ) -> LocalVerdict {
 

@@ -43,6 +43,11 @@ struct BitcoinAddressesView: View {
     @State private var loading: Bool = false
     @State private var copiedAddress: String?
     @State private var showHardwareDescriptor: Bool = false
+    /// Address whose QR is shown full-screen so another person can scan it to
+    /// pay (Android parity: the per-row QR button + sheet).
+    @State private var qrAddress: QRAddress?
+
+    private struct QRAddress: Identifiable { let id: String }
 
     var body: some View {
         NavigationStack {
@@ -83,6 +88,9 @@ struct BitcoinAddressesView: View {
             .sheet(isPresented: $showHardwareDescriptor) {
                 HardwareDescriptorSheet(wallet: wallet)
             }
+            .sheet(item: $qrAddress) { target in
+                AddressQRSheet(address: target.id)
+            }
         }
     }
 
@@ -107,7 +115,7 @@ struct BitcoinAddressesView: View {
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
                 } else {
-                    Text("—")
+                    Text("-")
                         .font(.callout.weight(.medium))
                         .foregroundStyle(.tertiary)
                 }
@@ -118,6 +126,15 @@ struct BitcoinAddressesView: View {
                     .lineLimit(2)
                     .textSelection(.enabled)
                 Spacer()
+                Button {
+                    qrAddress = QRAddress(id: row.address)
+                } label: {
+                    Image(systemName: "qrcode")
+                        .font(.callout)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(Color.accentColor)
+                .accessibilityLabel("Show QR")
                 Button {
                     UIPasteboard.general.string = row.address
                     copiedAddress = row.address
@@ -226,6 +243,7 @@ private struct HardwareDescriptorSheet: View {
     let wallet: BitcoinWallet
     @Environment(\.dismiss) private var dismiss
     @State private var copied: String?
+    @State private var xpubRevealed = false
 
     private var hardwareInfo: (fingerprint: String, xpub: String, coinType: UInt32)? {
         guard case let .hardware(_, fingerprintHex, accountXpub) = wallet.descriptor.kind else {
@@ -242,25 +260,9 @@ private struct HardwareDescriptorSheet: View {
                         descriptorRow(label: "Master fingerprint", value: info.fingerprint)
                         descriptorRow(label: "Derivation path", value: "m/84'/\(info.coinType)'/0'")
                         descriptorRow(label: "Network", value: wallet.descriptor.network.rawValue)
-                        descriptorRow(label: "Account xpub", value: info.xpub)
+                        descriptorRow(label: "Account xpub", value: info.xpub, secret: true)
                     } header: {
                         Text("Hardware wallet descriptor")
-                    } footer: {
-                        Text("These are the values needed to import this watch-only wallet into another wallet app, OR to feed the BLE signing test harness (code/tools/ledger-ble-test) so we can iterate on the Ledger SIGN_PSBT protocol from macOS.")
-                            .font(.caption)
-                    }
-
-                    Section {
-                        Button {
-                            let combined = "--fingerprint \(info.fingerprint) --xpub \(info.xpub) --account 0 --coin \(info.coinType)"
-                            UIPasteboard.general.string = combined
-                            copied = "args"
-                        } label: {
-                            Label(copied == "args" ? "Copied!" : "Copy as test-tool args", systemImage: "terminal")
-                        }
-                    } footer: {
-                        Text("Pastes a single line you can append to `swift run ledger-ble-test --psbt-file ...`.")
-                            .font(.caption)
                     }
                 } else {
                     Text("This wallet is not hardware-backed.")
@@ -279,11 +281,22 @@ private struct HardwareDescriptorSheet: View {
     }
 
     @ViewBuilder
-    private func descriptorRow(label: String, value: String) -> some View {
+    private func descriptorRow(label: String, value: String, secret: Bool = false) -> some View {
+        // `secret` values (the account xpub) are masked behind an eye toggle and
+        // revealed only on tap.
+        let hidden = secret && !xpubRevealed
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(label).font(.caption).foregroundStyle(.secondary)
                 Spacer()
+                if secret {
+                    Button {
+                        xpubRevealed.toggle()
+                    } label: {
+                        Image(systemName: xpubRevealed ? "eye.slash" : "eye").font(.callout)
+                    }
+                    .buttonStyle(.plain)
+                }
                 Button {
                     UIPasteboard.general.string = value
                     copied = label
@@ -294,10 +307,73 @@ private struct HardwareDescriptorSheet: View {
                 .buttonStyle(.plain)
                 .foregroundStyle(copied == label ? Color.green : Color.accentColor)
             }
-            Text(value)
+            Text(hidden ? String(repeating: "•", count: 24) : value)
                 .font(.system(.caption, design: .monospaced))
                 .textSelection(.enabled)
                 .lineLimit(4)
         }
+    }
+}
+
+/// Full-screen QR for a single address so another person can scan it to pay
+/// (Android parity: the per-row QR dialog). Renders the bare address through the
+/// shared BadgeQR CoreImage renderer.
+private struct AddressQRSheet: View {
+    let address: String
+    @Environment(\.dismiss) private var dismiss
+    @State private var copied = false
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 16) {
+                let image = BadgeQR.render(Data(address.utf8), scale: 8)
+                Group {
+                    if let image {
+                        Image(uiImage: image)
+                            .interpolation(.none)
+                            .resizable()
+                            .scaledToFit()
+                    } else {
+                        Image(systemName: "qrcode")
+                            .resizable()
+                            .scaledToFit()
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                .frame(width: 240, height: 240)
+                .padding(8)
+                .background(Color.white)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+                Text(address)
+                    .font(.system(.caption, design: .monospaced))
+                    .multilineTextAlignment(.center)
+                    .textSelection(.enabled)
+                    .padding(.horizontal, 24)
+
+                Button {
+                    UIPasteboard.general.string = address
+                    copied = true
+                } label: {
+                    Label(copied ? "Copied" : "Copy address", systemImage: copied ? "checkmark" : "doc.on.doc")
+                }
+                .buttonStyle(.bordered)
+
+                Text("Anything sent will arrive in this wallet.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+            }
+            .padding(.top, 24)
+            .frame(maxWidth: .infinity)
+            .navigationTitle("Receive to this address")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
     }
 }

@@ -31,14 +31,14 @@ struct AboutView: View {
             isPresented: $showLogsWarning,
             titleVisibility: .visible
         ) {
-            Button("I understand — share logs") {
+            Button("I understand, share logs") {
                 shareItems = [exportLogToTempFile()]
                 showShareSheet = true
             }
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("""
-                 Logs DO NOT contain your recovery phrase, passphrase, private keys, or wrap keys — those never leave Keychain.
+                 Logs DO NOT contain your recovery phrase, password, private keys, or wrap keys: those never leave Keychain.
 
                  Logs DO contain public-but-identifying information: wallet addresses, transaction hashes, the chains and services you've used, BLE device identifiers, and timestamps. Anyone who reads the logs can correlate your activity on-chain. Only share with people you trust.
                  """)
@@ -91,7 +91,7 @@ struct AboutView: View {
         } header: {
             Text("Elabify")
         } footer: {
-            Text("Maknoon and ElabifyCore are dual-licensed under Apache 2.0 or MIT, at your choice. No analytics and no telemetry: your recovery phrase, passphrase, and private keys never leave the Secure Enclave / Keychain, and every network endpoint below is overridable or self-hostable. File feature requests and bug reports on GitHub.")
+            Text("Maknoon and ElabifyCore are dual-licensed under Apache 2.0 or MIT, at your choice. No analytics and no telemetry: your recovery phrase, password, and private keys never leave the Secure Enclave / Keychain, and every network endpoint below is overridable or self-hostable. File feature requests and bug reports on GitHub.")
                 .font(.caption)
         }
     }
@@ -195,7 +195,7 @@ struct AboutView: View {
 
     private func row(_ key: String, _ value: String) -> some View {
         HStack(alignment: .top) {
-            Text(key).font(.caption).foregroundStyle(.secondary).frame(width: 80, alignment: .leading)
+            Text(LocalizedStringKey(key)).font(.caption).foregroundStyle(.secondary).frame(width: 80, alignment: .leading)
             Spacer()
             Text(value)
                 .font(.caption.monospaced())

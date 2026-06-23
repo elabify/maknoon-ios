@@ -87,7 +87,7 @@ struct LocalShareQrSheet: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
-            .navigationTitle("Verifier scans this")
+            .navigationTitle("Offline QR")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {

@@ -151,7 +151,7 @@ struct SolanaRPCClient: Sendable {
 
     /// Fetch a single transaction's SOL delta for `ownerAddress`.
     /// Returns nil when the transaction is missing or hasn't propagated
-    /// yet, so the row can fall back to "—".
+    /// yet, so the row can fall back to "-".
     func getTransactionDelta(
         signature: String,
         ownerAddress: String

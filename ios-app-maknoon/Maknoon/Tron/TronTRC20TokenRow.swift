@@ -44,7 +44,7 @@ struct TronTRC20TokenRow: View {
                     Text(token.format(rawAmountDecimal: raw))
                         .font(.callout.monospacedDigit())
                 } else {
-                    Text("—").font(.callout).foregroundStyle(.tertiary)
+                    Text("-").font(.callout).foregroundStyle(.tertiary)
                 }
                 Text(token.symbol).font(.caption2).foregroundStyle(.tertiary)
             }

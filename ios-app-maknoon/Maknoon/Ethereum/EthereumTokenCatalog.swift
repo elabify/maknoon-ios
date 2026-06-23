@@ -1,11 +1,11 @@
 // Two views of the same per-network token data:
 //
-//   • `firstRunSeed(for:)` — tight set installed automatically on a
+//   • `firstRunSeed(for:)`: tight set installed automatically on a
 //     fresh app launch. Just USDC for every chain that ships it.
 //     Avoids spamming the user's token list with stuff they don't
 //     hold.
 //
-//   • `reputable(for:)` — broader set used by the auto-discover
+//   • `reputable(for:)`: broader set used by the auto-discover
 //     code path: when a user's wallet has on-chain ERC-20 activity
 //     against a contract that matches an entry here, the token is
 //     auto-installed. Keep entries here verified against the chain's
@@ -134,7 +134,7 @@ enum EthereumTokenCatalog {
 
     /// Auto-discover lookup. Case-insensitive contract match within
     /// the given network's reputable list. Returns nil for unknown
-    /// contracts (those are surfaced to the user as "unknown token —
+    /// contracts (those are surfaced to the user as "unknown token,
     /// add as custom?" rather than auto-installed).
     static func find(network: EthereumNetwork, contract: String) -> EthereumToken? {
         let needle = contract.lowercased()

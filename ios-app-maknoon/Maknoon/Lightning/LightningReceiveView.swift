@@ -55,7 +55,7 @@ struct LightningReceiveView: View {
             } header: {
                 Text("Invoice")
             } footer: {
-                Text("Leave amount as 0 for an amountless invoice — the payer chooses the amount when paying.")
+                Text("Leave amount as 0 for an amountless invoice, the payer chooses the amount when paying.")
                     .font(.caption)
             }
             Section {

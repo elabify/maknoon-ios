@@ -23,7 +23,6 @@ struct DevicesView: View {
 
     var body: some View {
         Form {
-            identityProtectionSection
             registeredDevicesSection
         }
         .navigationTitle("Devices")
@@ -40,52 +39,6 @@ struct DevicesView: View {
                         }
                     }
             }
-        }
-    }
-
-    // MARK: -- identity protection
-
-    private var identityProtectionSection: some View {
-        Section {
-            // Secure Enclave signing: every sensitive operation gates
-            // through the user's configured biometric or passcode.
-            HStack {
-                Image(systemName: "cpu.fill").foregroundStyle(.blue)
-                VStack(alignment: .leading) {
-                    Text("Secure Enclave Signing").font(.callout.weight(.semibold))
-                    Text("Required for every sensitive operation. Authorized by your preferred configured biometric or passcode.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-            }
-
-            // Any device that's been promoted into the Identity
-            // Sandwich (wraps the BIP39 entropy via FIDO2 hmac-secret).
-            let identityDevices = store.devices.devices
-                .filter { $0.promotions.identity != nil }
-            if identityDevices.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
-                    Label("No security keys protect your Identity Sandwich yet", systemImage: "key.fill")
-                        .foregroundStyle(.purple)
-                    Text("Register a YubiKey or a Ledger (Security Key app), then add it from the device's detail screen below to require a second factor on every Identity Sandwich unlock.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-            } else {
-                ForEach(identityDevices) { dev in
-                    HStack {
-                        Image(systemName: dev.kind.systemImage).foregroundStyle(.purple)
-                        VStack(alignment: .leading) {
-                            Text(dev.label).font(.callout.weight(.semibold))
-                            Text("\(dev.kind.displayName) - \(dev.serialDisplay)")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
-                }
-            }
-        } header: {
-            Text("Identity protection")
-        } footer: {
-            Text("Secure Enclave signing unlocks the post-quantum master key locally via your preferred configured biometric or passcode. Registered security keys add a hardware second factor that wraps the BIP39 entropy via a FIDO2 hmac-secret challenge-response.")
-                .font(.caption)
         }
     }
 
@@ -124,9 +77,6 @@ struct DevicesView: View {
             }
         } header: {
             Text("Registered devices")
-        } footer: {
-            Text("Registration is a lightweight handshake that records the device's stable serial so Maknoon can recognise it on every reconnect. Promotion into Identity or a network requires opening the relevant on-device app and explicitly approving.")
-                .font(.caption)
         }
     }
 
@@ -157,6 +107,18 @@ struct DevicesView: View {
                         Text("Ethereum").font(.caption2)
                             .padding(.horizontal, 6).padding(.vertical, 1)
                             .background(Color.indigo.opacity(0.18))
+                            .clipShape(Capsule())
+                    }
+                    if !dev.promotions.solanaWalletIds.isEmpty {
+                        Text("Solana").font(.caption2)
+                            .padding(.horizontal, 6).padding(.vertical, 1)
+                            .background(Color.teal.opacity(0.18))
+                            .clipShape(Capsule())
+                    }
+                    if !dev.promotions.tronWalletIds.isEmpty {
+                        Text("Tron").font(.caption2)
+                            .padding(.horizontal, 6).padding(.vertical, 1)
+                            .background(Color.red.opacity(0.18))
                             .clipShape(Capsule())
                     }
                 }

@@ -1,7 +1,7 @@
 // Authorize a step-up tap before removing a device from the Identity
 // Sandwich. Without this gate, a drive-by attacker with an unlocked
 // phone could silently strip enrolled devices by tapping "Remove"
-// repeatedly — the wrap-envelope edit cost nothing on the multi-
+// repeatedly. The wrap-envelope edit cost nothing on the multi-
 // device branch.
 //
 // Any currently-enrolled device can authorize the removal:
@@ -37,28 +37,25 @@ struct RemoveFromSandwichSheet: View {
     /// Drives the pre-tap "open the Ethereum app" readiness sheet.
     @State private var pendingReadyOp: PendingHardwareOperation?
 
-    /// Rows in the picker: one per enrolled device. Includes the
-    /// device being removed so the common single-device case still
-    /// surfaces a sensible authorizer choice.
+    /// Rows in the picker: one per enrolled device that carries a CEK
+    /// wrap. Includes the device being removed so the common single-
+    /// device case still surfaces a sensible authorizer choice.
     private struct EnrolledRow: Identifiable {
         let device: RegisteredDevice
-        let wrap: WrappedMaterialPersisted
         var id: UUID { device.id }
     }
 
     private var enrolledRows: [EnrolledRow] {
-        guard let env = try? IdentitySandwich.loadWrapEnvelope() else { return [] }
-        return env.blobs.compactMap { blob in
-            guard let dev = store.devices.find(id: blob.deviceId) else { return nil }
-            return EnrolledRow(device: dev, wrap: blob)
-        }
+        store.devices.devices
+            .filter { $0.promotions.identity?.hasSecondFactorWrap == true }
+            .map { EnrolledRow(device: $0) }
     }
 
     var body: some View {
         NavigationStack {
             Form {
                 Section {
-                    Text("Removing **\(deviceToRemove.label)** from the Identity Sandwich requires confirmation from one of your enrolled devices. Tap whichever you have on hand. The device you tap will be asked to authorize the removal in real time.")
+                    Text("Removing **\(deviceToRemove.label)** as a second factor requires confirmation from one of your enrolled devices. Tap whichever you have on hand. The device you tap will be asked to authorize the removal in real time.")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 }
@@ -127,8 +124,15 @@ struct RemoveFromSandwichSheet: View {
         return Button {
             if row.device.kind == .yubikey {
                 pin = ""
-                pendingAuthorizerId = row.device.id
-                showPINPrompt = true
+                // Only prompt for the PIN if this key was enrolled PIN-protected;
+                // a no-PIN key authorizes with the tap alone.
+                if row.device.promotions.identity?.pinProtected ?? true {
+                    pendingAuthorizerId = row.device.id
+                    showPINPrompt = true
+                } else {
+                    pendingAuthorizerId = nil
+                    Task { await authorizeAndDemote(via: row) }
+                }
             } else if HardwareOperationPurpose.shouldPresent(for: row.device.kind) {
                 pendingAuthorizerId = row.device.id
                 pendingReadyOp = PendingHardwareOperation(
@@ -185,30 +189,21 @@ struct RemoveFromSandwichSheet: View {
             authorizingDeviceId = nil
         }
         do {
-            let result: IdentitySandwich.DemotionResult
+            guard let promo = row.device.promotions.identity, promo.hasSecondFactorWrap,
+                  let saltHex = promo.deviceSaltHex else {
+                throw IdentityWrapError.openFailed("This device's second-factor enrollment is from an older version and can't authorize a removal. Pick a different enrolled device, or restore from your encrypted backup.")
+            }
+            let deviceSalt = bytesFromHexLocal(saltHex)
+            let secret: Data
             switch row.device.kind {
             case .yubikey:
-                guard let promo = row.device.promotions.identity else {
-                    throw IdentityWrapError.deviceSerialMismatch(
-                        expected: "YubiKey enrolled credential id",
-                        actual: "no promotion record"
-                    )
-                }
-                if (promo.wrapProtocolVersion ?? 1) < 2 {
-                    throw IdentityWrapError.openFailed("The authorizing YubiKey enrollment uses the old wrap protocol; it can't reproduce its wrap key to authorize this removal. Pick a different enrolled device, or reset the wallet and re-enroll.")
-                }
-                let secret = try await YubiKeyClient.shared.recomputeHMACSecretOverNFC(
+                secret = try await YubiKeyClient.shared.recomputeHMACSecretOverNFC(
                     credentialIdHex: promo.credentialIdHex,
-                    salt: row.wrap.salt,
+                    salt: deviceSalt,
                     deviceSerial: row.device.serial,
                     pin: pin.isEmpty ? nil : pin
                 )
                 pin = ""
-                result = try await IdentitySandwich.demoteWithSecret(
-                    deviceToRemove: deviceToRemove,
-                    authorizingDevice: row.device,
-                    authorizingSecret: secret
-                )
             case .ledger, .trezor:
                 let hwKind: HardwareWalletKind = row.device.kind == .ledger ? .ledger : .trezor
                 let hardware = HardwareWalletFactory.make(kind: hwKind)
@@ -219,15 +214,25 @@ struct RemoveFromSandwichSheet: View {
                         actual: identifiedSerial
                     )
                 }
-                result = try await IdentitySandwich.demoteFromHardware(
-                    deviceToRemove: deviceToRemove,
-                    authorizingDevice: row.device,
-                    authorizingHardware: hardware
-                )
+                let challenge = SecondFactorSignature.challenge(deviceSalt: deviceSalt)
+                let sig = try await hardware.signMessage(challenge)
+                secret = SecondFactorSignature.secret(fromSignature: sig)
             case .seedsigner:
-                throw HardwareWalletError.transport("SeedSigner cannot wrap the Identity Sandwich and so cannot authorize a removal.")
+                throw HardwareWalletError.transport("SeedSigner cannot be a second factor and so cannot authorize a removal.")
             }
-            // Clear the demoted device's identity promotion record.
+            // Count the devices that will still carry a CEK wrap once the
+            // removed device's wrap fields are cleared. Zero means this
+            // was the last enrolled device (second factor turns off).
+            let remaining = store.devices.devices.filter {
+                $0.id != deviceToRemove.id && $0.promotions.identity?.hasSecondFactorWrap == true
+            }.count
+            let result = try IdentitySandwich.removeSecondFactor(
+                authorizingDevice: row.device,
+                authorizingSecret: secret,
+                remainingWrappedDevicesAfterRemoval: remaining
+            )
+            // Clear the removed device's identity promotion record (drops
+            // its deviceSaltHex / wrappedCekHex along with the rest).
             store.devices.setIdentityPromotion(deviceId: deviceToRemove.id, promotion: nil)
             onCompletion(result)
             dismiss()

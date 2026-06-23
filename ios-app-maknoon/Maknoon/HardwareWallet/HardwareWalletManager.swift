@@ -12,7 +12,7 @@
 //                  canonicalize({kind, masterPubkey, attestorPubkey}),
 //   }
 //
-// Persisted in Keychain (non-biometric class — neither pubkey nor sig
+// Persisted in Keychain (non-biometric class, neither pubkey nor sig
 // is a secret). Re-attested only when the user explicitly rotates
 // hardware wallets or restores from a different identity.
 

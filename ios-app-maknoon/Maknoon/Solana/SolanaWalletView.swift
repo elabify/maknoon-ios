@@ -214,12 +214,7 @@ struct SolanaWalletView: View {
                 }
             } label: {
                 HStack(spacing: 12) {
-                    ZStack {
-                        Circle().fill(Color.purple.opacity(0.18))
-                        Image(systemName: "circle.hexagongrid")
-                            .foregroundStyle(Color.purple)
-                    }
-                    .frame(width: 36, height: 36)
+                    ChainLogo("ChainSolana", size: 36)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(w.label).font(.headline)
                         Text(walletSubtitle)
@@ -253,7 +248,7 @@ struct SolanaWalletView: View {
     }
 
     private var walletSubtitle: String {
-        guard let w = activeWallet else { return "—" }
+        guard let w = activeWallet else { return "-" }
         switch w.kind {
         case .software(let a):           return "Software · Account \(a)"
         case .hardware(_, let a, _):     return "Hardware · Account \(a)"
@@ -442,7 +437,7 @@ struct SolanaWalletView: View {
     /// Lazy lookup of the SOL delta for a signature. The row calls
     /// this once on appear; subsequent renders read from the
     /// `deltaBySignature` cache. Returns nil on failure so the row
-    /// falls back to "—".
+    /// falls back to "-".
     @MainActor
     fileprivate func fetchDeltaIfNeeded(for sig: String) async {
         if deltaBySignature[sig] != nil { return }
@@ -456,7 +451,7 @@ struct SolanaWalletView: View {
     }
 
     private var balanceDisplay: String {
-        guard let b = balance else { return "—" }
+        guard let b = balance else { return "-" }
         let sol = Double(b) / 1_000_000_000.0
         return String(format: "%.6f", sol)
     }
@@ -658,7 +653,7 @@ struct SolanaWalletView: View {
             return .other
         }()
         let amountString: String = {
-            guard let d = delta else { return "—" }
+            guard let d = delta else { return "-" }
             let abs = Double(d.lamports.magnitude) / 1_000_000_000.0
             let sign = d.lamports > 0 ? "+" : (d.lamports < 0 ? "−" : "")
             return String(format: "%@%.6f SOL", sign, abs)

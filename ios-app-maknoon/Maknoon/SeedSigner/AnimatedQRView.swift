@@ -27,7 +27,7 @@ struct AnimatedQRView: View {
     var body: some View {
         GeometryReader { geo in
             // Take the SMALLER axis to keep the QR square, but
-            // don't subtract padding here — let the parent layout
+            // don't subtract padding here, let the parent layout
             // do the trimming. Bigger = more pixels per module =
             // scannable from further away.
             let side = min(geo.size.width, geo.size.height)

@@ -1,7 +1,7 @@
 // Codable settings snapshot for export / import and for bundling
 // inside the iCloud encrypted backup.
 //
-// CONTRACT — what's in / what's NOT:
+// CONTRACT, what's in / what's NOT:
 //
 //   IN: per-network RPC / Electrum / mempool / explorer / API-key
 //       overrides; fiat code; known-issuer allow-list; registered
@@ -15,7 +15,7 @@
 //       isn't transferable), credentials, hardware wrap blobs.
 //
 // File format is JSON. JSON is a subset of YAML 1.2, so the
-// exported file is also valid YAML — you can rename `.json` to
+// exported file is also valid YAML, you can rename `.json` to
 // `.yaml` if you want to hand-edit it in a YAML editor without
 // reformatting.
 
@@ -30,7 +30,7 @@ import UniformTypeIdentifiers
 // (see iCloudBackup.swift / BackupPlaintext.settings), and the
 // restore path applies it via `SettingsBackup.apply(to:)`. The
 // standalone FileDocument wrapper + the `UTType.yaml` extension
-// that were here are gone — neither has callers anymore.
+// that were here are gone, neither has callers anymore.
 
 
 struct SettingsBackup: Codable {

@@ -8,7 +8,7 @@
 // someone, Verify & Pay) behaves identically to a live scan.
 //
 // Limitation: a still image carries ONE QR, so multi-frame / rotating
-// (UR fountain) transmissions can't be completed this way — only
+// (UR fountain) transmissions can't be completed this way, only
 // single-QR payloads (pickup URL, request URL, drop envelope, badge,
 // or a single-QR presentation). PHPicker runs out-of-process and needs
 // no photo-library usage permission.

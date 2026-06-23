@@ -305,7 +305,7 @@ final class LedgerBLE: NSObject, HardwareWallet, @unchecked Sendable {
     }
 
     /// Send a complete APDU (header + Lc + data + Le) and await the
-    /// reassembled response (without SW1 SW2 status bytes — caller
+    /// reassembled response (without SW1 SW2 status bytes, caller
     /// gets the data and the status word separately).
     ///
     /// Pre-call we clear any stale `pendingAPDU` so a leftover
@@ -1275,7 +1275,7 @@ extension LedgerBLE: CBCentralManagerDelegate {
 
     /// The Ledger dropped (user locked it, switched apps, walked out
     /// of range, etc.). Fail every pending continuation explicitly so
-    /// the UI surfaces an error instead of hanging — and so a late
+    /// the UI surfaces an error instead of hanging, and so a late
     /// notify on a now-stale peripheral cannot double-resume an
     /// already-completed continuation, which would crash the app.
     func centralManager(_ central: CBCentralManager,
@@ -1371,7 +1371,7 @@ extension LedgerBLE: CBPeripheralDelegate {
         pendingAPDU = nil
         // Strip the 3- or 5-byte BLE framing header per packet.
         guard data.count >= 3, data[0] == bleApduTag else {
-            // Malformed packet — put the pending state back so the
+            // Malformed packet, put the pending state back so the
             // next legitimate notify can continue. We don't fail the
             // continuation outright; the timeout race in sendAPDU is
             // the backstop.

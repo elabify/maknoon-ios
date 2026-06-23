@@ -1,5 +1,5 @@
 // One LNDHub-backed Lightning custodial account. The password is
-// NOT stored on this struct — it lives in Keychain keyed by
+// NOT stored on this struct, it lives in Keychain keyed by
 // `lightning.password.<account.id>` so the account list can ship
 // as plain UserDefaults JSON without leaking credentials.
 //
@@ -48,7 +48,7 @@ struct LightningAccount: Codable, Identifiable, Hashable, Sendable {
 
     /// `lndhub://login:password@host[:port][/path]` URL used by
     /// Zeus and most LNDHub front-ends for QR-encoded account
-    /// import. Caller supplies the password — we don't keep it.
+    /// import. Caller supplies the password, we don't keep it.
     func exportURL(password: String) -> String? {
         guard let comps = URLComponents(string: serverURL),
               let host = comps.host else { return nil }

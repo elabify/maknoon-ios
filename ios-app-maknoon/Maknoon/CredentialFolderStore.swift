@@ -118,7 +118,7 @@ final class CredentialFolderStore {
 
     /// Assign a card to a folder, or pass `to: nil` to move it back
     /// to the All-credentials root. Unknown folder ids are ignored
-    /// (defensive — a stale picker selection from before a delete
+    /// (defensive: a stale picker selection from before a delete
     /// shouldn't reattach the card to nothing).
     func assign(cardId: String, to folderId: UUID?) {
         if let folderId {

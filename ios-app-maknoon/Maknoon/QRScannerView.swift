@@ -12,7 +12,7 @@
 // under `@preconcurrency` downgrades the resulting strict-concurrency
 // warnings (`Capture of 'session' with non-Sendable type
 // 'AVCaptureSession' in a '@Sendable' closure`) to warnings the
-// compiler accepts. The runtime semantics are correct — the capture
+// compiler accepts. The runtime semantics are correct, the capture
 // session is created on the main thread and start/stop is
 // dispatched to a background queue per Apple's own examples.
 @preconcurrency import AVFoundation

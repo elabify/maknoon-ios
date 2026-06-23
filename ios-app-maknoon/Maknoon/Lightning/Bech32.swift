@@ -1,4 +1,4 @@
-// Minimal bech32 codec — just what LNURL decoding needs.
+// Minimal bech32 codec, just what LNURL decoding needs.
 // LNURLs are bech32-encoded with HRP "lnurl" and a checksum.
 // The decoded data bytes are an ASCII URL (after 5→8 bit
 // regrouping).

@@ -131,7 +131,14 @@ actor MiniAppBundleStore {
         guard !manifest.files.isEmpty else { throw MiniAppBundleError.empty }
 
         let appDir = try appCacheDir(installedAppId: installedAppId)
-        let versionDir = appDir.appendingPathComponent(sanitizeComponent(manifest.version), isDirectory: true)
+        // Key the cache by version AND manifest hash, so a bundle whose
+        // content changed without a version bump (e.g. a re-published beta)
+        // gets a fresh directory and is re-downloaded instead of serving
+        // the stale same-version files.
+        let versionDir = appDir.appendingPathComponent(
+            sanitizeComponent(manifest.version) + "-" + String(manifestSha256.lowercased().prefix(12)),
+            isDirectory: true
+        )
 
         // Already cached + complete? Serve it without touching the network.
         if FileManager.default.fileExists(atPath: versionDir.appendingPathComponent(manifest.entryPath).path) {

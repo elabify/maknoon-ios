@@ -1,5 +1,5 @@
 // Presents the native merchant "Verify & Pay" sheet for the commerce bridge and
-// suspends the dApp's `commerce.collectAndCharge` call until it resolves
+// suspends the app's `commerce.collectAndCharge` call until it resolves
 // (ADR-0031). Mirrors MiniAppCollectCoordinator.
 
 import SwiftUI
@@ -10,6 +10,9 @@ final class MiniAppCommerceCoordinator {
     struct Request: Identifiable {
         let id = UUID()
         let appTitle: String
+        /// The merchant install whose verifier key signs the request; needed so
+        /// the QR sheet can re-mint a fresh request when this one expires.
+        let installedAppId: String
         let commerce: CommerceRequest
         /// Ephemeral keypair (merchant) the holder seals its response to; held
         /// only on this device to decrypt the polled response (server-blind).

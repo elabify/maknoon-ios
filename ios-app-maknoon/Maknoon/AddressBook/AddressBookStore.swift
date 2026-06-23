@@ -1,7 +1,7 @@
 // Persistent @Observable address book. Entries are kept in
 // arrival order; views can group by network as needed.
 //
-// No address-format validation here — the network's send flow
+// No address-format validation here; the network's send flow
 // validates at send time. We accept whatever the user typed so
 // they can save partial / not-yet-funded addresses for later.
 
@@ -101,7 +101,7 @@ final class AddressBookStore: @unchecked Sendable {
         persist()
     }
 
-    /// Bulk replace — used by settings-backup restore. Hands the
+    /// Bulk replace, used by settings-backup restore. Hands the
     /// full list over wholesale; existing entries are dropped.
     func replaceAll(_ next: [AddressBookEntry]) {
         entries = next

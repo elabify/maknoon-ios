@@ -1,0 +1,5 @@
+/* System permission prompts (Simplified Chinese). Machine-translated, pending human review. */
+"NFCReaderUsageDescription" = "Maknoon 使用 NFC 在您将 YubiKey 轻触 iPhone 顶部时读取它，并在您将手机贴近证件照片页时读取身份证件。";
+"NSBluetoothAlwaysUsageDescription" = "Maknoon 使用蓝牙连接 Ledger 硬件钱包以进行签名。不会向服务器发送任何数据。";
+"NSCameraUsageDescription" = "Maknoon 需要访问相机，以便在您接收凭证时扫描来自发行方的二维码。";
+"NSFaceIDUsageDescription" = "Maknoon 使用 Face ID 解锁应用，并授权使用您的钱包和凭证密钥进行签名。";

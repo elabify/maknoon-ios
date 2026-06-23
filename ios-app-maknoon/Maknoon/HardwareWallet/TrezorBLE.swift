@@ -2,8 +2,8 @@
 // Trezor Host Protocol (THP v2) through the `trezor-core` Rust crate.
 //
 // Unlike LedgerBLE (which frames APDUs in Swift), the Trezor wire
-// protocol — packet framing, channel allocation, the Noise XX
-// handshake, the AES-256-GCM session, ABP/ACK — all lives in Rust
+// protocol (packet framing, channel allocation, the Noise XX
+// handshake, the AES-256-GCM session, ABP/ACK) all lives in Rust
 // (`trezor-core`). Swift owns ONLY the raw BLE byte pipe: it writes
 // one report to the write characteristic and hands each notify report
 // back, via the `TrezorTransport` foreign-callback the Rust client
@@ -82,7 +82,7 @@ final class TrezorBLE: NSObject, HardwareWallet, @unchecked Sendable {
 
     // Inbound notify reports buffered for `readChunk()`. The Rust THP
     // layer reassembles these into messages, so Swift never inspects
-    // them — one notify == one report in the queue.
+    // them: one notify == one report in the queue.
     private var inbox: [Data] = []
     private var readContinuation: CheckedContinuation<Data, Error>?
 
@@ -211,7 +211,7 @@ final class TrezorBLE: NSObject, HardwareWallet, @unchecked Sendable {
     /// holds the pinned, paired+seeded THP session) survive across a
     /// compound flow (identity enroll, wallet discovery scanning many
     /// accounts, multi-step send). Without it every op would tear down
-    /// and reconnect — slow, and the device flags TRANSPORT_BUSY on the
+    /// and reconnect, slow, and the device flags TRANSPORT_BUSY on the
     /// rapid channel churn.
     private var sessionPinCount = 0
 
@@ -298,7 +298,7 @@ final class TrezorBLE: NSObject, HardwareWallet, @unchecked Sendable {
         return (credential, try TrezorCredentialStore.hostStaticKey())
     }
 
-    /// Retry an op that hits THP `TRANSPORT_BUSY` — the device still
+    /// Retry an op that hits THP `TRANSPORT_BUSY`: the device still
     /// tearing down a prior channel on a rapid reconnect. Per the spec
     /// we drop the link, back off, and retry (bounded). A stopgap until
     /// session pinning removes the per-op reconnect churn entirely.
@@ -318,8 +318,8 @@ final class TrezorBLE: NSObject, HardwareWallet, @unchecked Sendable {
 
     /// Returns the device's stable `device_id` (the same value
     /// registration stored as the serial), so every device-match check
-    /// recognises this Trezor. Reconnects with the stored credential —
-    /// no code entry — so the device must already be registered/paired.
+    /// recognises this Trezor. Reconnects with the stored credential,
+    /// no code entry, so the device must already be registered/paired.
     func identifyDevice() async throws -> String {
         defer { resetSession() }
         let creds = try credentialAndHostKey()

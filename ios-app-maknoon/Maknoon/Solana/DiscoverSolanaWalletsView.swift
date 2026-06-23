@@ -33,6 +33,17 @@ struct DiscoverSolanaWalletsView: View {
     /// Defaults to .software for back-compat with existing callers.
     /// AddSolanaWalletSheet's Hardware tab passes .hardware(deviceId:).
     var source: Source = .software
+    /// Trezor hidden-wallet choice, collected upstream in the connection
+    /// step (DeviceReadyConfirmationSheet) on the hardware path. The one
+    /// choice applies to both add and discover (ADR-0033). Passed as a
+    /// BINDING so the scan reads the LIVE committed value: the readiness
+    /// sheet sets it just before this sheet opens, and a plain snapshot
+    /// could capture the pre-selection `.standard` during the two-sheet
+    /// handoff (the bug that left the Trezor passphrase unsent). Software /
+    /// Ledger pass `.constant(.standard)` / `.constant("")`.
+    @Binding var passphrase: HiddenWalletSelection
+    /// Host-typed passphrase that pairs with `passphrase == .hostTyped`.
+    @Binding var hostPassphrase: String
     /// Fired after the discover sheet finishes adding wallets, so the
     /// parent can refresh + dismiss its own sheet.
     var onCompleted: (() -> Void)? = nil
@@ -44,11 +55,6 @@ struct DiscoverSolanaWalletsView: View {
     @State private var error: String?
     /// Per-account add/skip lines shown in the Results section.
     @State private var addReport: [String]?
-    /// Trezor-only hidden-wallet selector. `.standard` reproduces exact
-    /// Ledger behavior (empty passphrase).
-    @State private var hwPassphrase: HiddenWalletSelection = .standard
-    /// Host-typed passphrase, used only when `hwPassphrase == .hostTyped`.
-    @State private var hwHostPassphrase: String = ""
     /// Hardware-only: also sweep well-known alternative derivation paths
     /// (Ledger Live, …) for each account.
     @State private var alsoTryAltPaths: Bool = false
@@ -74,28 +80,8 @@ struct DiscoverSolanaWalletsView: View {
             } header: {
                 Text("Scanning")
             } footer: {
-                Text("Walks accounts 0, 1, 2, ... under your Identity Sandwich seed on \(network.displayName) until \(SolanaWalletDiscovery.emptyAccountGapLimit) consecutive empty accounts are found. Reads the seed once, then queries the configured RPC for balance + signatures per account.")
+                Text("Walks accounts 0, 1, 2, ... \(isHardwareSource ? "on this device" : "under your recovery phrase") on \(network.displayName) until \(SolanaWalletDiscovery.emptyAccountGapLimit) consecutive empty accounts are found, then queries the configured RPC for balance + signatures per account.")
                     .font(.caption)
-            }
-
-            if isTrezorSource && !scanning && discovered.isEmpty && progress.isEmpty {
-                Section {
-                    Picker("Wallet", selection: $hwPassphrase) {
-                        ForEach(HiddenWalletSelection.allCases) { mode in
-                            Text(mode.rawValue).tag(mode)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    if hwPassphrase == .hostTyped {
-                        SecureField("Passphrase", text: $hwHostPassphrase)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                    }
-                } header: {
-                    Text("Hidden wallet")
-                } footer: {
-                    Text(hwPassphrase.footer).font(.caption)
-                }
             }
 
             if isHardwareSource && !scanning && discovered.isEmpty && progress.isEmpty {
@@ -117,7 +103,7 @@ struct DiscoverSolanaWalletsView: View {
                         Label("Start scan", systemImage: "magnifyingglass")
                     }
                     .disabled((source.isSoftware && store.sandwich == nil)
-                        || !hwPassphrase.isReady(hostPassphrase: hwHostPassphrase))
+                        || !passphrase.isReady(hostPassphrase: hostPassphrase))
                 } footer: {
                     Text("Requires biometric or passcode once.")
                         .font(.caption)
@@ -225,7 +211,7 @@ struct DiscoverSolanaWalletsView: View {
         switch source {
         case .software:
             guard let sandwich = store.sandwich else {
-                error = "Identity Sandwich is locked. Unlock with your hardware device first."
+                error = "Maknoon is locked. Unlock with your hardware device first."
                 return
             }
             discoverySource = .software(sandwich: sandwich)
@@ -239,7 +225,7 @@ struct DiscoverSolanaWalletsView: View {
             // A Trezor hidden wallet derives in its own passphrase
             // session. Ledger / mock clients ignore this.
             if let trezor = client as? TrezorBLE {
-                trezor.applyPassphraseMode(hwPassphrase.choice(hostPassphrase: hwHostPassphrase))
+                trezor.applyPassphraseMode(passphrase.choice(hostPassphrase: hostPassphrase))
             }
             discoverySource = .hardware(client: client)
         }
@@ -254,7 +240,7 @@ struct DiscoverSolanaWalletsView: View {
 
         // A fresh hidden wallet has no on-chain activity, so the sweep
         // would surface nothing; keep account 0 so it can still be added.
-        let keepEmptyFirst = isTrezorSource && hwPassphrase != .standard
+        let keepEmptyFirst = isTrezorSource && passphrase != .standard
         let rpcURL = store.solanaSettings.rpcURL(for: network)
         do {
             let templates = (isHardwareSource && alsoTryAltPaths)
@@ -321,7 +307,7 @@ struct DiscoverSolanaWalletsView: View {
         // a host-typed passphrase to the Keychain). nil for software and
         // for every Ledger / standard sweep.
         let hidden = isTrezorSource
-            ? HardwarePassphraseRef.persist(selection: hwPassphrase)
+            ? HardwarePassphraseRef.persist(selection: passphrase)
             : nil
         let suffix = hidden == nil ? "" : " (Hidden)"
         for acct in discovered where selection.contains(acct.id) {
@@ -356,6 +342,21 @@ struct DiscoverSolanaWalletsView: View {
             }
             if let existing = dedupHit {
                 report.append("Account \(acct.account), already labelled \"\(existing.label)\", skipped.")
+                continue
+            }
+            // Relink-by-key (ADR-0033): re-point an ORPHANED wallet with the same
+            // public key (its stored deviceId no longer resolves) instead of
+            // adding a duplicate.
+            if case .hardware(let deviceId) = source,
+               let orphan = store.solanaWalletStore.wallets.first(where: { w in
+                   if case let .hardware(d, _, pk) = w.kind {
+                       return pk == acct.address && store.devices.find(id: d) == nil
+                   }
+                   return false
+               }) {
+                store.solanaWalletStore.relink(walletId: orphan.id, toDeviceId: deviceId)
+                store.devices.addSolanaWallet(deviceId: deviceId, walletId: orphan.id)
+                report.append("Account \(acct.account) re-linked to existing \"\(orphan.label)\".")
                 continue
             }
             let pathSuffix = acct.derivationPath != nil ? " (Custom path)" : ""

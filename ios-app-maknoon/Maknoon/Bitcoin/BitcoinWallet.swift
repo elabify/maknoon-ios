@@ -21,7 +21,7 @@ actor BitcoinWallet {
         case bleSigningNotYetImplemented
         var errorDescription: String? {
             switch self {
-            case .sandwichRequired:                  return "Identity Sandwich is locked"
+            case .sandwichRequired:                  return "Maknoon is locked"
             case .descriptorFailed(let m):           return "Descriptor: \(m)"
             case .syncFailed(let m):                 return "Sync failed: \(m)"
             case .sendFailed(let m):                 return "Send failed: \(m)"

@@ -35,7 +35,7 @@
 	<key>NFCReaderUsageDescription</key>
 	<string>Maknoon uses NFC to read your YubiKey when you tap it to the top of the iPhone, and to read ID documents when you tap your phone to the photo page.</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>Maknoon uses Bluetooth to share a signed credential directly with another phone in the room. No data is sent to a server.</string>
+	<string>Maknoon uses Bluetooth to connect to a Ledger hardware wallet for signing. No data is sent to a server.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Maknoon needs camera access to scan QR codes from issuers when you receive a credential.</string>
 	<key>NSFaceIDUsageDescription</key>

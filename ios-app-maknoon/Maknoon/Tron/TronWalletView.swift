@@ -198,12 +198,7 @@ struct TronWalletView: View {
                 }
             } label: {
                 HStack(spacing: 12) {
-                    ZStack {
-                        Circle().fill(Color.red.opacity(0.16))
-                        Image(systemName: "diamond.fill")
-                            .foregroundStyle(Color.red)
-                    }
-                    .frame(width: 36, height: 36)
+                    ChainLogo("ChainTron", size: 36)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(w.label).font(.headline)
                         Text(walletSubtitle).font(.caption).foregroundStyle(.secondary)
@@ -234,7 +229,7 @@ struct TronWalletView: View {
     }
 
     private var walletSubtitle: String {
-        guard let w = activeWallet else { return "—" }
+        guard let w = activeWallet else { return "-" }
         switch w.kind {
         case .software(let a):           return "Software · Account \(a)"
         case .hardware(_, let a, _):     return "Hardware · Account \(a)"
@@ -553,7 +548,7 @@ struct TronWalletView: View {
     // MARK: -- display helpers
 
     private var balanceDisplay: String {
-        guard let s = sun else { return "—" }
+        guard let s = sun else { return "-" }
         let trx = Double(s) / 1_000_000.0
         return String(format: "%.6f", trx)
     }

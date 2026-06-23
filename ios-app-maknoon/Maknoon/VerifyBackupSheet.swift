@@ -27,12 +27,12 @@ struct VerifyBackupSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    Text("Enter the passphrase you used for this backup, then pick the file. Maknoon decrypts it on this phone to confirm it opens. Nothing on this device is changed.")
+                    Text("Enter the password you used for this backup, then pick the file. Maknoon decrypts it on this phone to confirm it opens. Nothing on this device is changed.")
                         .font(.callout)
                         .foregroundStyle(.secondary)
 
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Passphrase").font(.caption).foregroundStyle(.secondary)
+                        Text("Password").font(.caption).foregroundStyle(.secondary)
                         SecureField("", text: $passphrase)
                             .textFieldStyle(.roundedBorder)
                             .autocorrectionDisabled()
@@ -51,7 +51,7 @@ struct VerifyBackupSheet: View {
 
                     switch status {
                     case .ok:
-                        Label("Backup verified. This file opens with that passphrase.", systemImage: "checkmark.seal.fill")
+                        Label("Backup verified. This file opens with that password.", systemImage: "checkmark.seal.fill")
                             .font(.callout)
                             .foregroundStyle(.green)
                     case .failed(let msg):
@@ -104,7 +104,7 @@ struct VerifyBackupSheet: View {
             try EncryptedBackup.verify(blob, passphrase: passphrase)
             status = .ok
         } catch {
-            status = .failed("Could not open this backup with that passphrase: \(error.localizedDescription)")
+            status = .failed("Could not open this backup with that password: \(error.localizedDescription)")
         }
     }
 }

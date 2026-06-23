@@ -46,10 +46,6 @@ struct TapIDDocumentSheet: View {
         kind: .passport,
         documentNumber: "", dateOfBirthYYMMDD: "", dateOfExpiryYYMMDD: ""
     )
-    @State private var birthDate: Date = Calendar.current.date(byAdding: .year, value: -30, to: Date()) ?? Date()
-    @State private var expiryDate: Date = Calendar.current.date(byAdding: .year, value: 5, to: Date()) ?? Date()
-    @State private var hasSetBirthDate = false
-    @State private var hasSetExpiryDate = false
     @State private var lastError: String?
     @State private var readResult: IDDocumentReadResult?
 
@@ -133,70 +129,51 @@ struct TapIDDocumentSheet: View {
     @ViewBuilder
     private var formStep: some View {
         Form {
-            if parameters.kind == .passport {
-                Section {
-                    VStack(spacing: 12) {
+            // Compact, box-free header (matches Android): a small passport+NFC
+            // image (passport only) and a one-line caption.
+            Section {
+                VStack(spacing: 8) {
+                    if parameters.kind == .passport {
                         Image("PassportNFC")
                             .resizable()
                             .scaledToFit()
-                            .frame(maxWidth: 280)
-                            .frame(height: 150)
+                            .frame(maxWidth: 150, maxHeight: 84)
                             .accessibilityLabel("Chip-enabled passport")
-                        Label(
-                            "Your passport must show this symbol on its cover. Without it, the passport cannot be scanned.",
-                            systemImage: "checkmark.seal"
-                        )
+                    }
+                    Text(formIntro)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 4)
+                        .frame(maxWidth: .infinity)
                 }
-                .listRowBackground(Color.clear)
+                .padding(.vertical, 2)
             }
-            Section {
-                Text(formIntro)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
+            .listRowBackground(Color.clear)
             Section {
                 TextField(parameters.kind.documentNumberLabel, text: $parameters.documentNumber)
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.characters)
                     .font(.system(.body, design: .monospaced))
-                DatePicker(
-                    "Date of birth",
-                    selection: $birthDate,
-                    in: ...Date(),
-                    displayedComponents: .date
-                )
-                .onChange(of: birthDate) { _, new in
-                    hasSetBirthDate = true
-                    parameters.dateOfBirthYYMMDD = Self.toYYMMDD(new)
-                }
-                DatePicker(
-                    "Date of expiry",
-                    selection: $expiryDate,
-                    displayedComponents: .date
-                )
-                .onChange(of: expiryDate) { _, new in
-                    hasSetExpiryDate = true
-                    parameters.dateOfExpiryYYMMDD = Self.toYYMMDD(new)
-                }
+                // YYMMDD text entry with a YY-MM-DD dash mask (ISO 8601 style;
+                // dashes copy safely into input fields). The stored value stays
+                // the raw 6 digits the chip's BAC key derivation expects. The
+                // 2-digit year matches the passport's printed MRZ.
+                TextField("Date of birth (YY-MM-DD)", text: Binding(
+                    get: { Self.dashed(parameters.dateOfBirthYYMMDD) },
+                    set: { parameters.dateOfBirthYYMMDD = String($0.filter(\.isNumber).prefix(6)) }
+                ))
+                .keyboardType(.numberPad)
+                .font(.system(.body, design: .monospaced))
+                TextField("Date of expiry (YY-MM-DD)", text: Binding(
+                    get: { Self.dashed(parameters.dateOfExpiryYYMMDD) },
+                    set: { parameters.dateOfExpiryYYMMDD = String($0.filter(\.isNumber).prefix(6)) }
+                ))
+                .keyboardType(.numberPad)
+                .font(.system(.body, design: .monospaced))
             } header: {
                 Text("Document details")
             } footer: {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(parameters.kind.documentNumberHint)
-                    if !hasSetBirthDate || !hasSetExpiryDate {
-                        Label(
-                            "Set both the birth date and expiry date exactly as printed. The chip only unlocks to these three values.",
-                            systemImage: "calendar"
-                        )
-                        .foregroundStyle(.orange)
-                    }
-                }
+                Text("The passport can only be read if the passport number, date of birth, and expiration are entered correctly.")
                 .font(.caption)
             }
             Section {
@@ -237,8 +214,8 @@ struct TapIDDocumentSheet: View {
         // the user having actually touched both pickers turns that
         // into an obvious "fill this in" instead.
         !parameters.documentNumber.trimmingCharacters(in: .whitespaces).isEmpty
-            && hasSetBirthDate
-            && hasSetExpiryDate
+            && parameters.dateOfBirthYYMMDD.count == 6
+            && parameters.dateOfExpiryYYMMDD.count == 6
     }
 
     /// Kind-specific opening sentence shown above the number /
@@ -252,12 +229,17 @@ struct TapIDDocumentSheet: View {
         }
     }
 
-    private static func toYYMMDD(_ date: Date) -> String {
-        let f = DateFormatter()
-        f.calendar = Calendar(identifier: .gregorian)
-        f.locale = Locale(identifier: "en_US_POSIX")
-        f.dateFormat = "yyMMdd"
-        return f.string(from: date)
+    /// Render a stored YYMMDD digit string as "YY-MM-DD" for display; dashes
+    /// appear only once their group's digits exist. Dashes (not slashes) match
+    /// ISO 8601 and copy safely into input fields.
+    private static func dashed(_ digits: String) -> String {
+        let d = Array(digits.filter(\.isNumber).prefix(6))
+        var out = ""
+        for (i, c) in d.enumerated() {
+            if i == 2 || i == 4 { out.append("-") }
+            out.append(c)
+        }
+        return out
     }
 
     // MARK: -- step 2: scanning
@@ -349,10 +331,7 @@ struct TapIDDocumentSheet: View {
                 Section("Details") {
                     let docLabel = result.document.userDeclaredKind?.documentNumberLabel ?? "Document number"
                     detailRow(docLabel, value: result.document.documentNumber)
-                    if let pn = result.document.personalNumber, !pn.isEmpty {
-                        let label = result.document.userDeclaredKind?.personalNumberLabel ?? "Personal number"
-                        detailRow(label, value: pn)
-                    }
+                    // Personal number intentionally not shown (ADR-0039).
                     if let dob = result.document.formattedDateOfBirth {
                         detailRow("Date of birth", value: dob)
                     }
@@ -393,13 +372,20 @@ struct TapIDDocumentSheet: View {
 
     private func detailRow(_ label: String, value: String) -> some View {
         HStack {
-            Text(label).foregroundStyle(.secondary)
+            Text(LocalizedStringKey(label)).foregroundStyle(.secondary)
             Spacer()
             Text(value)
         }
     }
 
     private func save(result: IDDocumentReadResult) {
+        // De-dup (ADR-0037): refuse a second copy of the same document with a
+        // friendly message rather than saving a duplicate card.
+        if store.idDocuments.isDuplicate(result.document) {
+            lastError = "This document is already saved."
+            step = .error
+            return
+        }
         let saved = store.idDocuments.add(
             result.document,
             photo: result.photo,

@@ -43,7 +43,7 @@ struct SolanaSPLTokenRow: View {
                     Text(token.format(rawAmount: raw))
                         .font(.callout.monospacedDigit())
                 } else {
-                    Text("—")
+                    Text("-")
                         .font(.callout)
                         .foregroundStyle(.tertiary)
                 }

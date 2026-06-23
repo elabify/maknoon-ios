@@ -1,4 +1,4 @@
-// User-defined EVM network — chain id, RPC URL, explorer URL,
+// User-defined EVM network: chain id, RPC URL, explorer URL,
 // optional Etherscan-family API URL + key. Lets users target niche
 // L2s, sidechains, or self-hosted devnets that aren't in the
 // shipped catalog.

@@ -65,6 +65,10 @@ final class DeviceRegistry: @unchecked Sendable {
             return existing
         }
         let record = RegisteredDevice(
+            // Deterministic id (ADR-0033) so a later remove + re-add of the SAME
+            // physical device reproduces the SAME id and keeps every wallet link
+            // intact, instead of a random id that orphaned them.
+            id: DeviceIdentity.deterministicId(kind: kind, serial: serial),
             kind: kind,
             serial: serial,
             label: label,
@@ -82,6 +86,30 @@ final class DeviceRegistry: @unchecked Sendable {
         guard let idx = devices.firstIndex(where: { $0.id == deviceId }) else { return }
         if devices[idx].peripheralUUID == peripheralUUID { return }
         devices[idx].peripheralUUID = peripheralUUID
+        persist()
+    }
+
+    /// Re-bind a device's persisted serial to the value it reports on THIS
+    /// platform (ADR-0033). A Ledger's serial is its BLE transport id, which
+    /// differs per OS (iOS CoreBluetooth peripheral UUID vs Android BLE MAC), so
+    /// a record carried across platforms by an encrypted backup can never
+    /// serial-match the live device. When the caller has confirmed this is the
+    /// SOLE device of its kind, re-point the stored serial to the live one. The
+    /// `id` and promotions are unchanged, so every wallet linked by deviceId
+    /// stays linked. Mirrors Android DeviceRegistry.rebindSerial.
+    func rebindSerial(deviceId: UUID, serial: String) {
+        guard let idx = devices.firstIndex(where: { $0.id == deviceId }) else { return }
+        if devices[idx].serial == serial { return }
+        let old = devices[idx]
+        devices[idx] = RegisteredDevice(
+            id: old.id,
+            kind: old.kind,
+            serial: serial,
+            label: old.label,
+            registeredAt: old.registeredAt,
+            promotions: old.promotions,
+            peripheralUUID: old.peripheralUUID
+        )
         persist()
     }
 

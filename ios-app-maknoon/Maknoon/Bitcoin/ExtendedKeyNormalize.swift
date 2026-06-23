@@ -90,7 +90,7 @@ enum Base58Check {
     static func decode(_ s: String) -> [UInt8]? {
         guard !s.isEmpty else { return nil }
 
-        // Count leading "1"s — those map to leading zero bytes.
+        // Count leading "1"s, those map to leading zero bytes.
         var zeros = 0
         for ch in s {
             if ch == "1" { zeros += 1 } else { break }
@@ -128,7 +128,7 @@ enum Base58Check {
         let checksum = Array(sha256d(payload).prefix(4))
         var bytes = payload + checksum
 
-        // Count leading zero bytes — encode as leading "1"s.
+        // Count leading zero bytes, encode as leading "1"s.
         var zeros = 0
         for b in bytes { if b == 0 { zeros += 1 } else { break } }
 

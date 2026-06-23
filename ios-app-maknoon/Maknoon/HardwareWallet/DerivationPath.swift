@@ -88,7 +88,7 @@ enum BIP32Path {
         case 44: return .legacy
         case 49: return .nestedSegwit
         case 84: return .nativeSegwit
-        case 86: return nil // taproot — not supported
+        case 86: return nil // taproot, not supported
         default: return .nativeSegwit
         }
     }

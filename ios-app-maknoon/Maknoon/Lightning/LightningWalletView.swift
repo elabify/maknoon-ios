@@ -1,4 +1,4 @@
-// Lightning wallet — account picker, balance, recent payments,
+// Lightning wallet: account picker, balance, recent payments,
 // Send / Receive entry points. Active account is sourced from the
 // store; switching accounts re-pulls everything.
 //
@@ -20,6 +20,8 @@ struct LightningWalletView: View {
     @State private var showAccounts = false
     @State private var showSend = false
     @State private var showReceive = false
+    @State private var showWithdraw = false
+    @State private var showAllTxs = false
 
     private var activeAccount: LightningAccount? {
         store.lightningAccountStore.activeAccount
@@ -93,6 +95,18 @@ struct LightningWalletView: View {
                     .environment(store)
             }
         }
+        .sheet(isPresented: $showWithdraw) {
+            if activeAccount != nil {
+                LightningWithdrawView(onWithdrawn: { Task { await refresh() } })
+                    .environment(store)
+            }
+        }
+        .sheet(isPresented: $showAllTxs) {
+            if let account = activeAccount {
+                LightningTransactionListView(account: account)
+                    .environment(store)
+            }
+        }
     }
 
     private var walletSwipeGesture: some Gesture {
@@ -125,11 +139,7 @@ struct LightningWalletView: View {
             }
         } label: {
             HStack {
-                WalletThumbprint(
-                    seed: activeAccount?.thumbprintSeed ?? "no-account",
-                    size: 36,
-                    systemImage: "bolt.fill"
-                )
+                ChainLogo("ChainLightning", size: 36)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(activeAccount?.label ?? "No account").font(.headline)
                     Text(subtitle).font(.caption).foregroundStyle(.secondary)
@@ -145,7 +155,7 @@ struct LightningWalletView: View {
     }
 
     private var subtitle: String {
-        guard let a = activeAccount else { return "—" }
+        guard let a = activeAccount else { return "-" }
         let host = URL(string: a.serverURL)?.host ?? a.serverURL
         return "\(a.username) · \(host)"
     }
@@ -181,13 +191,13 @@ struct LightningWalletView: View {
     }
 
     private var displayBalance: String {
-        guard let bal = balanceSat else { return "—" }
+        guard let bal = balanceSat else { return "-" }
         let f = NumberFormatter()
         f.numberStyle = .decimal
         return f.string(from: NSNumber(value: bal)) ?? "\(bal)"
     }
 
-    /// Fiat caption under the sat-denominated balance — same path
+    /// Fiat caption under the sat-denominated balance, same path
     /// as the Bitcoin wallet view since 1 sat is 1e-8 BTC.
     private var fiatBalanceCaption: String? {
         guard let bal = balanceSat, bal > 0 else { return nil }
@@ -203,6 +213,7 @@ struct LightningWalletView: View {
         HStack(spacing: 12) {
             actionButton("Send", systemImage: "arrow.up.right.circle.fill") { showSend = true }
             actionButton("Receive", systemImage: "arrow.down.left.circle.fill") { showReceive = true }
+            actionButton("Withdraw", systemImage: "tray.and.arrow.down.fill") { showWithdraw = true }
         }
         .padding(.horizontal, 16)
     }
@@ -232,6 +243,9 @@ struct LightningWalletView: View {
             HStack {
                 Text("Recent payments").font(.headline)
                 Spacer()
+                // Always shown (matches Android Lightning); the full-history
+                // sheet handles the empty case with its own placeholder.
+                Button("See all") { showAllTxs = true }.font(.callout)
             }
             if txs.isEmpty {
                 VStack(spacing: 6) {
@@ -323,7 +337,7 @@ struct LightningTxRow: View {
 
     private var dateString: String {
         let ts = TimeInterval(tx.timestamp ?? 0)
-        if ts <= 0 { return "—" }
+        if ts <= 0 { return "-" }
         let fmt = DateFormatter()
         fmt.dateStyle = .medium
         fmt.timeStyle = .short

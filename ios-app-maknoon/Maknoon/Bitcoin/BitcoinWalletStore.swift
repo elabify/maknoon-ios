@@ -92,6 +92,17 @@ final class BitcoinWalletStore {
         }
     }
 
+    /// Re-point an ORPHANED hardware wallet (its stored deviceId no longer
+    /// resolves in the registry) to a re-connected device that derives the SAME
+    /// xpub, instead of adding a duplicate (ADR-0033 relink-by-key). Preserves
+    /// label / hidden / derivationPath; only the kind's deviceId changes.
+    func relink(walletId: UUID, toDeviceId deviceId: UUID) {
+        guard let idx = wallets.firstIndex(where: { $0.id == walletId }) else { return }
+        guard case let .hardware(_, fingerprint, xpub) = wallets[idx].kind else { return }
+        wallets[idx].kind = .hardware(deviceId: deviceId, accountFingerprint: fingerprint, accountXpub: xpub)
+        persist()
+    }
+
     /// Called by `BitcoinWalletView.refresh()` after BDK has resolved
     /// the next-unused receive address. Caches it locally so we can
     /// re-publish at launch without rebuilding the wallet, then

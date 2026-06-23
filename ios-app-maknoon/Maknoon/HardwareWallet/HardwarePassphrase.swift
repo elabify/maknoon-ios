@@ -82,7 +82,7 @@ enum HardwarePassphraseRef: Codable, Hashable, Sendable {
 
 // Custom Codable: encode as a simple discriminator string and decode
 // tolerantly. This keeps wallets created by the earlier build (which
-// persisted `.onDevice` / `.hostStored(keychainId:)`) loading cleanly —
+// persisted `.onDevice` / `.hostStored(keychainId:)`) loading cleanly:
 // a legacy `hostStored` maps to `.hostEntry` (its Keychain copy is just
 // abandoned), so descriptors never fail to decode.
 extension HardwarePassphraseRef {

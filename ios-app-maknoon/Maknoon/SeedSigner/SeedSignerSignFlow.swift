@@ -91,7 +91,7 @@ struct SeedSignerSignFlow: View {
         do {
             // 70-byte fragments keep each QR at QR-version ~9-10
             // (about 50 modules per side). At a full-screen render
-            // of ~390-430pt, that's ~8 pixels per module — well
+            // of ~390-430pt, that's ~8 pixels per module, well
             // above the 4-pixel-per-module floor SeedSigner's
             // fixed-focus camera needs. Going to 100 bytes per
             // fragment shoved each QR up to version 13-14 (70+

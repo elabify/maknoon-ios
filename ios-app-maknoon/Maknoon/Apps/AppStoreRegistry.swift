@@ -1,7 +1,7 @@
-// Registry of configured dApps catalogs + installed apps. Lives on
+// Registry of configured apps catalogs + installed apps. Lives on
 // HolderStore so views can observe and persist changes.
 //
-// Default state: the Maknoon dApps catalog is always present
+// Default state: the Maknoon apps catalog is always present
 // (it ships with the app and cannot be removed). The user can add
 // other catalog URLs in Settings > Apps. `refresh()` fetches every
 // catalog URL (the built-in one plus any user-added) and populates
@@ -36,7 +36,7 @@ final class AppStoreRegistry: @unchecked Sendable {
         /// the Apps tab without needing the store to be online.
         let entry: AppStoreEntry
         /// Capability tokens the user accepted at install (and may later
-        /// revoke). nil for apps installed before the consent model — those
+        /// revoke). nil for apps installed before the consent model; those
         /// fall back to the entry's declared set via `grantedSet`.
         var grantedCapabilities: [String]?
 
@@ -47,7 +47,7 @@ final class AppStoreRegistry: @unchecked Sendable {
         }
     }
 
-    /// Always-present Elabify built-in dApps catalog. Not part of
+    /// Always-present Elabify built-in apps catalog. Not part of
     /// `userStores`. Starts as the bundled (empty) catalog and is
     /// replaced in place when `refresh()` fetches its URL.
     private(set) var defaultStore: AppStoreCatalog = DefaultAppStore.catalog
@@ -108,8 +108,8 @@ final class AppStoreRegistry: @unchecked Sendable {
     /// Reset to defaults then re-read UserDefaults (post-restore refresh).
     func reload() { load() }
 
-    /// Maknoon dApps is now the built-in `defaultStore`. Earlier builds
-    /// seeded it as a *user* store (alongside the retired "Elabify dApps"
+    /// Maknoon apps is now the built-in `defaultStore`. Earlier builds
+    /// seeded it as a *user* store (alongside the retired "Elabify apps"
     /// default). Drop any user store that points at the default catalog URL
     /// so it doesn't appear twice. Idempotent.
     private func migrateSeededDappsStore() {
@@ -166,6 +166,12 @@ final class AppStoreRegistry: @unchecked Sendable {
     private static func fetchCatalog(from url: URL) async -> AppStoreCatalog? {
         var req = URLRequest(url: url)
         req.timeoutInterval = 15
+        // Always pull the LIVE catalog. GitHub Pages serves catalog.json
+        // with `Cache-Control: max-age=600`, so the default policy could
+        // hand back a stale catalog whose pinned manifestSha256 no longer
+        // matches the published bundle, snapshotting an out-of-date pin at
+        // install and failing the integrity check at open. Bypass the cache.
+        req.cachePolicy = .reloadIgnoringLocalCacheData
         req.setValue("application/json", forHTTPHeaderField: "Accept")
         do {
             let (data, response) = try await URLSession.shared.data(for: req)

@@ -117,7 +117,7 @@ final class IdentityBridgeHandler: MiniAppNamespaceHandler {
 
         // Omit the inline pubkey ONLY when this merchant DID is registered, so
         // the holder resolves it from the registry (green "Verified" tier). If
-        // unconfirmed/offline, inline it (orange self-signed) — never omit an
+        // unconfirmed/offline, inline it (orange self-signed), never omit an
         // unregistered key, or the holder rejects the request as unknown.
         let registered = await VerifierRegistryClient.lookup(host: verifierBase, did: merchantDid) != nil
         let inlinePk: HexString? = registered ? nil : merchantPkHex

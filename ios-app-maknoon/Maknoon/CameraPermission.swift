@@ -1,6 +1,6 @@
 // Camera permission helper. Wraps `AVCaptureDevice` so the UI only
 // deals with three states: not-determined, authorized, denied.
-// `restricted` (parental controls / MDM) is folded into denied — the
+// `restricted` (parental controls / MDM) is folded into denied; the
 // remediation flow is identical.
 
 import AVFoundation

@@ -74,7 +74,7 @@ final class ActivityProbeView: UIView {
         // is too coarse; instead we route through a singleton broker
         // that captures any touch via the global UIApplication event
         // dispatch indirectly. Simpler still: poll via CADisplayLink
-        // for any touch.began in UIScreen.main's traits? No — there's
+        // for any touch.began in UIScreen.main's traits? No, there's
         // no clean public API.
         //
         // Pragmatic answer: the host SwiftUI window IS already an

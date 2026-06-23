@@ -25,16 +25,22 @@ struct DiscoverEthereumWalletsView: View {
 
     let source: Source
     let network: EthereumNetwork
+    /// Trezor hidden-wallet choice, collected upstream in the connection
+    /// step (DeviceReadyConfirmationSheet) on the hardware path. The one
+    /// choice applies to both add and discover (ADR-0033). Passed as a
+    /// BINDING so the scan reads the LIVE committed value: the readiness
+    /// sheet sets it just before this sheet opens, and a plain snapshot
+    /// could capture the pre-selection `.standard` during the two-sheet
+    /// handoff (the bug that left the Trezor passphrase unsent). Software /
+    /// Ledger pass `.constant(.standard)` / `.constant("")`.
+    @Binding var passphrase: HiddenWalletSelection
+    /// Host-typed passphrase that pairs with `passphrase == .hostTyped`.
+    @Binding var hostPassphrase: String
     var onCompleted: (() -> Void)? = nil
 
     @Environment(HolderStore.self) private var store
     @Environment(\.dismiss) private var dismiss
 
-    /// Trezor-only hidden-wallet selector. `.standard` reproduces
-    /// exact Ledger behavior (empty passphrase) and is the default.
-    @State private var passphraseMode: HiddenWalletSelection = .standard
-    /// Host-typed passphrase, used only when `passphraseMode == .hostTyped`.
-    @State private var hostPassphrase: String = ""
     /// Hardware-only: also sweep well-known alternative derivation paths
     /// (Ledger Live, MEW legacy, …) for each account.
     @State private var alsoTryAltPaths: Bool = false
@@ -44,9 +50,6 @@ struct DiscoverEthereumWalletsView: View {
     @State private var discovered: [EthereumWalletDiscovery.DiscoveredAccount] = []
     @State private var selection: Set<String> = []
     @State private var error: String?
-    /// Populated when Start Scan is tapped against a hardware source.
-    /// Drives the pre-tap readiness sheet.
-    @State private var pendingReadyOp: PendingHardwareOperation?
     /// Per-account report shown after Add Selected runs. Each
     /// discovered account either gets an "added" line or a "skipped,
     /// already labelled X" line.
@@ -54,7 +57,7 @@ struct DiscoverEthereumWalletsView: View {
 
     private var sourceLabel: String {
         switch source {
-        case .software: return "your Identity Sandwich seed"
+        case .software: return "your recovery phrase"
         case .hardware(let id):
             return store.devices.find(id: id)?.label ?? "the hardware device"
         }
@@ -72,12 +75,12 @@ struct DiscoverEthereumWalletsView: View {
     /// Map the selector + typed text onto the in-memory choice handed
     /// to the Trezor client for this sweep.
     private var currentPassphraseChoice: PassphraseChoice {
-        passphraseMode.choice(hostPassphrase: hostPassphrase)
+        passphrase.choice(hostPassphrase: hostPassphrase)
     }
 
     /// True once the chosen mode is actionable (host-typed needs text).
     private var passphraseReady: Bool {
-        passphraseMode.isReady(hostPassphrase: hostPassphrase)
+        passphrase.isReady(hostPassphrase: hostPassphrase)
     }
 
     /// Alternative-path sweeping is hardware-only (software wallets
@@ -106,27 +109,6 @@ struct DiscoverEthereumWalletsView: View {
                         .font(.caption)
                 }
 
-                if isTrezorSource && !scanning && discovered.isEmpty && progress.isEmpty {
-                    Section {
-                        Picker("Wallet", selection: $passphraseMode) {
-                            ForEach(HiddenWalletSelection.allCases) { mode in
-                                Text(mode.rawValue).tag(mode)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-
-                        if passphraseMode == .hostTyped {
-                            SecureField("Passphrase", text: $hostPassphrase)
-                                .textInputAutocapitalization(.never)
-                                .autocorrectionDisabled()
-                        }
-                    } header: {
-                        Text("Hidden wallet")
-                    } footer: {
-                        Text(passphraseFooter).font(.caption)
-                    }
-                }
-
                 if isHardwareSource && !scanning && discovered.isEmpty && progress.isEmpty {
                     Section {
                         Toggle("Try alternative derivation paths", isOn: $alsoTryAltPaths)
@@ -141,20 +123,14 @@ struct DiscoverEthereumWalletsView: View {
                 if !scanning && discovered.isEmpty && progress.isEmpty {
                     Section {
                         Button {
-                            if case .hardware(let id) = source,
-                               let dev = store.devices.find(id: id),
-                               HardwareOperationPurpose.shouldPresent(for: dev.kind) {
-                                pendingReadyOp = PendingHardwareOperation(
-                                    device: dev,
-                                    purpose: .ethereumDiscover
-                                )
-                            } else {
-                                Task { await runScan() }
-                            }
+                            Task { await runScan() }
                         } label: {
                             Label("Start scan", systemImage: "magnifyingglass")
                         }
                         .disabled(!passphraseReady)
+                    } footer: {
+                        Text("Requires biometric or passcode once.")
+                            .font(.caption)
                     }
                 }
 
@@ -237,18 +213,8 @@ struct DiscoverEthereumWalletsView: View {
                     Button(scanning ? "Hide" : "Close") { dismiss() }
                 }
             }
-            .sheet(item: $pendingReadyOp) { op in
-                DeviceReadyConfirmationSheet(
-                    device: op.device,
-                    purpose: op.purpose,
-                    onContinue: { Task { await runScan() } },
-                    onCancel: {}
-                )
-            }
         }
     }
-
-    private var passphraseFooter: String { passphraseMode.footer }
 
     private func detailLine(_ acct: EthereumWalletDiscovery.DiscoveredAccount) -> String {
         var parts: [String] = []
@@ -281,7 +247,7 @@ struct DiscoverEthereumWalletsView: View {
             case .software:
                 guard let sandwich = store.sandwich else {
                     throw NSError(domain: "Discovery", code: 0, userInfo: [
-                        NSLocalizedDescriptionKey: "Identity Sandwich is locked. Unlock Maknoon first."
+                        NSLocalizedDescriptionKey: "Maknoon is locked. Unlock Maknoon first."
                     ])
                 }
                 scanSource = .software(sandwich: sandwich)
@@ -311,7 +277,7 @@ struct DiscoverEthereumWalletsView: View {
             // A hidden wallet is expected to be fresh and empty, so the
             // activity probe would surface nothing. Keep account 0 in
             // the results when a passphrase is in play.
-            let keepEmptyFirst = isTrezorSource && passphraseMode != .standard
+            let keepEmptyFirst = isTrezorSource && passphrase != .standard
             let templates = (isHardwareSource && alsoTryAltPaths)
                 ? BIP32Path.alternativeTemplates(.ethereum)
                 : nil
@@ -404,6 +370,21 @@ struct DiscoverEthereumWalletsView: View {
                     report.append("\(shorten(acct.address)), already labelled \"\(existing.label)\", skipped.")
                     continue
                 }
+                // Relink-by-key (ADR-0033): re-point an ORPHANED wallet with the
+                // same address (its stored deviceId no longer resolves) instead
+                // of adding a duplicate.
+                if let orphan = store.ethereumWalletStore.wallets.first(where: {
+                    if case let .hardware(d, _, addr) = $0.kind {
+                        return addr.caseInsensitiveCompare(acct.address) == .orderedSame
+                            && store.devices.find(id: d) == nil
+                    }
+                    return false
+                }) {
+                    store.ethereumWalletStore.relink(walletId: orphan.id, toDeviceId: deviceId)
+                    store.devices.addEthereumWallet(deviceId: deviceId, walletId: orphan.id)
+                    report.append("\(shorten(acct.address)) re-linked to existing \"\(orphan.label)\".")
+                    continue
+                }
                 let dev = store.devices.find(id: deviceId)
                 let hiddenRef = makeHiddenRef()
                 var suffix = hiddenRef == nil ? "" : " (Hidden)"
@@ -428,6 +409,6 @@ struct DiscoverEthereumWalletsView: View {
     /// in the current scan. Returns nil for the standard wallet (incl.
     /// every Ledger add, where the selector is never shown).
     private func makeHiddenRef() -> HardwarePassphraseRef? {
-        HardwarePassphraseRef.persist(selection: passphraseMode)
+        HardwarePassphraseRef.persist(selection: passphrase)
     }
 }

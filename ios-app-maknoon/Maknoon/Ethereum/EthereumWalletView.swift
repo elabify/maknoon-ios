@@ -196,10 +196,12 @@ struct EthereumWalletView: View {
     // MARK: -- tokens
 
     private var currentTokens: [EthereumToken] {
-        // Only show tokens the wallet actually holds. Curated defaults
-        // (USDC on every chain) otherwise sit in the list at zero balance.
+        // All configured tokens for the network, including zero-balance entries
+        // (ADR-0033 Phase 2b round-2: the dashboard token list is aligned with
+        // Android, which lists every store token). Native ETH is NOT in this list;
+        // it stays the headline balance card. The asset dropdown that leads with
+        // native lives in the send screen, not here.
         return store.ethereumTokenStore.tokens(on: activeNetwork)
-            .filter { (tokenBalances[$0.id] ?? .zero) > .zero }
     }
 
     /// Native + ERC-20 transfers merged into one timestamp-sorted
@@ -299,11 +301,7 @@ struct EthereumWalletView: View {
             }
         } label: {
             HStack {
-                WalletThumbprint(
-                    seed: activeWallet?.address ?? activeWallet?.id.uuidString ?? "no-wallet",
-                    size: 36,
-                    systemImage: "diamond.fill"
-                )
+                ChainLogo("ChainEthereum", size: 36)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(activeWallet?.label ?? "No wallet").font(.headline)
                     Text(walletSubtitle).font(.caption).foregroundStyle(.secondary)
@@ -358,7 +356,7 @@ struct EthereumWalletView: View {
     }
 
     private var walletSubtitle: String {
-        guard let w = activeWallet else { return "—" }
+        guard let w = activeWallet else { return "-" }
         switch w.kind {
         case .software(let acct):  return "Software · Account \(acct)"
         case .hardware:            return "Hardware wallet"
@@ -560,11 +558,11 @@ struct EthereumWalletView: View {
     // MARK: -- data flow
 
     private var displayBalance: String {
-        guard let b = balance else { return "—" }
+        guard let b = balance else { return "-" }
         return b.display(ticker: "", maxDecimals: 6).trimmingCharacters(in: .whitespaces)
     }
 
-    /// Fiat caption shown under the balance — e.g. "≈ $1,234.56".
+    /// Fiat caption shown under the balance, e.g. "≈ $1,234.56".
     /// nil when the user disabled fiat references, the network has
     /// no CoinGecko asset id (testnets), or no price is cached yet.
     private var nativeFiatCaption: String? {
@@ -689,7 +687,7 @@ struct EthereumWalletView: View {
             )
             store.ethereumWalletStore.markSynced(id: descriptor.id)
             // Evict any pending entries whose hash is now in the
-            // confirmed feed (or older than 15 min — Eth can take
+            // confirmed feed (or older than 15 min, Eth can take
             // a while on busy chains).
             let confirmedHashes = Set(recentTxs.map { $0.hash })
             store.ethereumWalletStore.dropConfirmedPending(

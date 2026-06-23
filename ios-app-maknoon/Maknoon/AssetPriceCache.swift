@@ -2,15 +2,22 @@
 // endpoint. Aggressively cached (5-min TTL) so we stay under the
 // free-tier rate limit, and persists the last successful response
 // to UserDefaults so offline launches show stale fiat numbers
-// instead of "—".
+// instead of "-".
 //
 // Crypto is ALWAYS priced in USD (the deep, universally-quoted
 // market) and then crossed into the user's display currency via a
-// separate USD -> fiat foreign-exchange rate. CoinGecko's direct
-// crypto -> local-currency quotes are thin or entirely missing for
-// many of the currencies we offer (Gulf riyals, several LatAm and
-// frontier currencies), so we never depend on them; the cross via
-// USD keeps every currency consistent and well-defined:
+// separate USD -> fiat foreign-exchange rate. CoinGecko's free
+// /simple/price DOES support most of the currencies we offer
+// (~63 fiats, including AED / SAR / KWD / BHD), but NOT a handful we
+// list -- COP, EGP, ISK, OMR, PEN, QAR, RON -- so a direct quote
+// would silently drop those. Pricing in USD + an FX cross covers
+// every currency, AND it decouples the crypto-price source from the
+// fiat conversion: the spot-price endpoint is overridable (a paid
+// CoinGecko tier, or a self-hosted CoinGecko-compatible proxy -- which
+// can in turn front an open / no-key source like DefiLlama
+// coins.llama.fi or CoinCap, since those return USD only). The
+// override must speak CoinGecko's /simple/price shape; the FX step
+// then reaches all ~160 ISO currencies regardless.
 //
 //     crypto -> USD  (CoinGecko /simple/price?vs_currencies=usd)
 //     USD    -> fiat (open.er-api.com daily FX rates)
@@ -40,15 +47,17 @@ final class AssetPriceCache: @unchecked Sendable {
     private(set) var fxRates: [String: Double] = [:]
     private(set) var fxFetchedAt: Date?
 
-    /// CoinGecko base URL. Configurable so future paid-tier or
-    /// proxy users can point at their own gateway. Default is the
-    /// free public endpoint.
-    var baseURL: String = "https://api.coingecko.com/api/v3"
+    /// CoinGecko base URL. User-overridable in Settings (a self-hosted proxy
+    /// or paid gateway) via FiatPreferences; falls back to the free public
+    /// endpoint when no preferences are wired or the override is empty.
+    var baseURL: String { preferences?.effectiveCoinGeckoBaseURL ?? FiatPreferences.defaultCoinGecko }
 
-    /// Foreign-exchange base URL. open.er-api.com is key-free,
-    /// returns USD -> every-ISO-currency in a single document, and
-    /// covers the Gulf and frontier currencies CoinGecko omits.
-    var fxBaseURL: String = "https://open.er-api.com/v6/latest/USD"
+    /// Foreign-exchange base URL. open.er-api.com is key-free and
+    /// returns USD -> every-ISO-currency in a single document, so it
+    /// covers the currencies CoinGecko's /simple/price can't quote
+    /// directly (COP, EGP, ISK, OMR, PEN, QAR, RON) and keeps the
+    /// crypto-price source swappable. User-overridable in Settings.
+    var fxBaseURL: String { preferences?.effectiveFxBaseURL ?? FiatPreferences.defaultFX }
 
     /// Reference to the global preferences so the cache can short-
     /// circuit every public call when the user disabled fiat

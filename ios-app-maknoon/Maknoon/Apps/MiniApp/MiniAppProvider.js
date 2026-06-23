@@ -127,8 +127,14 @@
     },
     // Read the user's own wallet addresses for a chain (requires "wallet").
     // getAccounts({chain}) -> [{ name, address, network }]
+    // getAssets({chain, network, address}) -> [{ symbol, name, contract, decimals, kind }]
+    // (kind is "native"|"erc20"|"spl"|"trc20"; contract is null for native).
+    // getNetworks({chain}) -> [{ id, label, isTestnet }] ordered mainnet-first
+    // then mainnets alphabetically, then testnets alphabetically.
     wallet: {
       getAccounts: function (opts) { return call("wallet", "wallet.getAccounts", opts || {}); },
+      getAssets: function (opts) { return call("wallet", "wallet.getAssets", opts || {}); },
+      getNetworks: function (opts) { return call("wallet", "wallet.getNetworks", opts || {}); },
     },
     // Native QR/barcode scanner (requires "scan"). scan({prompt?}) -> { value }
     scan: function (opts) { return call("scan", "scan.read", opts || {}); },

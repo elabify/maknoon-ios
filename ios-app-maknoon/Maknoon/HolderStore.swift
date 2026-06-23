@@ -25,10 +25,16 @@ final class HolderStore {
     /// Elabify-hosted drop pastebin host. The holder uploads
     /// Presentations here in the offline `qrBack` share flow and shows the
     /// returned envelope as a small QR for an in-person verifier to scan.
-    /// Note: this is INFRASTRUCTURE, not a default verifier — Presentations
+    /// Note: this is INFRASTRUCTURE, not a default verifier. Presentations
     /// can be sent to any party via copy / paste-callback. The drop host is
     /// merely a temporary pastebin that any verifier can fetch from.
-    static let elabifyDropHost = URL(string: "https://musnad-verifier.elabify.com")!
+    /// User-overridable in Settings > Identity (#61); reads RelaySettings, which
+    /// defaults to the public elabify verifier. The `relaySettings` instance
+    /// below drives the Settings UI; this static serves the existing call sites.
+    static var elabifyDropHost: URL { RelaySettings.hostURL }
+
+    /// Observable relay override + on/off, bound by the Settings UI.
+    let relaySettings = RelaySettings()
 
     /// Currently visible tab.
     var selectedTab: Tab = .identity
@@ -40,6 +46,13 @@ final class HolderStore {
     /// flaky on iOS 26 when called from a Form-button action that
     /// also mutates observed state on the same tick.
     var identityNavigationPath = NavigationPath()
+
+    /// Navigation paths for the Wallet and Apps tabs, exposed for the
+    /// same reasons as `identityNavigationPath`: re-tapping an already-
+    /// selected tab pops its stack back to root (see ContentView's
+    /// selection binding).
+    var walletNavigationPath = NavigationPath()
+    var appsNavigationPath = NavigationPath()
 
     /// All credentials picked up so far.
     var credentials: [Credential] = []
@@ -69,11 +82,21 @@ final class HolderStore {
     /// a wallet with a live `sandwich`. Cleared when onboarding finishes.
     var isCompletingOnboarding = false
 
-    /// Non-empty when `loadIdentity()` discovers a hardware-wrapped
-    /// sandwich. Each entry is one enrolled device's wrap; the
-    /// unlock UI lists them and lets the user pick whichever device
-    /// is at hand. Cleared via `adopt(_:)` once any device unlocks.
-    private(set) var pendingHardwareUnlock: [WrappedMaterialPersisted] = []
+    /// Non-empty when `loadIdentity()` discovers a second-factor (CEK
+    /// scheme) sandwich. Each entry is one enrolled device that carries
+    /// a CEK wrap; the unlock UI lists them and lets the user pick
+    /// whichever device is at hand. Cleared via `adopt(_:)` once any
+    /// device unlocks. Empty while the second factor is OFF, and also
+    /// empty (with the sandwich still nil) in the clean-cut migration
+    /// state where the second factor is ON but no device has a v2 wrap.
+    private(set) var pendingHardwareUnlock: [RegisteredDevice] = []
+
+    /// True when the second factor is ON (sealedEntropyUnderCEK present)
+    /// but no enrolled device carries a CEK wrap (the clean-cut
+    /// migration state, ADR-0032): an old-format enrollment that this
+    /// build cannot unlock. The UI surfaces a restore-from-backup
+    /// banner. Set alongside `pendingHardwareUnlock` in `loadIdentity`.
+    private(set) var secondFactorNeedsMigration: Bool = false
 
     /// Driven by any view that needs to trigger the hardware-unlock
     /// sheet. The sheet is hosted on ContentView. Setting this to
@@ -86,7 +109,7 @@ final class HolderStore {
     /// hardware device this session. Used by identity-dependent
     /// UI to render "locked, tap to unlock" affordances.
     var isIdentityLocked: Bool {
-        sandwich == nil && !pendingHardwareUnlock.isEmpty
+        sandwich == nil && (!pendingHardwareUnlock.isEmpty || secondFactorNeedsMigration)
     }
 
     /// User's Bitcoin wallets list + the per-network backend config.
@@ -95,7 +118,9 @@ final class HolderStore {
     let bitcoinWalletStore = BitcoinWalletStore()
     let bitcoinSettings = BitcoinSettings()
     let bitcoinLabels = BitcoinLabelStore()
-    let bitcoinPrices = BitcoinPriceCache()
+    // Bitcoin pricing now goes through the shared `assetPrices` (AssetPriceCache),
+    // which honours the global price-source override + the show-reference-prices
+    // disable. The legacy per-chain BitcoinPriceCache has been retired (#63).
 
     /// Global fiat-reference settings: which currency to display,
     /// and whether fiat references are shown at all.
@@ -173,7 +198,7 @@ final class HolderStore {
 
     /// Per-install merchant verifier identity used by the POS to sign
     /// VerifierRequests / CommerceRequests (see MerchantIdentityStore). The
-    /// merchant dApp keeps its own settings + receipts via window.maknoon.storage;
+    /// merchant app keeps its own settings + receipts via window.maknoon.storage;
     /// only the verifier key is native (window.maknoon.merchant).
     let merchantIdentity = MerchantIdentityStore()
 
@@ -259,26 +284,34 @@ final class HolderStore {
 
     /// Try to reattach to a previously-persisted Identity Sandwich.
     /// Three outcomes:
-    ///   * `.loaded`    — `sandwich` is populated, route to ContentView.
-    ///   * `.locked`    — `pendingHardwareUnlock` is populated, route
+    ///   * `.loaded`:     `sandwich` is populated, route to ContentView.
+    ///   * `.locked`:     `pendingHardwareUnlock` is populated, route
     ///                    to HardwareUnlockView until the device is
     ///                    connected and the wrap-key signed.
-    ///   * `.empty`     — nothing persisted, route to OnboardingView.
+    ///   * `.empty`:      nothing persisted, route to OnboardingView.
     /// Safe to call multiple times.
     enum LoadOutcome { case loaded, locked, empty }
 
     @discardableResult
     func loadIdentity() throws -> LoadOutcome {
         if sandwich != nil { return .loaded }
-        if !pendingHardwareUnlock.isEmpty { return .locked }
+        if !pendingHardwareUnlock.isEmpty || secondFactorNeedsMigration { return .locked }
         switch try IdentitySandwich.loadFromKeychain() {
         case .notProvisioned:
             return .empty
         case .loaded(let s):
             self.sandwich = s
             return .loaded
-        case .wrappedAwaitingHardware(let enrollments):
-            self.pendingHardwareUnlock = enrollments
+        case .wrappedAwaitingHardware:
+            // Second factor (CEK scheme) is ON. The devices that carry
+            // a v2 CEK wrap drive the unlock UI. If none do, this is the
+            // clean-cut migration state (an old-format enrollment): the
+            // UI surfaces a restore-from-backup banner instead.
+            let wrapped = devices.devices.filter {
+                $0.promotions.identity?.hasSecondFactorWrap == true
+            }
+            self.pendingHardwareUnlock = wrapped
+            self.secondFactorNeedsMigration = wrapped.isEmpty
             return .locked
         }
     }
@@ -289,6 +322,7 @@ final class HolderStore {
     func adopt(_ sandwich: IdentitySandwich) {
         self.sandwich = sandwich
         self.pendingHardwareUnlock = []
+        self.secondFactorNeedsMigration = false
     }
 
     /// Refresh every owned store from UserDefaults after an encrypted
@@ -352,12 +386,13 @@ final class HolderStore {
     }
 
     /// Clear the in-memory sandwich (after a wallet reset). Does NOT
-    /// touch Keychain — the caller is responsible for wiping that.
+    /// touch Keychain, the caller is responsible for wiping that.
     /// The launch router will swap back to OnboardingView on the next
     /// render pass.
     func clearSandwich() {
         self.sandwich = nil
         self.pendingHardwareUnlock = []
+        self.secondFactorNeedsMigration = false
         self.credentials = []
         self.lastVerdict = nil
         self.lastVerifyAt = nil
@@ -411,7 +446,7 @@ final class HolderStore {
             "appstore.",
             "identity.",
             // Fiat preferences keys are `app.fiatCurrencyCode` and
-            // `app.fiatReferenceEnabled` — the legacy `fiat.` prefix
+            // `app.fiatReferenceEnabled`, the legacy `fiat.` prefix
             // matched nothing.
             "app.fiat",
             "display.",

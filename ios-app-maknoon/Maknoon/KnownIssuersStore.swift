@@ -1,6 +1,6 @@
 // User's allow-list of credential issuers. Storing the *host* of
 // each trusted issuer URL means a single entry trusts every
-// endpoint that issuer exposes — pickup, status, revocation —
+// endpoint that issuer exposes (pickup, status, revocation)
 // without having to enumerate paths.
 //
 // Defaults are loaded from the bundled Issuers.json (deployment data,
@@ -68,7 +68,7 @@ final class KnownIssuersStore {
     /// address with a port like `192.168.1.50:4000`) needs http; a
     /// production issuer hostname needs https. The user can always
     /// override by entering a full URL through the Custom… field at
-    /// issuance time — that path doesn't go through this helper.
+    /// issuance time, that path doesn't go through this helper.
     func outboundBaseURL(forEntry entry: String) -> URL? {
         let trimmed = entry.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
@@ -114,7 +114,7 @@ final class KnownIssuersStore {
         persist()
     }
 
-    /// Bulk replace — used by settings-backup restore. Hosts in the
+    /// Bulk replace, used by settings-backup restore. Hosts in the
     /// new list are normalised (full URLs trimmed to host) and the
     /// existing list is dropped wholesale.
     func replaceAll(_ raw: [String]) {

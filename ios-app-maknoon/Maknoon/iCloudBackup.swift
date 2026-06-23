@@ -2,7 +2,7 @@
 //
 // What gets written: AES-256-GCM(plaintext, key) where:
 //   - plaintext is JSON of `{ v: 2, entropyHex, createdAt, settings,
-//     lightningAccounts }` — passphrase is NEVER inside the blob,
+//     lightningAccounts }`. Passphrase is NEVER inside the blob,
 //     it IS the encryption material
 //   - key = PBKDF2-SHA256(passphrase, salt, 600_000 iter, 32 bytes)
 // v3 blobs additionally carry an ML-DSA-65 signature over the AES
@@ -90,7 +90,7 @@ struct BackupPlaintext: Codable {
     /// Keys are the exact UserDefaults keys (`networks.bitcoin.wallets.v1`
     /// etc.); values are the base64-encoded raw bytes. Restoring just
     /// writes the bytes back. Keeps the backup forward-compatible with
-    /// future schema changes in the wallet stores — nothing in
+    /// future schema changes in the wallet stores; nothing in
     /// iCloudBackup.swift needs to know wallet internals.
     let walletState: [String: String]?
 }
@@ -104,6 +104,43 @@ struct LightningAccountWithSecret: Codable, Sendable {
 }
 
 enum EncryptedBackup {
+
+    // MARK: -- canonical JSON coders (ISO-8601 dates)
+
+    /// The backup plaintext is the cross-platform wire contract (ADR-0035).
+    /// Every `Date`-typed field is encoded as an ISO-8601 string
+    /// (`"2026-06-13T14:30:45Z"`) so Android reads the same bytes, NOT Swift's
+    /// default reference-date Double, and never epoch-millis. Note this only
+    /// affects `Date` properties; credential `iat`/`exp` and anchor `anchoredAt`
+    /// are `Int64` unix seconds inside the signed credential and are unaffected.
+    static func backupEncoder() -> JSONEncoder {
+        let enc = JSONEncoder()
+        enc.dateEncodingStrategy = .iso8601
+        return enc
+    }
+
+    /// Decoder for the backup plaintext. Accepts ISO-8601 strings (the canonical
+    /// form written today) AND, for backward compatibility, the legacy
+    /// reference-date Double that older iOS v4 blobs wrote before the wire format
+    /// was pinned to ISO-8601.
+    static func backupDecoder() -> JSONDecoder {
+        let dec = JSONDecoder()
+        let iso = ISO8601DateFormatter()
+        dec.dateDecodingStrategy = .custom { decoder in
+            let c = try decoder.singleValueContainer()
+            if let s = try? c.decode(String.self), let d = iso.date(from: s) {
+                return d
+            }
+            if let n = try? c.decode(Double.self) {
+                // Legacy: Swift's default Date encoding (seconds since 2001-01-01).
+                return Date(timeIntervalSinceReferenceDate: n)
+            }
+            throw DecodingError.dataCorruptedError(
+                in: c, debugDescription: "Date is neither an ISO-8601 string nor a numeric interval"
+            )
+        }
+        return dec
+    }
 
     // MARK: -- encrypt / decrypt
 
@@ -170,36 +207,51 @@ enum EncryptedBackup {
         "appstore.userStores.v1",
         "appstore.installed.v1",
         "appstore.showBetaApps.v1",
-        // Per-mini-app settings (window.maknoon.storage) — includes the merchant
-        // dApp's own settings + receipts (txlog) + the per-install merchant name.
+        // Per-mini-app settings (window.maknoon.storage), includes the merchant
+        // app's own settings + receipts (txlog) + the per-install merchant name.
         "miniapp.settings.v1",
         // YubiKey FIDO2 hmac-secret enrollment record.
         "yubikey.enrollments.v1",
     ]
 
-    /// Snapshot the wallet-state UserDefaults keys into the opaque
-    /// `walletState` map for inclusion in an encrypted backup.
-    /// Returns nil when nothing is set; otherwise a base64-keyed map.
+    /// Snapshot the wallet-state UserDefaults keys into the `walletState`
+    /// map for inclusion in an encrypted backup. Returns nil when nothing
+    /// is set; otherwise a base64-keyed map.
     ///
-    /// Each value is captured type-preserving: we read the raw
-    /// UserDefaults object (Data, String, Bool, Date, array, or
-    /// dictionary) and serialize it as a binary property list wrapping
-    /// `[key: value]`. This is what lets scalar keys (the `*.active.v1`
-    /// wallet selections, the chain-wide network picks, the fiat and
-    /// display preferences) round-trip; the older `data(forKey:)`
-    /// capture silently dropped every non-Data value.
+    /// Cross-platform wire shape (ADR-0035, Phase 4): each value is
+    /// `base64(UTF-8(JSON))`.
+    ///   - Store blobs (the `*.wallets.*`, token, Apps, mini-app, YubiKey
+    ///     keys) are already JSON `Data`, captured verbatim, so the value
+    ///     is `base64(JSON-document-bytes)`.
+    ///   - Scalar keys (the `*.active.v1` / chain-wide selections, the fiat
+    ///     and display preferences) are serialized as a JSON fragment
+    ///     (`"usd"`, `true`, `"dark"`) via `.fragmentsAllowed`.
+    /// Android writes the same form from its mirrored SharedPreferences
+    /// keys, so a backup round-trips both directions. (The old form was an
+    /// Apple binary plist, which Android cannot write; `applyWalletState`
+    /// still reads it for backward compatibility.)
     static func captureWalletState() -> [String: String]? {
         var out: [String: String] = [:]
         for key in walletStateKeys {
             guard let value = UserDefaults.standard.object(forKey: key) else { continue }
-            // Wrap in a single-entry dict so the plist root is always a
-            // container (a bare scalar is not a valid plist root).
-            guard let data = try? PropertyListSerialization.data(
-                fromPropertyList: [key: value],
-                format: .binary,
-                options: 0
-            ) else { continue }
-            out[key] = data.base64EncodedString()
+            let jsonData: Data
+            if let data = value as? Data {
+                // Store blob: already JSON bytes; carry verbatim.
+                jsonData = data
+            } else if value is String || value is NSNumber {
+                // Scalar: encode as a JSON fragment.
+                guard let d = try? JSONSerialization.data(
+                    withJSONObject: value, options: [.fragmentsAllowed]
+                ) else { continue }
+                jsonData = d
+            } else if JSONSerialization.isValidJSONObject(value) {
+                // Native array/dict (rare): encode as JSON.
+                guard let d = try? JSONSerialization.data(withJSONObject: value) else { continue }
+                jsonData = d
+            } else {
+                continue
+            }
+            out[key] = jsonData.base64EncodedString()
         }
         return out.isEmpty ? nil : out
     }
@@ -207,17 +259,17 @@ enum EncryptedBackup {
     /// Clean-slate apply of the wallet state from a backup. Wipes all
     /// listed UserDefaults keys, then writes the backup contents back.
     ///
-    /// The in-memory @Observable stores do NOT pick this up on their
-    /// own. The restore path MUST call `HolderStore.reloadAfterRestore()`
-    /// (and `DisplayPreferences.reload()`) right after this so the live
-    /// UI reflects the restored state without an app relaunch. See
+    /// The in-memory @Observable stores do NOT pick this up on their own.
+    /// The restore path MUST call `HolderStore.reloadAfterRestore()` (and
+    /// `DisplayPreferences.reload()`) right after this so the live UI
+    /// reflects the restored state without an app relaunch. See
     /// `RecoveryView.restoreFromFile`.
     ///
-    /// Values written by current builds are binary property lists
-    /// wrapping `[key: value]` (see `captureWalletState`). Legacy v4
-    /// backups stored base64 of the raw JSON Data instead; we detect
-    /// those by the absence of the binary-plist magic header and write
-    /// the bytes back verbatim.
+    /// Decodes the cross-platform JSON form written by `captureWalletState`
+    /// (a JSON object/array is a store blob → written back as raw `Data`; a
+    /// JSON scalar is a preference → written back as the typed value). For
+    /// backward compatibility it still reads the legacy Apple binary plist
+    /// (`bplist0`) and the even older raw-JSON-`Data` form.
     static func applyWalletState(_ map: [String: String]?) {
         // Wipe every covered key first so a backup with a smaller
         // surface than the device still produces a clean state.
@@ -229,17 +281,25 @@ enum EncryptedBackup {
             guard walletStateKeys.contains(key),
                   let data = Data(base64Encoded: b64)
             else { continue }
-            // New format: a binary plist begins with "bplist0". JSON
-            // blobs (the only thing legacy backups stored under these
-            // keys) never do, so the header is an unambiguous
-            // discriminator.
+            // Legacy: a binary plist begins with "bplist0".
             if data.starts(with: Array("bplist0".utf8)),
                let plist = try? PropertyListSerialization.propertyList(
                    from: data, options: [], format: nil) as? [String: Any],
                let value = plist[key] {
                 UserDefaults.standard.set(value, forKey: key)
+                continue
+            }
+            // Cross-platform JSON form.
+            if let obj = try? JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed]) {
+                if obj is [Any] || obj is [String: Any] {
+                    // Store blob: write the raw JSON bytes back as Data.
+                    UserDefaults.standard.set(data, forKey: key)
+                } else {
+                    // Scalar preference (String / NSNumber incl. Bool).
+                    UserDefaults.standard.set(obj, forKey: key)
+                }
             } else {
-                // Legacy raw-Data path.
+                // Non-JSON Data blob: write bytes back verbatim.
                 UserDefaults.standard.set(data, forKey: key)
             }
         }
@@ -282,7 +342,7 @@ enum EncryptedBackup {
             idDocuments: idDocuments,
             walletState: walletState
         )
-        let plainBytes = try JSONEncoder().encode(plaintext)
+        let plainBytes = try backupEncoder().encode(plaintext)
 
         let sealed = try AES.GCM.seal(plainBytes, using: key)
         guard let combined = sealed.combined else {
@@ -394,9 +454,9 @@ enum EncryptedBackup {
         do {
             plainBytes = try AES.GCM.open(sealed, using: key)
         } catch {
-            throw BackupError.decryptFailed("Wrong passphrase, or tampered blob")
+            throw BackupError.decryptFailed("Wrong password, or tampered blob")
         }
-        let plain = try JSONDecoder().decode(BackupPlaintext.self, from: plainBytes)
+        let plain = try backupDecoder().decode(BackupPlaintext.self, from: plainBytes)
         // Accept the historical sequence 1, 2 and the current 4. v3 is
         // reserved for a parallel branch that never shipped.
         guard plain.v == 1 || plain.v == 2 || plain.v == 4 else {
@@ -411,7 +471,7 @@ enum EncryptedBackup {
                 let derivedSeed = try deriveMLDSASeed(entropy: entropy, passphrase: passphrase)
                 let derivedPk = try MLDSAClient.masterPublicKey(fromSeed: derivedSeed)
                 guard derivedPk == embeddedPk else {
-                    throw BackupError.decryptFailed("The master pubkey embedded in the backup doesn't match the one derived from this entropy + passphrase. Either the blob is corrupted, or this passphrase belongs to a different backup.")
+                    throw BackupError.decryptFailed("The master pubkey embedded in the backup doesn't match the one derived from this entropy + password. Either the blob is corrupted, or this password belongs to a different backup.")
                 }
             } catch let e as BackupError {
                 throw e
@@ -578,7 +638,7 @@ extension EncryptedBackup {
     }
 
     /// Walk the connected scenes to find the foreground key window's
-    /// topmost presented view controller — the one we should present
+    /// topmost presented view controller, the one we should present
     /// the picker on. Falls back through windows / scenes so we
     /// reliably find a presenter even in unusual app states.
     private static func topPresentingViewController() -> UIViewController? {

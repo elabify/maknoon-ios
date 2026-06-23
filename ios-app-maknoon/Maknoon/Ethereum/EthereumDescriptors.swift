@@ -21,7 +21,7 @@ enum EthereumDescriptorError: LocalizedError {
     case signingFailed(String)
     var errorDescription: String? {
         switch self {
-        case .sandwichLocked:         return "Identity Sandwich is locked"
+        case .sandwichLocked:         return "Maknoon is locked"
         case .hdWalletFailed(let m):  return "HD wallet derive failed: \(m)"
         case .signingFailed(let m):   return "Ethereum signing failed: \(m)"
         }

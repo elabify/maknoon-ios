@@ -1,6 +1,6 @@
 // Receive credential sheet. Opened from the Identity tab's "+" toolbar
 // menu. Default mode is live QR scanning. The user can switch to manual
-// URL paste at any time, or — if they have denied camera permission —
+// URL paste at any time, or (if they have denied camera permission)
 // is shown a clear remediation path with an "Open Settings" deep link.
 //
 // Polling handles the `pending_anchor` window from ADR-0022 (batch
@@ -136,7 +136,7 @@ struct ReceiveSheet: View {
                 .ignoresSafeArea(edges: .top)
 
             // Translucent rule-of-thirds reticle to give the user a
-            // target. The scanner accepts QRs anywhere in the frame —
+            // target. The scanner accepts QRs anywhere in the frame,
             // this is purely a visual cue.
             VStack {
                 Spacer()
@@ -383,7 +383,7 @@ struct ReceiveSheet: View {
                 try? await Task.sleep(nanoseconds: 10 * 1_000_000_000)
             }
         }
-        phase = .error("Timed out after \(maxAttempts) attempts. The issuer's batch may be stuck — try `curl -X POST <issuer>/v1/admin/anchor/flush` to force a flush.")
+        phase = .error("Timed out after \(maxAttempts) attempts. The issuer's batch may be stuck, try `curl -X POST <issuer>/v1/admin/anchor/flush` to force a flush.")
     }
 
     @MainActor

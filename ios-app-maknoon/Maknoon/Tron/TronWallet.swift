@@ -272,6 +272,38 @@ actor TronWallet {
         )
     }
 
+    /// Software path's sign-only step for TRC-20. Mirrors
+    /// `prepareSoftwareNative`; returns the wire-ready signed JSON
+    /// (with `txID`) for `broadcastSignedJSON`. Used by the commerce
+    /// flow so identity + the pre-broadcast txID can be posted before
+    /// money moves.
+    func prepareSoftwareTRC20(
+        contractAddress: String,
+        rawAmount: String,
+        recipient: String,
+        feeLimitSun: Int64 = 100_000_000,
+        biometricReason: String
+    ) async throws -> String {
+        guard let sandwich else { throw SandwichError.masterUnavailable }
+        guard case .software(let account) = descriptor.kind else {
+            throw TronDescriptorError.signingFailed("Wallet is hardware-backed; software sign not applicable")
+        }
+        let sender = try resolvedAddress(biometricReason: biometricReason)
+        let block = try await rpc.getNowBlock()
+        let blockRef = try TronWallet.blockRef(from: block)
+        return try TronTRC20TransferBuilder.sign(
+            sandwich: sandwich,
+            account: account,
+            senderBase58: sender,
+            contractBase58: contractAddress,
+            recipientBase58: recipient,
+            rawAmountDecimal: rawAmount,
+            blockRef: blockRef,
+            feeLimitSun: feeLimitSun,
+            biometricReason: biometricReason
+        )
+    }
+
     /// Broadcast a pre-signed transaction JSON. Idempotent on the
     /// caller's side: the same signed tx can be retried if the
     /// initial broadcast errored on transport (TronGrid will return

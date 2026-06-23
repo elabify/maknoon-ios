@@ -1,5 +1,5 @@
-// dApps catalog browser. Lists the configured catalogs (always
-// Elabify + any user-added), drills into a catalog to see its dApps,
+// Apps catalog browser. Lists the configured catalogs (always
+// Elabify + any user-added), drills into a catalog to see its apps,
 // lets the user install one into the Apps tab.
 //
 // Reached from the Apps tab "+" toolbar button.
@@ -26,13 +26,13 @@ struct BrowseAppStoreView: View {
                         }
                     }
                 } header: {
-                    Text("dApps catalogs")
+                    Text("Apps catalogs")
                 } footer: {
-                    Text("Add additional dApps catalogs in Settings > Apps. Each catalog is just a JSON document hosted at a URL of your (or your institution's) choosing.")
+                    Text("Add additional Apps catalogs in Settings > Apps.")
                         .font(.caption)
                 }
             }
-            .navigationTitle("Browse dApps")
+            .navigationTitle("Browse Apps")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -52,7 +52,7 @@ struct BrowseAppStoreView: View {
                 .frame(width: 30)
             VStack(alignment: .leading, spacing: 2) {
                 Text(catalog.name).font(.callout.weight(.semibold))
-                Text("Curated by \(catalog.curator) - \(catalog.apps.count) app\(catalog.apps.count == 1 ? "" : "s")")
+                Text("\(catalog.apps.count) app\(catalog.apps.count == 1 ? "" : "s")")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
@@ -87,10 +87,10 @@ private struct CatalogDetailView: View {
                 }
                 if visibleApps.isEmpty {
                     if catalog.apps.isEmpty {
-                        Text("This catalog has no dApps yet.")
+                        Text("This catalog has no apps yet.")
                             .font(.callout).foregroundStyle(.secondary)
                     } else {
-                        Text("Beta dApps are hidden. Turn on “Show beta apps” in Apps settings to see experimental dApps.")
+                        Text("Beta apps are hidden. Turn on “Show beta apps” in Apps settings to see experimental apps.")
                             .font(.callout).foregroundStyle(.secondary)
                     }
                 }
@@ -165,7 +165,10 @@ private struct InstallSheet: View {
                         Image(systemName: c.icon).foregroundStyle(.purple).frame(width: 22)
                         VStack(alignment: .leading, spacing: 1) {
                             Text(c.label).font(.callout.weight(.medium))
-                            Text(entry.reason(for: c.token)).font(.caption).foregroundStyle(.secondary)
+                            // Show the registry's canonical description so every
+                            // app requesting a capability reads the same, rather
+                            // than the catalog's per-app reason override.
+                            Text(c.reason).font(.caption).foregroundStyle(.secondary)
                         }
                         if c.tier == .perUse {
                             Spacer(minLength: 0)
@@ -190,12 +193,13 @@ private struct InstallSheet: View {
                             .foregroundStyle(.purple)
                         VStack(alignment: .leading, spacing: 4) {
                             Text(entry.title).font(.title3.weight(.semibold))
-                            Text("\(entry.channelLabel)\(entry.version.map { " · v\($0)" } ?? "") - curated by \(entry.curatedBy)")
+                            Text("\(entry.channelLabel)\(entry.version.map { " · v\($0)" } ?? "")")
                                 .font(.caption.weight(.medium))
                                 .foregroundStyle(entry.statusColor)
                         }
                     }
-                    DAppCompatibilityRow(requires: entry.requiresMaknoonVersion)
+                    DAppCompatibilityRow(requires: entry.requiresMaknoonVersion,
+                                         supersededAt: entry.supersededAtMaknoonVersion)
                     Divider()
                     Text(entry.summary).font(.callout.weight(.medium))
                     Text(entry.details).font(.callout).foregroundStyle(.secondary)
@@ -222,6 +226,10 @@ private struct InstallSheet: View {
                         }
                         .buttonStyle(.bordered)
                     } else {
+                        let compatibility = DAppCompatibility.evaluate(
+                            requires: entry.requiresMaknoonVersion,
+                            supersededAt: entry.supersededAtMaknoonVersion)
+                        let blocked = compatibility.blocksInstall
                         Button {
                             store.appStores.install(entry, fromStore: catalog.id)
                             // Jump straight in for a runnable mini app.
@@ -237,6 +245,19 @@ private struct InstallSheet: View {
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.borderedProminent)
+                        .disabled(blocked)
+                        if case .recommendsNewer(let required, _) = compatibility {
+                            Text("Requires Maknoon \(required)")
+                                .font(.caption)
+                                .foregroundStyle(.orange)
+                                .frame(maxWidth: .infinity)
+                        }
+                        if case .superseded(let supersededAt, _) = compatibility {
+                            Text("This app needs an update for Maknoon (superseded at \(supersededAt))")
+                                .font(.caption)
+                                .foregroundStyle(.orange)
+                                .frame(maxWidth: .infinity)
+                        }
                     }
                 }
                 .padding(16)

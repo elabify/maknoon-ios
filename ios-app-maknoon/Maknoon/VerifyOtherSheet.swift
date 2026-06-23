@@ -3,16 +3,16 @@
 // shows, validate locally, display the result. One-shot, nothing saved.
 //
 // Accepted QR payloads:
-//   * `BadgePayload` — a no-PII credential reference (issuer + schema +
+//   * `BadgePayload`: a no-PII credential reference (issuer + schema +
 //     cid + anchor). Validated by inspecting metadata. Cryptographic
 //     proof requires an online lookup; surfaced as informational.
-//   * `DropEnvelope` — pastebin reference. Fetched from Elabify's drop
+//   * `DropEnvelope`: pastebin reference. Fetched from Elabify's drop
 //     host and run through `PresentationVerifier.verifyOffline`.
 //   * Raw Presentation JSON (large QR is rare but possible). Same
 //     validation as the dropped variant.
 //
 // "Verify" here is intentionally limited: the verifier sees whatever the
-// other person chose to disclose. No filter spec, no request — that
+// other person chose to disclose. No filter spec, no request, that
 // flow lives on the React /verifier page for business-grade verifiers.
 
 import SwiftUI
@@ -40,7 +40,7 @@ struct VerifyOtherSheet: View {
     var body: some View {
         NavigationStack {
             content
-                .navigationTitle("Verify someone")
+                .navigationTitle("Verify credential")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
@@ -105,7 +105,7 @@ struct VerifyOtherSheet: View {
                             .progressViewStyle(.linear)
                             .tint(.green)
                             .frame(width: 240)
-                        Text("Hold steady — let the rotating QR cycle once.")
+                        Text("Hold steady, let the rotating QR cycle once.")
                             .font(.caption)
                             .foregroundStyle(.white.opacity(0.8))
                             .multilineTextAlignment(.center)
@@ -136,7 +136,7 @@ struct VerifyOtherSheet: View {
     }
 
     private func noQRFound() {
-        phase = .rejected(reason: "No QR code found in that image. Note: multi-frame / rotating QR can't be read from a still photo — use the live camera for those.")
+        phase = .rejected(reason: "No QR code found in that image. Note: multi-frame / rotating QR can't be read from a still photo, use the live camera for those.")
     }
 
     private var cameraDeniedView: some View {
@@ -234,7 +234,7 @@ struct VerifyOtherSheet: View {
             if !v.disclosed.isEmpty {
                 Section("Disclosed claims") {
                     ForEach(v.disclosed.keys.sorted(), id: \.self) { k in
-                        kv(k, v.disclosed[k]?.displayText ?? "—")
+                        kv(k, v.disclosed[k]?.displayText ?? "-")
                     }
                 }
             }
@@ -323,7 +323,7 @@ struct VerifyOtherSheet: View {
     @ViewBuilder
     private func kv(_ key: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(key).font(.caption).foregroundStyle(.secondary)
+            Text(LocalizedStringKey(key)).font(.caption).foregroundStyle(.secondary)
             Text(value).font(.callout.monospaced()).textSelection(.enabled).lineLimit(2)
         }
         .padding(.vertical, 2)
@@ -393,7 +393,7 @@ struct VerifyOtherSheet: View {
             phase = .badge(badge)
             return
         }
-        // DropEnvelope (online fallback — kept for completeness).
+        // DropEnvelope (online fallback, kept for completeness).
         if let envelope = try? JSONDecoder().decode(DropEnvelope.self, from: data),
            envelope.v == 1, !envelope.dropId.isEmpty {
             phase = .fetching

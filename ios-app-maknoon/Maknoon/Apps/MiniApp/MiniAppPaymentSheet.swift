@@ -5,7 +5,7 @@
 // on-chain. When the balance rises by at least the requested amount the
 // sale is auto-confirmed and the continuation resolves; the merchant can
 // also confirm manually or cancel. The customer pays from their own wallet
-// by scanning the QR — nothing is signed on this device.
+// by scanning the QR, nothing is signed on this device.
 
 import SwiftUI
 import Observation
@@ -78,7 +78,7 @@ struct MiniAppPaymentSheet: View {
         "\(NSDecimalNumber(decimal: request.amount).stringValue) \(request.ticker)"
     }
 
-    /// The Lightning account this receive targets: the one chosen by the dApp
+    /// The Lightning account this receive targets: the one chosen by the app
     /// (its UUID passed through `request.address`), else the active account.
     private var lightningAccount: LightningAccount? {
         if let id = UUID(uuidString: request.address),
@@ -251,13 +251,13 @@ struct MiniAppPaymentSheet: View {
             let w = try await LNURL.fetchWithdrawRequest(url)
             let msat = sats * 1000
             guard msat >= w.minWithdrawable && msat <= w.maxWithdrawable else {
-                lnError = "Voucher allows \(w.minWithdrawable / 1000)–\(w.maxWithdrawable / 1000) sat, need \(sats)."
+                lnError = "Voucher allows \(w.minWithdrawable / 1000)-\(w.maxWithdrawable / 1000) sat, need \(sats)."
                 status = lnError!; return
             }
             let client = LNDHubClient(account: account, password: pw)
             let invoice = try await client.addInvoice(amountSat: sats, memo: request.appTitle)
             try await LNURL.submitWithdraw(w, bolt11: invoice)
-            status = "Voucher accepted — waiting for settlement to \(account.label)…"
+            status = "Voucher accepted, waiting for settlement to \(account.label)…"
             // The balance watcher (already running) resolves on receipt.
         } catch {
             lnError = "Could not pull from voucher: \((error as? LocalizedError)?.errorDescription ?? "\(error)")"

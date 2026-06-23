@@ -270,7 +270,8 @@ struct TronSendView: View {
                     }
                 )) {
                     Text("TRX (native)").tag("trx")
-                    ForEach(availableTokens) { token in
+                    // Native first, then tokens alphabetically by symbol (ADR-0033 Phase 2b round-2).
+                    ForEach(availableTokens.sorted { $0.symbol.lowercased() < $1.symbol.lowercased() }) { token in
                         Text("\(token.symbol) - \(token.name)").tag(token.id)
                     }
                 }
@@ -440,7 +441,7 @@ struct TronSendView: View {
                 value: activeNetwork.displayName,
                 highlightTint: .red
             )
-            ReviewRow(label: "Pay to", value: shortAddress(recipient.isEmpty ? "—" : recipient))
+            ReviewRow(label: "Pay to", value: shortAddress(recipient.isEmpty ? "-" : recipient))
             ReviewRow(
                 label: "Amount",
                 value: reviewAmountLine,
@@ -686,7 +687,7 @@ struct TronSendView: View {
             return
         }
         if !isHardware, store.sandwich == nil {
-            lastError = "Identity Sandwich is locked. Unlock from the Sandwich tab and retry."
+            lastError = "Maknoon is locked. Unlock from the Identity tab and retry."
             return
         }
         lastError = nil
@@ -937,6 +938,6 @@ struct TronSendView: View {
 }
 
 // Shared `NetworkChipLabel`, `ReviewRow`, `PulseBroadcastButton`,
-// `ChainScanSheet` live in `Maknoon/UI/SendViewKit.swift` — adopted
+// `ChainScanSheet` live in `Maknoon/UI/SendViewKit.swift`, adopted
 // here, in Solana/SolanaSendView.swift, and in
 // Ethereum/EthereumSendView.swift.

@@ -210,10 +210,59 @@ struct RegisteredDevice: Codable, Identifiable, Hashable, Sendable {
         /// prompt.
         let wrapProtocolVersion: Int?
 
-        init(credentialIdHex: String, enrolledAt: Date, wrapProtocolVersion: Int? = 2) {
+        /// Whether the enrolled YubiKey had a FIDO2 PIN set at enrollment. When
+        /// true, unlock prompts for the PIN; when false, the key is a no-PIN
+        /// (touch-only) factor and unlock skips the PIN prompt. Defaults to true
+        /// for records written before this field existed (those keys could only
+        /// enroll with a PIN), and is the cross-platform contract with Android.
+        let pinProtected: Bool
+
+        /// ADR-0032 second-factor wrap (CEK scheme, byte-identical to Android).
+        /// The 32-byte device salt (hex) that, with this device's deterministic
+        /// secret, derives the HKDF wrap key. Also the YubiKey hmac-secret salt.
+        /// Nil on records written before the CEK scheme existed (those need a
+        /// re-enroll to gate the entropy).
+        let deviceSaltHex: String?
+
+        /// ADR-0032 second-factor wrap. The shared CEK sealed under this
+        /// device's wrap key (framed nonce||ct||tag, hex). Together with
+        /// `deviceSaltHex` this is the full per-device envelope: recompute the
+        /// secret, derive the wrap key, decrypt this to the CEK, then open
+        /// sealedEntropyUnderCEK. Nil = no CEK wrap yet.
+        let wrappedCekHex: String?
+
+        /// True once this device actually wraps the CEK (a complete v2
+        /// envelope), not just a legacy credential-only promotion.
+        var hasSecondFactorWrap: Bool {
+            wrapProtocolVersion == 2
+                && !(deviceSaltHex ?? "").isEmpty
+                && !(wrappedCekHex ?? "").isEmpty
+        }
+
+        init(
+            credentialIdHex: String,
+            enrolledAt: Date,
+            wrapProtocolVersion: Int? = 2,
+            pinProtected: Bool = true,
+            deviceSaltHex: String? = nil,
+            wrappedCekHex: String? = nil
+        ) {
             self.credentialIdHex = credentialIdHex
             self.enrolledAt = enrolledAt
             self.wrapProtocolVersion = wrapProtocolVersion
+            self.pinProtected = pinProtected
+            self.deviceSaltHex = deviceSaltHex
+            self.wrappedCekHex = wrappedCekHex
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            credentialIdHex = try c.decode(String.self, forKey: .credentialIdHex)
+            enrolledAt = try c.decode(Date.self, forKey: .enrolledAt)
+            wrapProtocolVersion = try c.decodeIfPresent(Int.self, forKey: .wrapProtocolVersion)
+            pinProtected = try c.decodeIfPresent(Bool.self, forKey: .pinProtected) ?? true
+            deviceSaltHex = try c.decodeIfPresent(String.self, forKey: .deviceSaltHex)
+            wrappedCekHex = try c.decodeIfPresent(String.self, forKey: .wrappedCekHex)
         }
     }
 

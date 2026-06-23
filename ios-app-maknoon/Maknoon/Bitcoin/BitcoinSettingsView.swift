@@ -12,7 +12,6 @@ struct BitcoinSettingsView: View {
     @State private var mempoolURL: String = ""
     @State private var explorerURL: String = ""
     @State private var fiatCode: String = "usd"
-    @State private var coinGeckoBase: String = "https://api.coingecko.com/api/v3"
 
     var body: some View {
         Form {
@@ -78,21 +77,26 @@ struct BitcoinSettingsView: View {
                     .font(.caption)
             }
 
-            Section("Historical rates + fiat") {
-                TextField("CoinGecko base URL", text: $coinGeckoBase)
-                    .autocorrectionDisabled()
-                    .textInputAutocapitalization(.never)
+            Section {
                 Picker("Fiat currency", selection: $fiatCode) {
                     ForEach(commonFiats, id: \.self) {
                         Text($0.uppercased()).tag($0)
                     }
                 }
-                Button("Reset to defaults") {
-                    coinGeckoBase = "https://api.coingecko.com/api/v3"
+                Button("Reset to default") {
                     fiatCode = "usd"
                     save()
                 }
                 .foregroundStyle(.blue)
+            } header: {
+                Text("Fiat currency")
+            } footer: {
+                // The spot-price + FX endpoints moved to a single global override
+                // under Settings > Currency > Price data sources (#63); the
+                // legacy per-Bitcoin CoinGecko field + BitcoinPriceCache are
+                // retired. All chains now price through the shared AssetPriceCache.
+                Text("The display currency and price sources are set globally under Settings, Currency.")
+                    .font(.caption)
             }
 
             Section {
@@ -130,7 +134,6 @@ struct BitcoinSettingsView: View {
         pinnedCertSHA = cfg.pinnedCertSHA256
         mempoolURL = store.bitcoinSettings.mempoolURLByNetwork[selectedNetwork] ?? ""
         explorerURL = store.bitcoinSettings.explorerURLByNetwork[selectedNetwork] ?? ""
-        coinGeckoBase = store.bitcoinSettings.coinGeckoBaseURL
         fiatCode = store.bitcoinSettings.fiatCode
     }
 
@@ -144,7 +147,6 @@ struct BitcoinSettingsView: View {
         )
         store.bitcoinSettings.setMempool(mempoolURL, for: selectedNetwork)
         store.bitcoinSettings.setExplorerURL(explorerURL, for: selectedNetwork)
-        store.bitcoinSettings.coinGeckoBaseURL = coinGeckoBase
         store.bitcoinSettings.fiatCode = fiatCode
         store.bitcoinSettings.persist()
     }

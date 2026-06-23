@@ -34,7 +34,7 @@ enum IDDocumentIssuanceError: LocalizedError {
         case .missingChipMaterial:
             return "This document is missing the chip-signed objects needed for issuance. Re-tap the document so Maknoon can capture them."
         case .identityNotLoaded:
-            return "Identity Sandwich isn't loaded. Unlock your identity first."
+            return "Maknoon is locked. Unlock first."
         case .mldsaSignFailed(let m):
             return "Couldn't sign the issuance request: \(m)"
         case .submitFailed(let m):
@@ -47,7 +47,7 @@ enum IDDocumentIssuanceError: LocalizedError {
     }
 }
 
-/// Shape of GET /v1/issuer/info — we read just enough to pin the
+/// Shape of GET /v1/issuer/info, we read just enough to pin the
 /// packet to the issuer's actual DID. The endpoint returns more
 /// fields (mlDsaPubkey, schemas, anchorManifest, etc.); we ignore
 /// them here.

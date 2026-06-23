@@ -79,7 +79,7 @@ struct OnboardingView: View {
         case .restoreEncryptedBackup:   return "Restore backup"
         case .reveal:                   return "Recovery phrase"
         case .verify:                   return "Verify phrase"
-        case .passphraseEntry:          return "Set passphrase"
+        case .passphraseEntry:          return "Set password"
         case .encryptedBackup:          return "Encrypted backup"
         case .provisioning:             return "Setting up"
         case .passportScan:             return "Scan passport"
@@ -175,7 +175,7 @@ struct OnboardingView: View {
                     Label("Store this OFFLINE", systemImage: "exclamationmark.shield")
                         .font(.callout.weight(.medium))
                         .foregroundStyle(.orange)
-                    Text("The only safe place for these 24 words without encryption is paper or stamped metal, stored OFFLINE, in a locked safe. Never type them into any computer or phone. Never take a photo or screenshot. Anyone with this recovery phrase AND your passphrase can recreate your identity.")
+                    Text("The only safe place for these 24 words without encryption is paper or stamped metal, stored OFFLINE, in a locked safe. Never type them into any computer or phone. Never take a photo or screenshot. Anyone with this recovery phrase AND your password can recreate your identity.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -214,7 +214,7 @@ struct OnboardingView: View {
                 .disabled(!confirmedOffline)
 
                 Button(action: { skipRecoveryStorage() }) {
-                    Text("Skip for now — remind me in 7 days").frame(maxWidth: .infinity)
+                    Text("Skip for now, remind me in 7 days").frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
 
@@ -274,15 +274,15 @@ struct OnboardingView: View {
     private var passphraseEntryView: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                Text("Set a passphrase")
+                Text("Set a password")
                     .font(.title3.weight(.semibold))
 
-                Text("A passphrase is used to backup your identity and any local assets using post-quantum encryption.")
+                Text("A password is used to backup your identity and any local assets using post-quantum encryption.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Passphrase").font(.caption).foregroundStyle(.secondary)
+                    Text("Password").font(.caption).foregroundStyle(.secondary)
                     SecureField("", text: $passphrase)
                         .textFieldStyle(.roundedBorder)
                         .autocorrectionDisabled()
@@ -290,7 +290,7 @@ struct OnboardingView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Confirm passphrase").font(.caption).foregroundStyle(.secondary)
+                    Text("Confirm password").font(.caption).foregroundStyle(.secondary)
                     SecureField("", text: $passphraseConfirm)
                         .textFieldStyle(.roundedBorder)
                         .autocorrectionDisabled()
@@ -300,7 +300,7 @@ struct OnboardingView: View {
                 if !passphrase.isEmpty,
                    passphraseConfirm.isEmpty == false,
                    passphrase != passphraseConfirm {
-                    Text("Passphrases do not match")
+                    Text("Passwords do not match")
                         .font(.caption)
                         .foregroundStyle(.red)
                 }
@@ -308,7 +308,7 @@ struct OnboardingView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Label("Save it to a password manager NOW", systemImage: "key.horizontal")
                         .font(.callout.weight(.medium))
-                    Text("This is the last time the passphrase will be shown. Add it to a vetted password manager before you continue.")
+                    Text("This is the last time the password will be shown. Add it to a vetted password manager before you continue.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -317,7 +317,7 @@ struct OnboardingView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
 
                 Toggle(isOn: $confirmedSavedToPasswordManager) {
-                    Text("I have saved this passphrase").font(.callout)
+                    Text("I have saved this password").font(.callout)
                 }
                 .toggleStyle(.switch)
                 .tint(.purple)
@@ -347,7 +347,7 @@ struct OnboardingView: View {
                 Label("Encrypted backup", systemImage: "lock.doc")
                     .font(.title3.weight(.semibold))
 
-                Text("Maknoon will store an encrypted backup in any location you prefer using your passphrase. Without the passphrase, the post-quantum encrypted backup is useless and nobody can unlock it.")
+                Text("Maknoon will store an encrypted backup in any location you prefer using your password. Without the password, the post-quantum encrypted backup is useless and nobody can unlock it.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
 
@@ -456,7 +456,7 @@ struct OnboardingView: View {
         }
     }
 
-    /// "Skip — remind me in 7 days" on the reveal screen. Per the
+    /// "Skip, remind me in 7 days" on the reveal screen. Per the
     /// spec we assume the user has NOT actually stored the phrase
     /// and mark the verification state accordingly. The 7-day
     /// reminder banner picks this up.

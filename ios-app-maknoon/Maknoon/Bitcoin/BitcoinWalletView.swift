@@ -217,11 +217,7 @@ struct BitcoinWalletView: View {
             }
         } label: {
             HStack {
-                WalletThumbprint(
-                    seed: thumbprintSeed(for: activeWallet),
-                    size: 36,
-                    systemImage: "bitcoinsign.circle.fill"
-                )
+                ChainLogo("ChainBitcoin", size: 36)
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
                         Text(activeWallet?.label ?? "No wallet").font(.headline)
@@ -275,7 +271,7 @@ struct BitcoinWalletView: View {
     }
 
     private var walletSubtitle: String {
-        guard let w = activeWallet else { return "—" }
+        guard let w = activeWallet else { return "-" }
         let accountSuffix: String
         switch w.kind {
         case .software(let acct):  accountSuffix = "Index \(acct)"
@@ -292,7 +288,7 @@ struct BitcoinWalletView: View {
     /// "Next receive: bc1q…xyz · copy" row. Sits immediately below
     /// the wallet picker. Bitcoin has no single "the" address (HD
     /// keychain), so the most-actionable surface is the next
-    /// unrevealed receive address — what the user would share with
+    /// unrevealed receive address, what the user would share with
     /// a sender right now.
     @ViewBuilder
     private var nextReceiveRow: some View {
@@ -446,7 +442,7 @@ struct BitcoinWalletView: View {
     // MARK: -- data
 
     private var displayBalance: String {
-        guard let b = balance else { return "—" }
+        guard let b = balance else { return "-" }
         let sats = b.total.toSat()
         let btc = Double(sats) / 100_000_000.0
         return String(format: "%.8f", btc)
@@ -851,7 +847,7 @@ struct BitcoinTxRow: View {
     private var amountString: String {
         // Pre-computed by the parent via BitcoinWallet.netAmount(tx:).
         // Display as +/- BTC with 8 decimals trimmed where possible.
-        guard let sats = netSat else { return "—" }
+        guard let sats = netSat else { return "-" }
         let signedBTC = Double(sats) / 100_000_000
         // The leading sign is preserved by String(format:) for negatives;
         // we prepend an explicit "+" for positive deltas so the
@@ -880,7 +876,7 @@ struct BitcoinTxRow: View {
     /// Bump-fee is offered when:
     ///   * we have a wallet handle to build the replacement PSBT,
     ///   * the tx is still in the mempool (unconfirmed), and
-    ///   * the tx is outgoing (net delta < 0 — money left the wallet).
+    ///   * the tx is outgoing (net delta < 0, money left the wallet).
     /// BDK will surface a clean error if the tx itself isn't
     /// actually RBF-replaceable for some reason (e.g. it didn't
     /// signal AND the user's local node is on a non-full-RBF

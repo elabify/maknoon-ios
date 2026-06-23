@@ -85,8 +85,8 @@ struct BitcoinOfflinePSBTSheet: View {
                 // Suite) might emit. URPSBTScannerView assembles UR
                 // fragments; non-UR payloads pass through the
                 // single-frame branch. As with the SeedSigner sheet
-                // path above, we populate but do not broadcast —
-                // user confirms via the Broadcast button.
+                // path above, we populate but do not broadcast.
+                // User confirms via the Broadcast button.
                 URPSBTScannerView(
                     onDecoded: { bytes in
                         showSignedScanner = false
@@ -200,7 +200,7 @@ struct BitcoinOfflinePSBTSheet: View {
         // fall back to copy/share for long ones.
         VStack(spacing: 6) {
             if payload.count > 800 {
-                Text("PSBT too long for a single QR (\(payload.count) chars). Use Copy or Share instead — or split with Animated QR / BBQr in your signer.")
+                Text("PSBT too long for a single QR (\(payload.count) chars). Use Copy or Share instead, or split with Animated QR / BBQr in your signer.")
                     .font(.caption2).foregroundStyle(.secondary)
             } else if let img = BadgeQR.render(Data(payload.utf8), scale: 6) {
                 Image(uiImage: img)
@@ -282,7 +282,7 @@ struct BitcoinOfflinePSBTSheet: View {
             )
             unsignedBase64 = s
             // SeedSigner wallets jump straight into the animated
-            // UR-PSBT scanner — the static base64 QR above can't
+            // UR-PSBT scanner, the static base64 QR above can't
             // be parsed by the SeedSigner camera (wrong format).
             // Auto-present so the user doesn't have to scroll to
             // find the "Sign on SeedSigner via QR" button.

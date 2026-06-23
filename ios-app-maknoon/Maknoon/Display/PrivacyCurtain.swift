@@ -1,4 +1,4 @@
-// Privacy curtain — covers the UI when the app is inactive so the
+// Privacy curtain: covers the UI when the app is inactive so the
 // iOS task switcher snapshot doesn't expose wallet balances /
 // credential cards / passport photos. Stays neutral (logo + name)
 // so users can still recognise the app in the switcher.

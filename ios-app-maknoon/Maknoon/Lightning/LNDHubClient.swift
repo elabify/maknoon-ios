@@ -252,7 +252,16 @@ actor LNDHubClient {
         try await ensureAuth()
         var body: [String: Any] = ["invoice": bolt11]
         if let amt = amountSat { body["amount"] = amt }
-        let resp: PayInvoiceResponse = try await postJSON(path: "/payinvoice", body: body, authenticated: true)
+        // /payinvoice blocks until the payment ROUTES (or fails), which can
+        // exceed URLSession's 60s default for a multi-hop route and surface as
+        // a bogus "timeout" on a healthy hub. Give it a generous window
+        // (parity with Android's 120s read timeout on the same call).
+        let resp: PayInvoiceResponse = try await postJSON(
+            path: "/payinvoice",
+            body: body,
+            authenticated: true,
+            timeout: 120
+        )
         if let err = resp.error ?? resp.message, resp.payment_preimage == nil {
             throw LNDHubError.server(err)
         }
@@ -311,7 +320,7 @@ actor LNDHubClient {
         LogStore.shared.warn("lightning.gettxs",
             "could not decode \(account.serverURL): \(preview)")
         throw LNDHubError.decode(
-            "history payload didn't match any known LNDHub shape — paste the diagnostic log entry under Settings → About → Share logs so we can extend the decoder."
+            "history payload didn't match any known LNDHub shape. Paste the diagnostic log entry under Settings → About → Share logs so we can extend the decoder."
         )
     }
 
@@ -386,13 +395,19 @@ actor LNDHubClient {
         return data
     }
 
-    private func postJSON<T: Decodable>(path: String, body: [String: Any], authenticated: Bool) async throws -> T {
+    private func postJSON<T: Decodable>(
+        path: String,
+        body: [String: Any],
+        authenticated: Bool,
+        timeout: TimeInterval? = nil
+    ) async throws -> T {
         var req = URLRequest(url: try url(path))
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         if authenticated, let token = accessToken {
             req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
+        if let timeout { req.timeoutInterval = timeout }
         req.httpBody = try JSONSerialization.data(withJSONObject: body)
         return try await send(req)
     }

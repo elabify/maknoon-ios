@@ -31,7 +31,7 @@ enum BitcoinMessageSigningError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .identityRequired:
-            return "Unlock your Identity Sandwich first; signing needs your wallet's private key."
+            return "Unlock Maknoon first; signing needs your wallet's private key."
         case .hardwareUnsupported:
             return "Message signing is available for software wallets only. This wallet is hardware-backed; its key never leaves the device."
         case .networkUnsupported:

@@ -30,7 +30,7 @@ struct SandwichLockedBanner: View {
                     Image(systemName: "lock.shield.fill")
                         .font(.title3)
                         .foregroundStyle(.orange)
-                    Text("Identity Sandwich is locked")
+                    Text("Maknoon is locked")
                         .font(.subheadline.weight(.semibold))
                 }
                 Text("This software wallet's seed is sealed by your enrolled hardware devices. Balance is read-only until you unlock; Send fails. Tap below to unlock with any enrolled device.")

@@ -26,7 +26,7 @@ struct IdentitySettingsView: View {
             registeredSection
             knownIssuersSection
             cscaSection
-            footerSection
+            relaySection
         }
         .navigationTitle("Identity")
         .navigationBarTitleDisplayMode(.inline)
@@ -85,9 +85,6 @@ struct IdentitySettingsView: View {
             }
         } header: {
             Text("Known issuers")
-        } footer: {
-            Text("Pickup URLs from these hosts are accepted silently. Other hosts trigger a one-time-trust prompt at Receive time. Paste a full URL or just a hostname; only the host is stored. The shield turns green only when the issuer is reachable over a valid TLS connection and returns a valid issuer document; pull down to re-check.")
-                .font(.caption)
         }
     }
 
@@ -131,9 +128,6 @@ struct IdentitySettingsView: View {
             .disabled(cscaUpdating || store.knownIssuers.hosts.isEmpty)
         } header: {
             Text("Passport trust list (CSCA)")
-        } footer: {
-            Text("Country Signing CA certificates used to check passport chip authenticity on-device. Fetched from your first known issuer (\(store.knownIssuers.hosts.first ?? "none set")) and refreshed automatically; the issuer also verifies authoritatively. Tap Update now to pull the latest list.")
-                .font(.caption)
         }
     }
 
@@ -206,7 +200,7 @@ struct IdentitySettingsView: View {
                 Image(systemName: "cpu.fill").foregroundStyle(.blue)
                 VStack(alignment: .leading) {
                     Text("Secure Enclave Signing").font(.callout.weight(.semibold))
-                    Text("Required for every sensitive operation. Authorized by your preferred configured biometric or passcode.")
+                    Text("Required for every sensitive operation. Authorized by your preferred configured biometric, passcode, or second factor.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
@@ -241,7 +235,7 @@ struct IdentitySettingsView: View {
         } header: {
             Text("Hardware second factor")
         } footer: {
-            Text("Enabling a device wraps your BIP39 entropy with an AES-256 key derived from a deterministic signature only that device can produce. The device is required on every cold launch unlock once enabled. Losing the device strands the sandwich; restore from your 24-word paper seed in that case.")
+            Text("Enabling a hardware device adds extra protection for your identity and asset transactions. The device is then required to unlock; if you lose it, restore from your 24-word recovery phrase.")
                 .font(.caption)
         }
     }
@@ -276,11 +270,26 @@ struct IdentitySettingsView: View {
         .padding(.vertical, 2)
     }
 
-    private var footerSection: some View {
-        Section {
-            EmptyView()
+    /// Presentation relay (drop host) override + on/off (#61). The relay carries
+    /// a sealed presentation as a one-shot link when sharing over the network.
+    private var relaySection: some View {
+        @Bindable var settings = store.relaySettings
+        return Section {
+            Toggle("Use network relay", isOn: $settings.enabled)
+            if settings.enabled {
+                TextField("Relay host URL", text: $settings.host)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .keyboardType(.URL)
+                    .font(.system(.body, design: .monospaced))
+                Button("Reset to default") {
+                    settings.host = RelaySettings.defaultHost
+                }
+            }
+        } header: {
+            Text("Presentation relay")
         } footer: {
-            Text("Enabling / disabling runs FIDO2 hmac-secret enrollment over the device's existing transport. Only YubiKey enrollment needs the paid Apple Developer Program (NFC reader + accessory entitlements). Ledger and Trezor run over Bluetooth and do not need any additional iOS entitlements.")
+            Text("When on, you can share a verified credential over the internet using a private one-time link. Turn it off to share only by QR code.")
                 .font(.caption)
         }
     }

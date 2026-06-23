@@ -5,7 +5,7 @@
 //     including their own wallets (mirrored in by the wallet stores), so a POS
 //     can offer a receive-address picker instead of a raw text field.
 //   * fiat.quote({chain, network?}) -> the configured fiat code + the native
-//     coin's spot rate, so a dapp can show fiat-equivalents and offer
+//     coin's spot rate, so a app can show fiat-equivalents and offer
 //     fiat-first amount entry.
 //
 // addressBook requires the "payment" permission (it exposes the user's
@@ -86,7 +86,7 @@ final class FiatBridgeHandler: MiniAppNamespaceHandler {
             ]
             out["coinId"] = coinId.map { $0 as Any } ?? NSNull()
             // rate is null when there's no spot price (e.g. testnets): the
-            // dapp should fall back to crypto-only entry.
+            // app should fall back to crypto-only entry.
             out["rate"] = rate.map { $0 as Any } ?? NSNull()
             return out
         default:

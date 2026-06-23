@@ -129,10 +129,13 @@ func caip2Label(_ chain: String) -> String {
 }
 
 /// De-duplicated, comma-joined friendly names for a set of CAIP-2 ids.
+/// Testnet pins (Sepolia, Base Sepolia, anvil) are filtered out: end users see
+/// production chains only; testnets are admin-only in the issuer console
+/// (ADR-0040). Returns "" when only testnet anchors exist.
 func caip2LabelList(_ chains: [String]) -> String {
     var seen = Set<String>()
     var out = [String]()
-    for c in chains {
+    for c in chains where ChainMark.isProduction(c) {
         let label = caip2Label(c)
         if seen.insert(label).inserted { out.append(label) }
     }

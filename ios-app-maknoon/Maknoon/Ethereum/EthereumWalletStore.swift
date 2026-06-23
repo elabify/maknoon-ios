@@ -4,10 +4,10 @@
 // Tron + Solana stay siblings.
 //
 // Storage schema:
-//   v2 — `networks.ethereum.wallets.v2` holds an array of network
+//   v2: `networks.ethereum.wallets.v2` holds an array of network
 //        -agnostic descriptors. The per-wallet selected network
 //        lives separately at `networks.ethereum.currentNetwork.v2`.
-//   v1 — `networks.ethereum.wallets.v1` was per-(network, account)
+//   v1: `networks.ethereum.wallets.v1` was per-(network, account)
 //        descriptors. Migration on first launch under v2 dedupes
 //        by (kind, account, address) and seeds the current-network
 //        map from the original network field.
@@ -89,7 +89,7 @@ final class EthereumWalletStore {
         UserDefaults.standard.set(encodeChainNetwork(id), forKey: Self.currentChainNetworkKey)
     }
 
-    /// Convenience overload — pick a built-in case directly.
+    /// Convenience overload: pick a built-in case directly.
     func setCurrentNetwork(_ network: EthereumNetwork, for walletId: UUID) {
         setCurrentNetworkID(.builtin(network), for: walletId)
     }
@@ -290,6 +290,17 @@ final class EthereumWalletStore {
     func rename(id: UUID, to label: String) {
         guard let idx = wallets.firstIndex(where: { $0.id == id }) else { return }
         wallets[idx].label = label
+        persist()
+    }
+
+    /// Re-point an ORPHANED hardware wallet (its stored deviceId no longer
+    /// resolves in the registry) to a re-connected device that derives the SAME
+    /// address, instead of adding a duplicate (ADR-0033 relink-by-key). Only the
+    /// kind's deviceId changes.
+    func relink(walletId: UUID, toDeviceId deviceId: UUID) {
+        guard let idx = wallets.firstIndex(where: { $0.id == walletId }) else { return }
+        guard case let .hardware(_, account, address) = wallets[idx].kind else { return }
+        wallets[idx].kind = .hardware(deviceId: deviceId, account: account, address: address)
         persist()
     }
 

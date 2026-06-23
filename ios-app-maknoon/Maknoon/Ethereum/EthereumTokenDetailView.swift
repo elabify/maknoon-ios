@@ -16,6 +16,7 @@ struct EthereumTokenDetailView: View {
     @State private var loading: Bool = true
     @State private var showSend: Bool = false
     @State private var showReceive: Bool = false
+    @State private var copiedContract: Bool = false
 
     private var address: String? {
         store.ethereumWalletStore.activeWallet?.address
@@ -76,7 +77,7 @@ struct EthereumTokenDetailView: View {
                 ProgressView().controlSize(.large)
             } else {
                 Text(balance?.displayUnits(ticker: "", decimals: token.decimals, maxDecimals: 6)
-                        .trimmingCharacters(in: .whitespaces) ?? "—")
+                        .trimmingCharacters(in: .whitespaces) ?? "-")
                     .font(.system(size: 36, weight: .semibold, design: .rounded))
                     .monospacedDigit()
             }
@@ -140,18 +141,29 @@ struct EthereumTokenDetailView: View {
             metaRow("Network", token.network.displayName)
             metaRow("Symbol", token.symbol)
             metaRow("Decimals", "\(token.decimals)")
-            metaRow("Contract", token.contractAddress, monospaced: true)
+            metaRow("Contract", token.contractAddress, monospaced: true, copyable: true)
         }
         .padding(.horizontal, 16)
     }
 
-    private func metaRow(_ label: String, _ value: String, monospaced: Bool = false) -> some View {
+    private func metaRow(_ label: String, _ value: String, monospaced: Bool = false, copyable: Bool = false) -> some View {
         HStack(alignment: .top) {
             Text(label).font(.caption).foregroundStyle(.secondary).frame(width: 80, alignment: .leading)
             Text(value)
                 .font(monospaced ? .caption.monospaced() : .caption)
                 .multilineTextAlignment(.leading)
             Spacer()
+            if copyable {
+                Button {
+                    UIPasteboard.general.string = value
+                    copiedContract = true
+                } label: {
+                    Image(systemName: copiedContract ? "checkmark" : "doc.on.doc").font(.caption)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(copiedContract ? Color.green : Color.accentColor)
+                .accessibilityLabel("Copy contract address")
+            }
         }
     }
 

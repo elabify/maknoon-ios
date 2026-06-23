@@ -28,7 +28,7 @@ actor EthereumWallet {
             case .missingAddress: return "Wallet has no derived address"
             case .rpcURLInvalid:  return "Configured RPC URL is not a valid URL"
             case .rpcFailure(let m): return m
-            case .sandwichRequired: return "Identity Sandwich must be loaded to sign"
+            case .sandwichRequired: return "Maknoon is locked"
             case .hardwareSigningNotImplemented:
                 return "Hardware-wallet Ethereum signing is not yet shipped. Use a software wallet for now."
             case .insufficientBalance(let have, let need):

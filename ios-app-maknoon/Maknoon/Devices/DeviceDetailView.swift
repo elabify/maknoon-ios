@@ -27,7 +27,13 @@ struct DeviceDetailView: View {
     /// string means "no PIN" (we skip verifyPin).
     @State private var showYubiKeyPINPrompt = false
     @State private var yubiKeyPin: String = ""
+    /// Shown once, right after enrolling a YubiKey that has no FIDO2 PIN.
+    @State private var noPinWarning = false
     @State private var removeAuthForDeviceId: UUID? = nil
+    /// When true, the demote sheet was opened by "Remove device" (not the
+    /// standalone "Remove from Identity Sandwich"), so on a successful demote we
+    /// also forget the device and dismiss (#79).
+    @State private var removeDeviceAfterDemote = false
     /// Populated when the user taps "Add device to Identity Sandwich"
     /// for a Ledger / Trezor. Drives the pre-tap "open the Ethereum
     /// app" readiness sheet before Maknoon opens BLE for the wrap
@@ -64,11 +70,23 @@ struct DeviceDetailView: View {
                 yubiKeyPin = ""
             }
         } message: {
-            Text("Enter your YubiKey FIDO2 PIN. Leave blank if no PIN is set on the key.")
+            Text("If your YubiKey has a FIDO2 PIN, enter it now. Leave blank if the key has no PIN (it will register as a tap-only key).")
+        }
+        .alert("Registered without a PIN", isPresented: $noPinWarning) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("This YubiKey has no FIDO2 PIN, so anyone holding it can unlock your identity with a tap. For a second factor you can rely on, set a PIN on the key (Yubico Authenticator) and re-register it.")
         }
         .sheet(item: removeAuthBinding) { dev in
             RemoveFromSandwichSheet(deviceToRemove: dev) { _ in
                 removeAuthForDeviceId = nil
+                // If this demote was triggered by "Remove device", finish the
+                // job: forget the device and close the detail screen.
+                if removeDeviceAfterDemote {
+                    removeDeviceAfterDemote = false
+                    store.devices.remove(id: dev.id)
+                    dismiss()
+                }
             }
             .environment(store)
         }
@@ -154,31 +172,39 @@ struct DeviceDetailView: View {
                         Image(systemName: "checkmark.shield.fill")
                             .foregroundStyle(.green)
                         VStack(alignment: .leading) {
-                            Text("Active second factor for the Identity Sandwich")
+                            Text("Active second factor")
                                 .font(.callout.weight(.semibold))
                             Text("Enrolled \(formatRelative(promo.enrolledAt))")
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                     }
-                    Button(role: .destructive) {
-                        // Show the step-up auth sheet. Any enrolled
-                        // device must tap to authorize the removal,
-                        // preventing a drive-by attacker on an
-                        // unlocked phone from silently stripping
-                        // enrolled devices.
-                        removeAuthForDeviceId = dev.id
-                    } label: {
-                        Label("Remove from Identity Sandwich", systemImage: "minus.circle")
+                    // A YubiKey is identity-only, so its removal is the single
+                    // "Remove device" action below (demote + forget). Only the
+                    // wallet-capable Ledger/Trezor offer a demote-but-keep here.
+                    if dev.kind != .yubikey {
+                        Button(role: .destructive) {
+                            // Show the step-up auth sheet. Any enrolled
+                            // device must tap to authorize the removal,
+                            // preventing a drive-by attacker on an
+                            // unlocked phone from silently stripping
+                            // enrolled devices.
+                            removeAuthForDeviceId = dev.id
+                        } label: {
+                            Label("Remove second factor", systemImage: "minus.circle")
+                        }
+                        .disabled(promotingIdentity)
                     }
-                    .disabled(promotingIdentity)
+                } else if dev.kind == .yubikey {
+                    // YubiKeys enroll automatically at registration (#79); there
+                    // is no manual "add" step. A bare YubiKey only appears if a
+                    // registration was interrupted -- re-register it.
+                    Text("A YubiKey becomes a second factor automatically when you register it. Re-register this key to enroll it.")
+                        .font(.callout).foregroundStyle(.secondary)
                 } else {
                     Text(promotionPrompt(for: dev.kind))
                         .font(.callout).foregroundStyle(.secondary)
                     Button {
-                        if dev.kind == .yubikey {
-                            yubiKeyPin = ""
-                            showYubiKeyPINPrompt = true
-                        } else if HardwareOperationPurpose.shouldPresent(for: dev.kind) {
+                        if HardwareOperationPurpose.shouldPresent(for: dev.kind) {
                             pendingReadyOp = PendingHardwareOperation(
                                 device: dev,
                                 purpose: .identitySandwichEnroll
@@ -189,7 +215,7 @@ struct DeviceDetailView: View {
                     } label: {
                         HStack {
                             if promotingIdentity { ProgressView().controlSize(.small) }
-                            Label(promotingIdentity ? "Promoting…" : "Add device to Identity Sandwich", systemImage: "shield.lefthalf.filled")
+                            Label(promotingIdentity ? "Promoting…" : "Add device as second factor", systemImage: "shield.lefthalf.filled")
                         }
                     }
                     .disabled(promotingIdentity)
@@ -201,7 +227,7 @@ struct DeviceDetailView: View {
                     Text(identityError).font(.caption).foregroundStyle(.red)
                 }
             } header: {
-                Text("Identity Sandwich")
+                Text("Second factor")
             } footer: {
                 Text(promotionFooter(for: dev.kind)).font(.caption)
             }
@@ -223,7 +249,7 @@ struct DeviceDetailView: View {
             // skeleton pending hardware iteration.
             return "Enrollment runs over the device's existing Bluetooth transport. No additional iOS entitlements are required."
         case .seedsigner:
-            return "SeedSigner is Bitcoin-only and cannot participate in the Identity Sandwich. Use a Ledger or YubiKey to wrap the identity."
+            return "SeedSigner is Bitcoin-only and cannot be a second factor. Use a Ledger or YubiKey to protect your wallet."
         }
     }
 
@@ -263,8 +289,8 @@ struct DeviceDetailView: View {
 
     /// Start a one-second-tick countdown bound to `secondsRemaining`.
     /// Cancels any prior countdown so a quick retry doesn't double-
-    /// fire. The body itself isn't a real timeout on our side —
-    /// signMessage's BLE call has no client-side timeout — but it
+    /// fire. The body itself isn't a real timeout on our side
+    /// (signMessage's BLE call has no client-side timeout), but it
     /// matches the Ledger's internal sign-prompt timeout so the
     /// user knows how much real time is left.
     @MainActor
@@ -297,7 +323,7 @@ struct DeviceDetailView: View {
         case .yubikey:
             return "Tap the YubiKey when it flashes. iOS holds the NFC session open for ~60s."
         case .seedsigner:
-            return "SeedSigner is Bitcoin-only and never enrolls in the Identity Sandwich."
+            return "SeedSigner is Bitcoin-only and never enrolls as a second factor."
         }
     }
 
@@ -322,13 +348,13 @@ struct DeviceDetailView: View {
     private func promotionPrompt(for kind: DeviceKind) -> String {
         switch kind {
         case .yubikey:
-            return "Add this YubiKey to the Identity Sandwich. Tap the YubiKey to the top of the iPhone when iOS shows the NFC sheet. Maknoon enrolls a FIDO2 credential and derives a deterministic ECDSA-based wrap key so the YubiKey can re-protect your recovery phrase. NFC tap only takes a second."
+            return "Add this YubiKey as a second factor. Tap the YubiKey to the top of the iPhone when iOS shows the NFC sheet. Maknoon enrolls a FIDO2 credential and derives a deterministic ECDSA-based wrap key so the YubiKey can re-protect your recovery phrase. NFC tap only takes a second."
         case .ledger:
-            return "Add this Ledger to the Identity Sandwich. Unlock the Ledger and open the ETHEREUM app on the device, then tap Add. Maknoon will reconnect over BLE, confirm the same serial, and sign a one-time wrap challenge whose deterministic signature derives the AES key that seals your BIP39 entropy. Confirm the prompt on the device."
+            return "Add this Ledger as a second factor. Unlock the Ledger and open the ETHEREUM app on the device, then tap Add. Maknoon will reconnect over BLE, confirm the same serial, and sign a one-time wrap challenge whose deterministic signature derives the AES key that seals your BIP39 entropy. Confirm the prompt on the device."
         case .trezor:
-            return "Add this Trezor to the Identity Sandwich. Unlock the device and confirm the wrap signature on-screen."
+            return "Add this Trezor as a second factor. Unlock the device and confirm the wrap signature on-screen."
         case .seedsigner:
-            return "SeedSigner is Bitcoin-only and cannot wrap the Identity Sandwich."
+            return "SeedSigner is Bitcoin-only and cannot be a second factor."
         }
     }
 
@@ -337,13 +363,20 @@ struct DeviceDetailView: View {
     private func dangerSection(_ dev: RegisteredDevice) -> some View {
         Section {
             Button(role: .destructive) {
-                store.devices.remove(id: dev.id)
-                dismiss()
+                if dev.promotions.identity != nil {
+                    // Enrolled as an identity factor: removing the device must
+                    // first demote it (step-up auth, anti-brick), then forget.
+                    removeDeviceAfterDemote = true
+                    removeAuthForDeviceId = dev.id
+                } else {
+                    store.devices.remove(id: dev.id)
+                    dismiss()
+                }
             } label: {
                 Label("Remove device", systemImage: "trash")
             }
         } footer: {
-            Text("Removes the device from Maknoon. Wallets created from this device on any network stay in the wallet list (you can still see them in watch-only mode), but signing on those wallets fails until you re-register the device.")
+            Text("Removes the device from Maknoon. If it's a second factor, you'll first authorize the removal on the device, then it's dropped as a factor and forgotten. Wallets created from this device stay in the wallet list (watch-only) until you re-register it.")
                 .font(.caption)
         }
     }
@@ -360,104 +393,126 @@ struct DeviceDetailView: View {
             stopCountdown()
         }
         do {
+            guard let liveSandwich = store.sandwich else {
+                throw SandwichError.masterUnavailable
+            }
+            // ADR-0032: when the second factor is already on (other
+            // devices enrolled), recover the SHARED CEK by tapping an
+            // already-enrolled device first, then reuse it for the new
+            // device so every device opens the same sealed entropy. The
+            // common first-device case has no existing CEK (nil mints a
+            // fresh one). This is the simplified, correct two-tap add.
+            let existingCek = try await recoverExistingCekIfNeeded(excluding: dev.id)
+
+            // Generate the deviceSalt up-front so the same value drives
+            // both the device's deterministic secret and the HKDF wrap
+            // key (ADR-0032).
+            let deviceSalt = SecondFactorWrap.newDeviceSalt()
+            let secret: Data
+            var credentialIdHex = dev.serial
+            var pinProtected = true
             switch dev.kind {
             case .yubikey:
-                // YubiKey FIDO2 hmac-pattern over NFC. Generate the
-                // wrap salt up-front so the same value drives both
-                // the YubiKey's deterministic ECDSA signature (via
-                // a salt-derived clientDataHash) and our HKDF wrap
-                // key derivation. iOS shows its native NFC sheet;
-                // the user taps the YubiKey to the top of the
-                // phone.
-                var saltBytes = [UInt8](repeating: 0, count: 32)
-                let status = SecRandomCopyBytes(kSecRandomDefault, 32, &saltBytes)
-                guard status == errSecSuccess else {
-                    throw IdentityWrapError.sealFailed("SecRandomCopyBytes failed: \(status)")
-                }
-                let salt = Data(saltBytes)
-                // Use the FIDO2 hmac-secret extension as the wrap-key
-                // source. Raw getAssertion signatures (the previous
-                // path) are non-deterministic across calls because
-                // the authData signature counter increments, which
-                // broke every unlock. hmac-secret produces a
-                // deterministic per-(credential, salt) output so the
-                // wrap key reproduces on every unlock.
+                // FIDO2 hmac-secret over NFC. The salt IS the deviceSalt.
                 let result = try await YubiKeyClient.shared.enrollHMACSecretOverNFC(
                     label: dev.label,
-                    salt: salt,
+                    salt: deviceSalt,
                     deviceSerial: dev.serial,
                     pin: yubiKeyPin.isEmpty ? nil : yubiKeyPin
                 )
                 yubiKeyPin = ""
-                guard let liveSandwich = store.sandwich else {
-                    throw SandwichError.masterUnavailable
-                }
-                let promotion = try await IdentitySandwich.promoteWithSecret(
-                    sandwich: liveSandwich,
-                    device: dev,
-                    secret: result.secret,
-                    salt: salt
-                )
-                // The biometric Keychain item is gone if this was the
-                // first enrolled device. Push the just-read entropy
-                // into the live sandwich's session cache so backup /
-                // reveal phrase / delegation renewal keep working
-                // in this session.
-                store.sandwich?.cacheRecoveryMaterial(promotion.material)
-                store.devices.setIdentityPromotion(
-                    deviceId: dev.id,
-                    promotion: RegisteredDevice.IdentityPromotion(
-                        credentialIdHex: result.credentialIdHex,
-                        enrolledAt: promotion.wrapped.wrappedAt,
-                        wrapProtocolVersion: 2
-                    )
-                )
+                secret = result.secret
+                credentialIdHex = result.credentialIdHex
+                pinProtected = result.pinProtected
             case .ledger, .trezor:
-                try await promoteViaPersonalSign(dev)
+                let hardwareKind: HardwareWalletKind = dev.kind == .ledger ? .ledger : .trezor
+                let hardware = HardwareWalletFactory.make(kind: hardwareKind)
+                let connectedSerial = try await hardware.identifyDevice()
+                guard connectedSerial == dev.serial else {
+                    throw IdentityWrapError.deviceSerialMismatch(expected: dev.serial, actual: connectedSerial)
+                }
+                let challenge = SecondFactorSignature.challenge(deviceSalt: deviceSalt)
+                let sig = try await hardware.signMessage(challenge)
+                secret = SecondFactorSignature.secret(fromSignature: sig)
             case .seedsigner:
-                throw HardwareWalletError.transport("SeedSigner is Bitcoin-only and cannot wrap the Identity Sandwich.")
+                throw HardwareWalletError.transport("SeedSigner is Bitcoin-only and cannot be a second factor.")
+            }
+
+            let seal = try IdentitySandwich.sealForSecondFactorEnroll(
+                sandwich: liveSandwich,
+                device: dev,
+                secret: secret,
+                deviceSalt: deviceSalt,
+                existingCek: existingCek
+            )
+            // The plain biometric item is gone after the first
+            // enrollment; push the entropy into the live sandwich's
+            // session cache so backup / reveal / renewal keep working.
+            store.sandwich?.cacheRecoveryMaterial(seal.material)
+            store.devices.setIdentityPromotion(
+                deviceId: dev.id,
+                promotion: RegisteredDevice.IdentityPromotion(
+                    credentialIdHex: credentialIdHex,
+                    enrolledAt: Date(),
+                    wrapProtocolVersion: 2,
+                    pinProtected: pinProtected,
+                    deviceSaltHex: bytesToHexLocal(deviceSalt),
+                    wrappedCekHex: seal.wrappedCekHex
+                )
+            )
+            if dev.kind == .yubikey, !pinProtected {
+                noPinWarning = true
             }
         } catch {
             identityError = userFacingYubiKeyMessage(for: error)
         }
     }
 
+    /// Recover the shared CEK from an already-enrolled device so a NEW
+    /// device can reuse it (ADR-0032 multi-device OR). Returns nil when
+    /// no other device carries a CEK wrap (the first-device case, where
+    /// a fresh CEK is minted). Taps one enrolled device.
     @MainActor
-    private func promoteViaPersonalSign(_ dev: RegisteredDevice) async throws {
-        let hardwareKind: HardwareWalletKind = dev.kind == .ledger ? .ledger : .trezor
-        let hardware = HardwareWalletFactory.make(kind: hardwareKind)
-        // Confirm the connected device is the same one we registered.
-        let connectedSerial = try await hardware.identifyDevice()
-        guard connectedSerial == dev.serial else {
-            throw IdentityWrapError.deviceSerialMismatch(
-                expected: dev.serial,
-                actual: connectedSerial
-            )
+    private func recoverExistingCekIfNeeded(excluding newDeviceId: UUID) async throws -> Data? {
+        guard try IdentitySandwich.isSecondFactorOn() else { return nil }
+        // Fast path: the CEK is cached in-session (the user unlocked or
+        // enrolled the first device this session), so we can wrap it for
+        // the new device WITHOUT tapping an already-enrolled key. This is
+        // the common case and means "add a second factor" taps only the
+        // new device, never silently pulls in the Ledger/YubiKey.
+        if let cached = store.sandwich?.cachedSecondFactorCek { return cached }
+        guard let authorizer = store.devices.devices.first(where: {
+            $0.id != newDeviceId && $0.promotions.identity?.hasSecondFactorWrap == true
+        }), let promo = authorizer.promotions.identity, let saltHex = promo.deviceSaltHex else {
+            // 2FA on but nothing to recover the CEK with (the clean-cut
+            // migration state). Cannot add a device here; the user must
+            // restore from backup first.
+            throw IdentityWrapError.sealFailed("Your existing security key enrollment is from an older version. Restore from your encrypted backup, then add this device.")
         }
-        // Wrap. The HardwareWallet implementation owns the personal
-        // _sign APDU; on simulator the MockHardwareWallet returns a
-        // deterministic SHA-based pseudo-sig so the flow runs end
-        // to end.
-        guard let liveSandwich = store.sandwich else {
-            throw SandwichError.masterUnavailable
-        }
-        let promotion = try await IdentitySandwich.promoteToHardware(
-            sandwich: liveSandwich,
-            device: dev,
-            hardware: hardware
-        )
-        // Cache the just-read entropy on the live sandwich so
-        // in-session reveal / backup / delegation renewal calls
-        // survive the biometric-Keychain-item deletion that fires
-        // on first hardware enrollment.
-        store.sandwich?.cacheRecoveryMaterial(promotion.material)
-        store.devices.setIdentityPromotion(
-            deviceId: dev.id,
-            promotion: RegisteredDevice.IdentityPromotion(
-                credentialIdHex: promotion.wrapped.deviceSerial,
-                enrolledAt: promotion.wrapped.wrappedAt
+        let deviceSalt = bytesFromHexLocal(saltHex)
+        let secret: Data
+        switch authorizer.kind {
+        case .yubikey:
+            secret = try await YubiKeyClient.shared.recomputeHMACSecretOverNFC(
+                credentialIdHex: promo.credentialIdHex,
+                salt: deviceSalt,
+                deviceSerial: authorizer.serial,
+                pin: yubiKeyPin.isEmpty ? nil : yubiKeyPin
             )
-        )
+        case .ledger, .trezor:
+            let hwKind: HardwareWalletKind = authorizer.kind == .ledger ? .ledger : .trezor
+            let hardware = HardwareWalletFactory.make(kind: hwKind)
+            let connectedSerial = try await hardware.identifyDevice()
+            guard connectedSerial == authorizer.serial else {
+                throw IdentityWrapError.deviceSerialMismatch(expected: authorizer.serial, actual: connectedSerial)
+            }
+            let challenge = SecondFactorSignature.challenge(deviceSalt: deviceSalt)
+            let sig = try await hardware.signMessage(challenge)
+            secret = SecondFactorSignature.secret(fromSignature: sig)
+        case .seedsigner:
+            throw HardwareWalletError.transport("SeedSigner cannot recover the second factor.")
+        }
+        return try IdentitySandwich.recoverCek(device: authorizer, secret: secret)
     }
 
     private func formatRelative(_ date: Date) -> String {

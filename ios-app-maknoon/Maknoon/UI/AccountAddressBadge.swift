@@ -14,7 +14,7 @@ import UIKit
 
 struct AccountAddressBadge: View {
     /// BIP44-style account index. Kept on the API for source compat
-    /// with existing call sites, but no longer rendered — the
+    /// with existing call sites, but no longer rendered, the
     /// wallet picker above the badge already shows the account
     /// number (e.g. "Account 0") in its subtitle.
     let accountIndex: UInt32?

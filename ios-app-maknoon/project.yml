@@ -43,7 +43,7 @@ settings:
     # isolated SWIFT_VERSION.
     SWIFT_VERSION: "5.10"
     IPHONEOS_DEPLOYMENT_TARGET: "26.0"
-    MARKETING_VERSION: "0.5.2"
+    MARKETING_VERSION: "0.6.0"
     CURRENT_PROJECT_VERSION: "1"
     # MAKNOON_NFC gates NFC code paths (ID document scanning via
     # NFCPassportReader, YubiKey FIDO2 hmac-secret over NFC).
@@ -204,7 +204,7 @@ targets:
         LSRequiresIPhoneOS: true
         NSFaceIDUsageDescription: Maknoon uses Face ID to unlock the app and authorize signing with your wallet and credential keys.
         NSCameraUsageDescription: Maknoon needs camera access to scan QR codes from issuers when you receive a credential.
-        NSBluetoothAlwaysUsageDescription: Maknoon uses Bluetooth to share a signed credential directly with another phone in the room. No data is sent to a server.
+        NSBluetoothAlwaysUsageDescription: Maknoon uses Bluetooth to connect to a Ledger hardware wallet for signing. No data is sent to a server.
         # NOTE: we intentionally do NOT declare
         # UISupportedExternalAccessoryProtocols / com.yubico.ylp. That
         # protocol is the YubiKey 5Ci *Lightning* (iAP2) accessory path,

@@ -30,7 +30,7 @@ struct EthereumTokenRow: View {
                 }
                 Spacer()
                 Text(balance?.displayUnits(ticker: "", decimals: token.decimals, maxDecimals: 4)
-                        .trimmingCharacters(in: .whitespaces) ?? "—")
+                        .trimmingCharacters(in: .whitespaces) ?? "-")
                     .font(.callout.monospaced())
                 Image(systemName: "chevron.forward")
                     .font(.caption.weight(.semibold))

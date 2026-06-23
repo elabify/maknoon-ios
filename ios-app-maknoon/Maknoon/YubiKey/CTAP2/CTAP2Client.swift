@@ -90,17 +90,24 @@ struct CTAP2Client {
 
     // MARK: -- authenticatorGetInfo (0x04)
 
-    /// Returns the authenticator's supported extension names. Used to
-    /// verify the device supports hmac-secret before enrollment so we
-    /// can surface a useful error if the user pairs a key whose
-    /// firmware predates that extension.
-    func getInfoExtensions() async throws -> [String] {
+    /// Subset of authenticatorGetInfo (0x04) Maknoon needs: the supported
+    /// extension names (map key 2) and the `clientPin` option (map key 4).
+    struct GetInfo {
+        let extensions: [String]
+        /// `options.clientPin`: `true` = a PIN is set on the key; `false` =
+        /// clientPin is supported but no PIN has been set yet; `nil` = the
+        /// option is absent (clientPin unsupported, or no options map). This
+        /// is the difference between "enter your PIN" and "set a PIN first".
+        let clientPinSet: Bool?
+    }
+
+    /// One getInfo round trip returning the extensions + the clientPin state.
+    func getInfo() async throws -> GetInfo {
         let resp = try await exchangeCommand(0x04, payload: .map([]))
-        // Map key 2 in getInfo response is "extensions": array of strings.
-        guard let ext = resp.entry(forIntKey: 2)?.asArray else {
-            return []
-        }
-        return ext.compactMap { $0.asString }
+        let exts = (resp.entry(forIntKey: 2)?.asArray ?? []).compactMap { $0.asString }
+        // Map key 4 is "options": a map of String -> Bool.
+        let clientPin = resp.entry(forIntKey: 4)?.entry(forTextKey: "clientPin")?.asBool
+        return GetInfo(extensions: exts, clientPinSet: clientPin)
     }
 
     // MARK: -- authenticatorClientPIN (0x06)
@@ -168,20 +175,21 @@ struct CTAP2Client {
         let credentialId: Data
     }
 
-    /// makeCredential with `extensions = {"hmac-secret": true}`. UV
-    /// is gated by `pinUvAuthParam` (mandatory on PIN-protected
-    /// YubiKeys).
+    /// makeCredential with `extensions = {"hmac-secret": true}`. When
+    /// `pinUvAuthParam` is non-nil (the key has a PIN set) it is sent to
+    /// satisfy user verification; when nil (a no-PIN key) the keys 8/9 are
+    /// omitted and the authenticator gates on user presence (the touch) alone.
     func makeCredentialHMACSecret(
         rpId: String,
         rpName: String,
         userId: Data,
         userName: String,
         clientDataHash: Data,
-        pinUvAuthParam: Data
+        pinUvAuthParam: Data?
     ) async throws -> MakeCredentialResult {
         // {1: clientDataHash, 2: rp, 3: user, 4: pubKeyCredParams,
-        //  6: extensions, 7: options, 8: pinUvAuthParam, 9: pinUvAuthProtocol}
-        let request: CBORValue = .map([
+        //  6: extensions, [8: pinUvAuthParam, 9: pinUvAuthProtocol]}
+        var entries: [CBORMapEntry] = [
             CBORMapEntry(key: .intKey(1), value: .byteString(clientDataHash)),
             CBORMapEntry(key: .intKey(2), value: .map([
                 CBORMapEntry(key: .textString("id"), value: .textString(rpId)),
@@ -201,10 +209,12 @@ struct CTAP2Client {
             CBORMapEntry(key: .intKey(6), value: .map([
                 CBORMapEntry(key: .textString("hmac-secret"), value: .bool(true)),
             ])),
-            CBORMapEntry(key: .intKey(8), value: .byteString(pinUvAuthParam)),
-            CBORMapEntry(key: .intKey(9), value: .unsignedInt(1)),
-        ])
-        let resp = try await exchangeCommand(0x01, payload: request)
+        ]
+        if let pinUvAuthParam {
+            entries.append(CBORMapEntry(key: .intKey(8), value: .byteString(pinUvAuthParam)))
+            entries.append(CBORMapEntry(key: .intKey(9), value: .unsignedInt(1)))
+        }
+        let resp = try await exchangeCommand(0x01, payload: .map(entries))
         // {1: fmt, 2: authData, 3: attStmt}
         guard let authData = resp.entry(forIntKey: 2)?.asBytes else {
             throw CTAP2Error.missingField("authData (response map key 2)")
@@ -233,7 +243,7 @@ struct CTAP2Client {
         platformPriv: P256.KeyAgreement.PrivateKey,
         authenticatorPub: P256.KeyAgreement.PublicKey,
         sharedSecret: Data,
-        pinUvAuthParam: Data
+        pinUvAuthParam: Data?
     ) async throws -> AssertionHMACSecretResult {
         precondition(salt.count == 32, "hmac-secret salt1 must be exactly 32 bytes")
         // saltEnc = AES-256-CBC(shared, IV=0, salt)
@@ -252,7 +262,7 @@ struct CTAP2Client {
         // getAssertion request:
         //   {1: rpId, 2: clientDataHash, 3: allowList,
         //    4: extensions, 6: pinUvAuthParam, 7: pinUvAuthProtocol}
-        let request: CBORValue = .map([
+        var entries: [CBORMapEntry] = [
             CBORMapEntry(key: .intKey(1), value: .textString(rpId)),
             CBORMapEntry(key: .intKey(2), value: .byteString(clientDataHash)),
             CBORMapEntry(key: .intKey(3), value: .array([
@@ -264,10 +274,12 @@ struct CTAP2Client {
             CBORMapEntry(key: .intKey(4), value: .map([
                 CBORMapEntry(key: .textString("hmac-secret"), value: hmacSecretExt),
             ])),
-            CBORMapEntry(key: .intKey(6), value: .byteString(pinUvAuthParam)),
-            CBORMapEntry(key: .intKey(7), value: .unsignedInt(1)),
-        ])
-        let resp = try await exchangeCommand(0x02, payload: request)
+        ]
+        if let pinUvAuthParam {
+            entries.append(CBORMapEntry(key: .intKey(6), value: .byteString(pinUvAuthParam)))
+            entries.append(CBORMapEntry(key: .intKey(7), value: .unsignedInt(1)))
+        }
+        let resp = try await exchangeCommand(0x02, payload: .map(entries))
         // {2: authData, 3: signature, ...}
         guard let authData = resp.entry(forIntKey: 2)?.asBytes else {
             throw CTAP2Error.missingField("authData (response map key 2)")

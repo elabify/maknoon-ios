@@ -9,10 +9,10 @@
 // to nearby devices.
 //
 // GATT layout per ADR-0028:
-//   handshake — write (no response). Verifier writes encapsulated key.
-//   payload   — write w/ response + notify. Sealed Presentation flows
+//   handshake: write (no response). Verifier writes encapsulated key.
+//   payload  : write w/ response + notify. Sealed Presentation flows
 //               here (verifier reads via notify).
-//   status    — notify. One-shot completion signal.
+//   status   : notify. One-shot completion signal.
 //
 // The simulator has no BLE radio. On simulator builds the peripheral
 // initialises but never reaches `.poweredOn`; the share sheet

@@ -18,7 +18,9 @@ import Foundation
 struct EthereumWalletDescriptor: Codable, Identifiable, Hashable, Sendable {
     let id: UUID
     var label: String
-    let kind: EthereumWalletKind
+    // var (not let) so an orphaned hardware wallet can be re-linked to a
+    // re-connected device by repointing kind.deviceId (ADR-0033 relink-by-key).
+    var kind: EthereumWalletKind
     let createdAt: Date
     var lastSyncAt: Date?
 

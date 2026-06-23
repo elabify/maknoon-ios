@@ -30,7 +30,7 @@ enum FiatCurrencyCatalog {
         codes.sorted()
     }
 
-    /// Compact picker label: `USD ($) — US Dollar`. Sticks the
+    /// Compact picker label: `USD ($), US Dollar`. Sticks the
     /// symbol right after the code so the user can disambiguate at
     /// a glance even when several currencies share a symbol (USD,
     /// AUD, CAD all show `$`, KWD vs DZD both show "د.ك"/"د.ج",
@@ -39,7 +39,7 @@ enum FiatCurrencyCatalog {
         let upper = code.uppercased()
         let sym = symbol(code)
         let symPart = sym == upper ? "" : " (\(sym))"
-        return "\(upper)\(symPart) — \(displayName(code))"
+        return "\(upper)\(symPart), \(displayName(code))"
     }
 
     /// Localized currency name (e.g. "US Dollar", "Emirati Dirham").

@@ -1,17 +1,24 @@
 // Add an LNDHub-compatible account. Two ways in:
 //
-//   • Import — paste or scan a `lndhub://user:pass@host[:port][/path]`
+//   • Import: paste or scan a `lndhub://user:pass@host[:port][/path]`
 //     URL. Same wire format Zeus, BlueWallet, and most LNDHub
 //     front-ends use to export an account. The parsed values fill in
 //     the manual fields below so the user can sanity-check before
 //     saving.
-//   • Manual — server URL + username + password fields the user fills
+//   • Manual: server URL + username + password fields the user fills
 //     in directly. Useful for self-hosted hubs whose operator hands
 //     credentials over out-of-band.
 //
-// A single TLS toggle in the Transport section lets users opt into
-// self-signed certificates when they're running a hub behind a
-// private CA.
+// A Validate-TLS toggle sits in the credentials section so users can
+// opt into self-signed certificates when they're running a hub behind
+// a private CA.
+//
+// Lightning is an LNDHub connection (a server URL plus credentials),
+// not a seed- or hardware-derived wallet, so this add flow is a
+// connection form with no Software/Hardware source split, no Ledger or
+// Trezor, no passphrase selector, account stepper, or derivation
+// network picker. It is the documented exception to the universal
+// add-wallet anatomy (see an internal design decision).
 
 import SwiftUI
 
@@ -34,25 +41,25 @@ struct AddLightningAccountSheet: View {
             Form {
                 Section {
                     Button {
+                        showScanner = true
+                    } label: {
+                        Label("Scan lndhub:// QR", systemImage: "qrcode.viewfinder")
+                            .frame(maxWidth: .infinity)
+                    }
+                    Button {
                         if let s = UIPasteboard.general.string {
                             applyImport(s)
                         } else {
                             lastError = "Clipboard is empty."
                         }
                     } label: {
-                        Label("Paste lndhub URL", systemImage: "doc.on.clipboard")
-                            .frame(maxWidth: .infinity)
-                    }
-                    Button {
-                        showScanner = true
-                    } label: {
-                        Label("Scan lndhub QR", systemImage: "qrcode.viewfinder")
+                        Label("Paste lndhub:// URL", systemImage: "doc.on.clipboard")
                             .frame(maxWidth: .infinity)
                     }
                 } header: {
                     Text("Import")
                 } footer: {
-                    Text("Format: lndhub://user:password@host[:port][/path]. Same wire shape Zeus and BlueWallet export. Imported values fill the fields below; tap Add account to save.")
+                    Text("Scan or paste an lndhub:// connection URL. This is the de-facto BlueWallet standard, exported by Zeus, LNbits (LNDHub extension), Alby and others. Imported values fill the fields below; tap Add account to save.")
                         .font(.caption)
                 }
 
@@ -71,17 +78,12 @@ struct AddLightningAccountSheet: View {
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
                         .font(.system(.caption, design: .monospaced))
-                } header: {
-                    Text("Server credentials")
-                }
-
-                Section {
                     Toggle("Validate TLS certificate", isOn: Binding(
                         get: { !allowInsecureTLS },
                         set: { allowInsecureTLS = !$0 }
                     ))
                 } header: {
-                    Text("Transport")
+                    Text("Server credentials")
                 } footer: {
                     Text("Disable TLS validation only if your hub uses a self-signed certificate you trust.")
                         .font(.caption)
@@ -132,7 +134,12 @@ struct AddLightningAccountSheet: View {
     private func applyImport(_ raw: String) {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let parsed = LightningAccountStore.parseImportURL(trimmed) else {
-            lastError = "Could not parse the URL. Expected lndhub://user:password@host[:port][/path]."
+            let lower = trimmed.lowercased()
+            if lower.hasPrefix("http://") || lower.hasPrefix("https://") {
+                lastError = "That looks like a web wallet page link, not an LNDHub connection. In LNbits, enable the LNDHub extension, open it, and scan the admin QR (an lndhub:// URL)."
+            } else {
+                lastError = "Could not read an lndhub:// connection URL. Expected lndhub://login:password@host (the LNDHub extension QR)."
+            }
             return
         }
         lastError = nil
@@ -179,7 +186,7 @@ private struct ScanLNDHubSheet: View {
         NavigationStack {
             QRScannerView(onCode: onScan)
                 .ignoresSafeArea()
-                .navigationTitle("Scan lndhub QR")
+                .navigationTitle("Scan lndhub:// QR")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {

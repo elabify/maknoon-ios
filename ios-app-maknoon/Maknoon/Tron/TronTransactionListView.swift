@@ -174,7 +174,7 @@ struct TronTxRow: View {
         guard let sun = tx.nativeSunAmount, sun > 0 else {
             // TRC-20 or non-transfer: no native amount we can decode
             // cheaply. Display the contract type for context.
-            return tx.contractType == "TriggerSmartContract" ? "TRC-20" : "—"
+            return tx.contractType == "TriggerSmartContract" ? "TRC-20" : "-"
         }
         let trx = Double(sun) / 1_000_000.0
         let f = NumberFormatter()

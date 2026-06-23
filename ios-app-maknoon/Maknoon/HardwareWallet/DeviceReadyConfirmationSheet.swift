@@ -66,19 +66,40 @@ struct DeviceReadyConfirmationSheet: View {
     /// passphrase field here and require it before Continue. The typed
     /// value is handed back via `onPassphrase` and never stored.
     var requiresPassphrase: Bool = false
+    /// When true (Trezor ADD / DISCOVER, ADR-0033), this sheet is the
+    /// connection step that collects the hidden-wallet passphrase choice
+    /// (None / On Device / Type Here + masked field). The ONE choice
+    /// applies to BOTH adding and discovering; it is handed back via
+    /// `onPassphraseSelection` just before `onContinue`. Continue is
+    /// disabled until a Type-Here passphrase is non-empty. Ledger never
+    /// sets this (its passphrase lives on the device).
+    var showsPassphraseSelector: Bool = false
     let onContinue: () -> Void
     let onCancel: () -> Void
     /// Called with the passphrase the user typed, just before
     /// `onContinue`, when `requiresPassphrase` is set. Nil otherwise.
     var onPassphrase: ((String) -> Void)? = nil
+    /// Called with the chosen hidden-wallet selection + host-typed
+    /// passphrase, just before `onContinue`, when `showsPassphraseSelector`
+    /// is set. Nil otherwise. The secret is never stored.
+    var onPassphraseSelection: ((HiddenWalletSelection, String) -> Void)? = nil
 
     /// Re-typed each presentation; the sheet is rebuilt by
     /// `.sheet(item:)` so this never carries over between signings.
     @State private var passphrase: String = ""
+    /// Trezor connection-step hidden-wallet choice + masked passphrase.
+    @State private var selection: HiddenWalletSelection = .standard
+    @State private var selectionPassphrase: String = ""
+    @State private var revealSelectionPassphrase: Bool = false
 
     private var passphraseMissing: Bool {
         requiresPassphrase
             && passphrase.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    private var selectionNotReady: Bool {
+        showsPassphraseSelector
+            && !selection.isReady(hostPassphrase: selectionPassphrase)
     }
 
     var body: some View {
@@ -114,6 +135,40 @@ struct DeviceReadyConfirmationSheet: View {
                             .font(.caption)
                     }
                 }
+                if showsPassphraseSelector {
+                    Section {
+                        Picker("Passphrase", selection: $selection) {
+                            ForEach(HiddenWalletSelection.allCases) { mode in
+                                Text(selectorLabel(mode)).tag(mode)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        if selection == .hostTyped {
+                            HStack {
+                                Group {
+                                    if revealSelectionPassphrase {
+                                        TextField("Passphrase", text: $selectionPassphrase)
+                                    } else {
+                                        SecureField("Passphrase", text: $selectionPassphrase)
+                                    }
+                                }
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                Button {
+                                    revealSelectionPassphrase.toggle()
+                                } label: {
+                                    Image(systemName: revealSelectionPassphrase ? "eye.slash" : "eye")
+                                }
+                                .buttonStyle(.borderless)
+                            }
+                        }
+                    } header: {
+                        Text("Passphrase")
+                    } footer: {
+                        Text("Wake your \(device.kind.displayName) and approve the prompt when it appears, then tap Continue. A hidden-wallet passphrase opens a different wallet, so it applies to both adding and discovering.")
+                            .font(.caption)
+                    }
+                }
                 Section {
                     Text(timeoutHint)
                         .font(.caption)
@@ -139,13 +194,27 @@ struct DeviceReadyConfirmationSheet: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Continue") {
                         if requiresPassphrase { onPassphrase?(passphrase) }
+                        if showsPassphraseSelector {
+                            onPassphraseSelection?(selection, selectionPassphrase)
+                        }
                         onContinue()
                         dismiss()
                     }
                     .fontWeight(.semibold)
-                    .disabled(passphraseMissing)
+                    .disabled(passphraseMissing || selectionNotReady)
                 }
             }
+        }
+    }
+
+    /// ADR-0033 UI-layer labels for the hidden-wallet selector chips:
+    /// None / On Device / Type Here (the SDK enum's Standard / On device /
+    /// Type here, remapped for the agreed copy without touching semantics).
+    private func selectorLabel(_ mode: HiddenWalletSelection) -> String {
+        switch mode {
+        case .standard:  return "None"
+        case .onDevice:  return "On Device"
+        case .hostTyped: return "Type Here"
         }
     }
 

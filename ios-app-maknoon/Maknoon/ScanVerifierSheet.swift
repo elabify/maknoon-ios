@@ -328,7 +328,7 @@ struct ScanVerifierSheet: View {
             let when = (obj["screenedAt"] as? String).map { String($0.prefix(10)) } ?? ""
             return when.isEmpty ? "Sanctions: \(result)" : "Sanctions: \(result) (screened \(when))"
         }
-        return c.claims[key]?.displayText ?? "—"
+        return c.claims[key]?.displayText ?? "-"
     }
 
     // MARK: -- trust badge
@@ -362,7 +362,7 @@ struct ScanVerifierSheet: View {
         // Unified entry: a merchant Verify & Pay code is a short request URL.
         // Fetch it; if it resolves to a CommerceRequest (has payment terms), open
         // the single-confirm Verify & Pay sheet. Otherwise it's a plain verifier
-        // request_uri — fall through to the identity validate path.
+        // request_uri, fall through to the identity validate path.
         if let url = URL(string: trimmed), let scheme = url.scheme?.lowercased(),
            scheme == "https" || scheme == "http" {
             phase = .validating(payload: code)

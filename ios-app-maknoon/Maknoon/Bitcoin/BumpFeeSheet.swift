@@ -5,8 +5,8 @@
 // sign (software / hardware BLE), broadcast as a separate step.
 //
 // The replacement tx reuses the same recipients + amounts as the
-// original — BDK's BumpFeeTxBuilder pulls those from the wallet's
-// stored tx history — so the user only chooses the new fee rate.
+// original (BDK's BumpFeeTxBuilder pulls those from the wallet's
+// stored tx history), so the user only chooses the new fee rate.
 
 import SwiftUI
 import BitcoinDevKit
@@ -223,7 +223,7 @@ struct BumpFeeSheet: View {
         case .software: return "Sign replacement"
         case .hardwareBLE:
             let name = boundDevice?.label ?? "device"
-            return "Sign using Hardware Wallet — \(name)"
+            return "Sign using Hardware Wallet, \(name)"
         case .airgappedPSBT: return "Bump unsupported for this wallet"
         }
     }

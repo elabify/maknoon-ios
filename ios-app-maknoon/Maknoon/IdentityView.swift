@@ -1,4 +1,4 @@
-// Identity tab — primary home for verified credentials.
+// Identity tab, primary home for verified credentials.
 //
 // Layout, top to bottom:
 //   1. Compact identity header (collapsed by default, tap to expand).
@@ -59,20 +59,23 @@ struct IdentityView: View {
                     pendingPickupsSection
                 }
 
-                // Unified card stack: verified credentials AND
-                // scanned passports render with the same Apple-Wallet
-                // shape, sorted alphabetically by type, nickname,
-                // issuer. The empty state shows only when there are
-                // no cards of either kind.
+                // Two distinct sections (ADR-0037): verified Credentials and ID
+                // documents. A single folder strip governs BOTH: a folder may
+                // hold credentials and/or ID documents, so selecting one filters
+                // both sections. The empty state shows only when there are no
+                // cards of either kind.
                 if walletCards.isEmpty {
                     emptyState
                 } else {
+                    // One unsectioned list (ADR-0039): a passport folds its
+                    // scanned chip + issued credential into a single card, so
+                    // the old "Credentials" / "ID documents" split is gone.
                     folderStrip
-                    if displayedCards.isEmpty {
+                    let all = (displayedCredentialCards + displayedPassportCards).sorted(by: Self.cardSort)
+                    if activeFolderId != nil && all.isEmpty {
                         folderEmptyState
-                    } else {
-                        credentialStack
                     }
+                    cardStack(all)
                 }
             }
             .padding(.horizontal, 16)
@@ -103,7 +106,7 @@ struct IdentityView: View {
                     Button {
                         showVerifyOther = true
                     } label: {
-                        Label("Verify someone", systemImage: "person.fill.viewfinder")
+                        Label("Verify credential", systemImage: "person.fill.viewfinder")
                     }
                     #if MAKNOON_NFC
                     Button {
@@ -147,7 +150,7 @@ struct IdentityView: View {
         }
         .sheet(item: $selectedIDDocumentId) { wrapper in
             NavigationStack {
-                IDDocumentDetailView(documentId: wrapper.id).environment(store)
+                PassportCardDetailView(documentId: wrapper.id).environment(store)
             }
         }
         #endif
@@ -179,7 +182,7 @@ struct IdentityView: View {
         }
     }
 
-    /// List of in-flight credential pickups — the issuer minted the
+    /// List of in-flight credential pickups: the issuer minted the
     /// credential server-side and the holder's background poller is
     /// waiting for it to anchor. One row per pending entry, with a
     /// schema-keyed icon, the credentialId (short), a relative
@@ -331,7 +334,7 @@ struct IdentityView: View {
     ) -> some View {
         Button(action: action) {
             HStack(spacing: 6) {
-                Text(label)
+                Text(LocalizedStringKey(label))
                     .font(.callout.weight(.semibold))
                     .lineLimit(1)
                     .truncationMode(.tail)
@@ -380,33 +383,37 @@ struct IdentityView: View {
     /// destination mechanisms (NavigationLink for credentials, sheet
     /// for passports) so the existing detail views don't have to
     /// change.
-    private var credentialStack: some View {
+    private func cardStack(_ cards: [WalletCardData]) -> some View {
         let overlap = CredentialCard.height - CredentialCard.peekHeight
         return VStack(spacing: -overlap) {
-            ForEach(displayedCards) { card in
+            ForEach(cards) { card in
                 walletCardLink(card)
             }
         }
     }
 
-    /// Unified, sorted list of all cards (verified credentials +
-    /// scanned passports). Sort: type → nickname → issuer, all
-    /// case-insensitive.
-    private var walletCards: [WalletCardData] {
+    /// Verified credential cards. Excludes ANY passport credential whose
+    /// normalized identity tuple matches a scanned ID document (ADR-0039): the
+    /// passport is shown once as its merged card, so neither the self-signed nor
+    /// an issuer-issued passport VC renders a duplicate. Non-passport credentials
+    /// are unaffected. Sort: type → nickname → issuer, case-insensitive.
+    private var credentialCards: [WalletCardData] {
         // Known-issuer hosts to probe for each credential's signed well-known
-        // doc (verified-issuer-name resolution). iOS stores no per-credential
-        // issuer URL, so the resolver matches the doc DID across these hosts.
+        // doc (verified-issuer-name resolution).
         let candidateBaseURLs = store.knownIssuers.hosts.compactMap {
             store.knownIssuers.outboundBaseURL(forEntry: $0)
         }
-        // A self-signed passport credential (issuer == holder, passport
-        // schema) is represented by its passport card (which can Present it on
-        // demand), so it must not also render its own duplicate card. Elabify-
-        // issued passport VCs have a different issuer DID and stay visible.
         let holderDID = store.sandwich?.holderDID
-        let credentialCards = store.credentials
+        let scannedKeys = PassportPairing.documentKeys(store.idDocuments.documents)
+        return store.credentials
             .filter { cred in
-                !(cred.header.schema == passportSchemaURI && cred.header.iss == holderDID)
+                // Fold a passport credential into its scanned card when matched;
+                // also drop a self-signed passport VC even without a scan match.
+                if cred.header.schema == passportSchemaURI {
+                    if let k = PassportPairing.key(for: cred), scannedKeys.contains(k) { return false }
+                    if cred.header.iss == holderDID { return false }
+                }
+                return true
             }
             .map { cred in
                 WalletCardData.forCredential(
@@ -415,22 +422,49 @@ struct IdentityView: View {
                     candidateBaseURLs: candidateBaseURLs
                 )
             }
-        let passportCards = store.idDocuments.documents.map { doc in
-            WalletCardData.forPassport(doc, photo: store.idDocuments.photo(for: doc))
-        }
-        return (credentialCards + passportCards).sorted { lhs, rhs in
-            if lhs.sortKey.0 != rhs.sortKey.0 { return lhs.sortKey.0 < rhs.sortKey.0 }
-            if lhs.sortKey.1 != rhs.sortKey.1 { return lhs.sortKey.1 < rhs.sortKey.1 }
-            return lhs.sortKey.2 < rhs.sortKey.2
-        }
+            .sorted(by: Self.cardSort)
     }
 
-    /// Cards filtered by the active folder pill. `nil` = all cards.
-    private var displayedCards: [WalletCardData] {
-        let all = walletCards
-        guard let activeFolderId else { return all }
+    /// Scanned passports / ID documents (ADR-0037: a section distinct from
+    /// verified credentials).
+    private var passportCards: [WalletCardData] {
+        let holderDID = store.sandwich?.holderDID
+        return store.idDocuments.documents
+            .map { doc -> WalletCardData in
+                var card = WalletCardData.forPassport(doc, photo: store.idDocuments.photo(for: doc))
+                // Fold the matched issued credential's pinned networks into the
+                // badge so it reads "ID is Genuine · <network>".
+                let chains = PassportPairing.matchedCredential(for: doc, in: store.credentials, holderDID: holderDID)?
+                    .anchor?.anchors.map(\.chain) ?? []
+                card.networkLabel = chains.isEmpty ? nil : caip2LabelList(chains)
+                return card
+            }
+            .sorted(by: Self.cardSort)
+    }
+
+    /// All cards, used for the empty-state check + folder member counts.
+    private var walletCards: [WalletCardData] { credentialCards + passportCards }
+
+    /// Credential cards filtered by the active folder pill (ADR-0037: folders
+    /// hold both credentials and ID documents).
+    private var displayedCredentialCards: [WalletCardData] {
+        guard let activeFolderId else { return credentialCards }
         let ids = store.credentialFolderStore.cardIds(in: activeFolderId)
-        return all.filter { ids.contains($0.id) }
+        return credentialCards.filter { ids.contains($0.id) }
+    }
+
+    /// ID-document cards filtered by the active folder pill (same folder map as
+    /// credentials, keyed by the "passport:<uuid>" card id).
+    private var displayedPassportCards: [WalletCardData] {
+        guard let activeFolderId else { return passportCards }
+        let ids = store.credentialFolderStore.cardIds(in: activeFolderId)
+        return passportCards.filter { ids.contains($0.id) }
+    }
+
+    private static func cardSort(_ lhs: WalletCardData, _ rhs: WalletCardData) -> Bool {
+        if lhs.sortKey.0 != rhs.sortKey.0 { return lhs.sortKey.0 < rhs.sortKey.0 }
+        if lhs.sortKey.1 != rhs.sortKey.1 { return lhs.sortKey.1 < rhs.sortKey.1 }
+        return lhs.sortKey.2 < rhs.sortKey.2
     }
 
     /// Tap target per card. Credentials use the existing String-based
@@ -485,9 +519,9 @@ struct IdentityView: View {
                 store.credentialFolderStore.assign(cardId: card.id, to: nil)
             } label: {
                 if currentFolderId == nil {
-                    Label("None (All credentials)", systemImage: "checkmark")
+                    Label("None (All)", systemImage: "checkmark")
                 } else {
-                    Text("None (All credentials)")
+                    Text("None (All)")
                 }
             }
             ForEach(store.credentialFolderStore.folders, id: \.id) { folder in
@@ -577,7 +611,7 @@ struct IdentityView: View {
             Button {
                 activeFolderId = nil
             } label: {
-                Text("Show all credentials")
+                Text("Show all")
                     .font(.callout.weight(.semibold))
             }
             .buttonStyle(.bordered)

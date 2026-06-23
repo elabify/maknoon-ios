@@ -5,7 +5,7 @@
 
 import Foundation
 
-/// Hex string with optional `0x` prefix — what the wire format uses for
+/// Hex string with optional `0x` prefix, what the wire format uses for
 /// 32-byte / 65-byte / 1952-byte fields.
 public typealias HexString = String
 
@@ -47,7 +47,7 @@ struct Credential: Codable, Identifiable, Sendable {
 /// Per the issuer backend CredentialHeader.
 struct CredentialHeader: Codable, Sendable {
     let v: Int                    // 1 for the current header version
-    let alg: String?              // "ML-DSA-65" — present but we don't enforce
+    let alg: String?              // "ML-DSA-65", present but we don't enforce
     let hash: String?             // "RPO-256"
     let iss: String
     let sub: String
@@ -407,7 +407,7 @@ indirect enum JSONValue: Codable, Equatable, Sendable {
         case .int(let v):    return String(v)
         case .double(let v): return String(v)
         case .bool(let v):   return v ? "yes" : "no"
-        case .null:          return "—"
+        case .null:          return "-"
         case .array(let v):  return "[\(v.count) item\(v.count == 1 ? "" : "s")]"
         case .object(let v): return "{\(v.count) field\(v.count == 1 ? "" : "s")}"
         }

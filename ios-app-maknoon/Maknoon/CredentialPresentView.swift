@@ -3,7 +3,7 @@
 // Two modes via a segmented control at the top:
 //
 //   1. Badge QR (default): renders a `BadgePayload` as a QR. No PII,
-//      no holder pubkey, no claims. Static — anyone with the QR could
+//      no holder pubkey, no claims. Static, anyone with the QR could
 //      replay it, but since the payload reveals nothing private, replay
 //      is harmless. A verifier scanning the QR sees issuer + schema +
 //      cid + anchor reference and can confirm the credential exists by
@@ -24,7 +24,7 @@ import SwiftUI
 /// Form (a stable anchor) instead of from inside `PresentAttributesView`'s
 /// Form-nested rows, where a sheet was torn down on Form recompute and
 /// dismissed itself. One item with a `kind` so a single `.sheet` covers
-/// both share variants — two sibling `.sheet` modifiers on one view
+/// both share variants, two sibling `.sheet` modifiers on one view
 /// conflict in SwiftUI.
 private struct ShareItem: Identifiable {
     enum Kind { case qr, drop }
@@ -45,6 +45,10 @@ struct CredentialPresentView: View {
     /// Initial segmented-control mode. Defaults to Badge QR for normal
     /// taps; `ScanVerifierSheet` opens in Share Attributes / Respond.
     var initialMode: Mode = .badge
+    /// Passport flow (ADR-0039): hides the Privacy-QR mode entirely and always
+    /// uses the attribute (server-assisted) QR, defaulting to all attributes
+    /// and allowing redaction down to zero.
+    var passportMode: Bool = false
 
     enum Mode: Hashable {
         case badge
@@ -61,48 +65,59 @@ struct CredentialPresentView: View {
     init(
         credential: Credential,
         initialMode: Mode = .badge,
+        passportMode: Bool = false,
         pendingRequest: VerifierRequest? = nil,
         nicknameInjection: String? = nil
     ) {
         self.credential = credential
         self.initialMode = initialMode
+        self.passportMode = passportMode
         self.pendingRequest = pendingRequest
         self.nicknameInjection = nicknameInjection
-        self._mode = State(initialValue: initialMode)
+        self._mode = State(initialValue: passportMode ? .attributes : initialMode)
     }
 
     var body: some View {
         Form {
-            nicknameSection
+            // Passport Show-QR is lean (ADR-0039): just the attribute QR builder.
+            // Nickname, mode picker, technical details, folder, and remove live
+            // in Advanced options, not here.
+            if !passportMode { nicknameSection }
 
-            Section {
-                Picker("Mode", selection: $mode) {
-                    Text("Privacy QR").tag(Mode.badge)
-                    Text(pendingRequest == nil ? "Attribute QR" : "Respond").tag(Mode.attributes)
+            if !passportMode {
+                Section {
+                    Picker("Mode", selection: $mode) {
+                        Text("Privacy QR").tag(Mode.badge)
+                        Text(pendingRequest == nil ? "Attribute QR" : "Respond").tag(Mode.attributes)
+                    }
+                    .pickerStyle(.segmented)
                 }
-                .pickerStyle(.segmented)
             }
 
-            switch mode {
-            case .badge:      BadgeMode(credential: credential)
-            case .attributes:
+            if mode == .badge && !passportMode {
+                BadgeMode(credential: credential)
+            } else {
                 PresentAttributesView(
                     credential: credential,
                     pendingRequest: pendingRequest,
+                    compact: passportMode,
                     onPresentQR: { activeShare = ShareItem(kind: .qr, presentation: $0) },
                     onPresentDrop: { activeShare = ShareItem(kind: .drop, presentation: $0) }
                 )
             }
 
-            Section {
-                DisclosureGroup("Technical details") {
-                    TechnicalDetails(credential: credential)
+            if !passportMode {
+                Section {
+                    DisclosureGroup("Technical details") {
+                        TechnicalDetails(credential: credential)
+                    }
+                    .font(.callout)
                 }
-                .font(.callout)
+
+                folderSection
             }
 
-            folderSection
-
+            if !passportMode {
             Section {
                 Button(role: .destructive) {
                     // Pop the Identity tab's navigation path
@@ -130,6 +145,7 @@ struct CredentialPresentView: View {
                         .frame(maxWidth: .infinity)
                 }
             }
+            }
         }
         .navigationTitle(SchemaPalette.forSchema(credential.header.schema).humanLabel)
         .navigationBarTitleDisplayMode(.inline)
@@ -151,11 +167,13 @@ struct CredentialPresentView: View {
         // Share-attributes rows, so a Form recompute can't tear it down.
         // One sheet, switched on kind: two sibling .sheet modifiers conflict.
         .sheet(item: $activeShare) { share in
+            // In passport mode, closing the QR returns all the way to the
+            // passport (dismiss this builder too), not back to the builder.
             switch share.kind {
             case .qr:
-                LocalShareQrSheet(presentation: share.presentation, onClose: { activeShare = nil })
+                LocalShareQrSheet(presentation: share.presentation, onClose: { activeShare = nil; if passportMode { dismiss() } })
             case .drop:
-                DropQrSheet(presentation: share.presentation, onClose: { activeShare = nil })
+                DropQrSheet(presentation: share.presentation, onClose: { activeShare = nil; if passportMode { dismiss() } })
             }
         }
     }
@@ -311,7 +329,7 @@ private struct BadgeMode: View {
 
     private func kv(_ key: String, _ value: String) -> some View {
         HStack(alignment: .top) {
-            Text(key).font(.caption).foregroundStyle(.secondary)
+            Text(LocalizedStringKey(key)).font(.caption).foregroundStyle(.secondary)
             Spacer(minLength: 8)
             Text(value).font(.callout.weight(.medium)).multilineTextAlignment(.trailing)
         }
@@ -390,13 +408,13 @@ private struct TechnicalDetails: View {
 
     private func kv(_ k: String, _ v: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(k).font(.caption2).foregroundStyle(.tertiary)
+            Text(LocalizedStringKey(k)).font(.caption2).foregroundStyle(.tertiary)
             Text(v).font(.system(.caption, design: .monospaced)).textSelection(.enabled)
         }
     }
 
     /// Render a Unix-seconds instant as ISO 8601 / RFC 3339 in UTC,
-    /// e.g. `2024-03-07T23:59:59Z`. Cached formatter — same one used
+    /// e.g. `2024-03-07T23:59:59Z`. Cached formatter, same one used
     /// across all credentials in this view.
     private static let isoFormatter: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()

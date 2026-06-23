@@ -68,6 +68,11 @@ struct BitcoinSendView: View {
         case failed(message: String, debugCode: String?, recoverable: Bool)
     }
     @State private var sendState: SendState = .idle
+    /// The signed PSBT retained across a broadcast-only failure so Retry can
+    /// re-push the SAME bytes without re-signing (no second hardware prompt).
+    /// Set only when broadcast fails after a successful sign; cleared at the
+    /// start of a new sign. nil => a retry must re-sign from scratch.
+    @State private var retainedSignedPSBT: (signed: String, unsigned: String)?
     /// Re-typed each signing for a host-entry hidden wallet; never stored.
     @State private var signingPassphrase: String = ""
     @State private var pendingReadyOp: PendingHardwareOperation?
@@ -587,20 +592,20 @@ struct BitcoinSendView: View {
             )
             ReviewRow(
                 label: "Pay to",
-                value: address.isEmpty ? "—" : shortAddress(address)
+                value: address.isEmpty ? "-" : shortAddress(address)
             )
             ReviewRow(
                 label: "Amount",
-                value: amountSats > 0 ? "\(formatBTC(amountSats)) BTC" : "—",
+                value: amountSats > 0 ? "\(formatBTC(amountSats)) BTC" : "-",
                 subValue: amountFiatCaption
             )
             ReviewRow(
                 label: "Max fee",
-                value: estimatedFeeSat.map { "\(formatBTC($0)) BTC (\($0.formatted()) sats)" } ?? "—"
+                value: estimatedFeeSat.map { "\(formatBTC($0)) BTC (\($0.formatted()) sats)" } ?? "-"
             )
             ReviewRow(
                 label: "Total",
-                value: totalCostSat.map { "\(formatBTC($0)) BTC" } ?? "—",
+                value: totalCostSat.map { "\(formatBTC($0)) BTC" } ?? "-",
                 subValue: totalFiatCaption
             )
             if let totalCostSat,
@@ -756,7 +761,7 @@ struct BitcoinSendView: View {
         case .airgappedPSBT: return "Generate PSBT for offline signing"
         case .hardwareBLE:
             let name = boundDevice?.label ?? "device"
-            return "Sign using Hardware Wallet — \(name)"
+            return "Sign using Hardware Wallet, \(name)"
         }
     }
 
@@ -810,6 +815,9 @@ struct BitcoinSendView: View {
         guard let descriptor = store.bitcoinWalletStore.activeWallet else { return }
         sendState = .signing
         status = nil
+        // New signature: drop any PSBT retained from a previous broadcast
+        // failure so a later Retry cannot re-push stale bytes.
+        retainedSignedPSBT = nil
         do {
             let outpoints = coinControl ? selectedOutpoints() : nil
             let unsignedB64 = try await wallet.buildUnsignedPSBT(
@@ -893,6 +901,10 @@ struct BitcoinSendView: View {
             // freshly-Unconfirmed transaction in the list.
             dismiss()
         } catch {
+            // Broadcast-only failure: the signing already succeeded, so retain
+            // the signed PSBT for a re-push without re-signing (no second
+            // hardware prompt). retryCurrentPhase recovers it via lastSignedState.
+            retainedSignedPSBT = (signed: signedB64, unsigned: unsignedB64)
             sendState = .failed(
                 message: (error as? LocalizedError)?.errorDescription ?? "Broadcast failed: \(error)",
                 debugCode: BitcoinSigningHelpers.extractDebugCode(error),
@@ -901,13 +913,9 @@ struct BitcoinSendView: View {
         }
     }
 
-    /// Retry behaviour depends on which phase last failed. We rely
-    /// on the prior state captured before .failed; here we just
-    /// restart from `.idle` for sign-time failures and re-attempt
-    /// broadcast when a signed PSBT is still in hand (we recover
-    /// it from .failed by re-running the whole flow — losing the
-    /// signed PSBT on retry is acceptable since the user opted to
-    /// retry rather than cancel).
+    /// Retry behaviour depends on which phase last failed. When a signed
+    /// PSBT was retained (broadcast-only failure) we re-push the SAME bytes
+    /// without re-signing; otherwise we restart the sign phase from scratch.
     @MainActor
     private func retryCurrentPhase() async {
         // If a signed PSBT survives in state, retry broadcast.
@@ -927,11 +935,15 @@ struct BitcoinSendView: View {
         }
     }
 
-    /// We don't preserve the last-signed PSBT across .failed today;
-    /// a future iteration could stash it so broadcast failures
-    /// don't require re-summoning the device. For now Retry always
-    /// re-signs.
-    private var lastSignedState: SendState { .idle }
+    /// The signed PSBT preserved across a broadcast-only failure, surfaced as
+    /// a `.signed` state so retryCurrentPhase can re-broadcast without re-signing.
+    /// `.idle` when nothing is retained (a sign-time failure), forcing a re-sign.
+    private var lastSignedState: SendState {
+        if let r = retainedSignedPSBT {
+            return .signed(signedPSBTBase64: r.signed, unsignedPSBTBase64: r.unsigned)
+        }
+        return .idle
+    }
 
     /// Map the picker's typed key set into BDK's `[OutPoint]`.
     /// We construct OutPoints from the txid string + vout. BDK's

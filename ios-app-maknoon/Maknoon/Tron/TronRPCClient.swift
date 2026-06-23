@@ -211,7 +211,7 @@ struct TronRPCClient: Sendable {
         /// native TRX; "TriggerSmartContract" for TRC-20.
         var contractType: String? { rawData?.contract?.first?.type }
 
-        /// The contract's first value object — the most useful shape
+        /// The contract's first value object, the most useful shape
         /// for surfacing amount + counterparty.
         var contractValue: ContractValue? {
             rawData?.contract?.first?.parameter?.value
@@ -289,7 +289,7 @@ struct TronRPCClient: Sendable {
     /// the Ledger Tron app signs plus the JSON envelope to splice
     /// the signature into for broadcast.
     struct UnsignedTransaction {
-        /// Raw protobuf bytes of `Transaction.raw_data` — what the
+        /// Raw protobuf bytes of `Transaction.raw_data`, what the
         /// Ledger SIGN APDU consumes.
         let rawData: Data
         /// Hex of `rawData`. Stored on the broadcast JSON's

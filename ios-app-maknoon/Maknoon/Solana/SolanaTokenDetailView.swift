@@ -18,6 +18,7 @@ struct SolanaTokenDetailView: View {
     @State private var loading: Bool = true
     @State private var showSend: Bool = false
     @State private var showReceive: Bool = false
+    @State private var copiedContract: Bool = false
 
     private var descriptor: SolanaWalletDescriptor? {
         store.solanaWalletStore.wallets.first(where: { $0.id == walletId })
@@ -63,7 +64,7 @@ struct SolanaTokenDetailView: View {
             if loading {
                 ProgressView().controlSize(.large)
             } else {
-                Text(rawBalance.map { token.format(rawAmount: $0) } ?? "—")
+                Text(rawBalance.map { token.format(rawAmount: $0) } ?? "-")
                     .font(.system(size: 36, weight: .semibold, design: .rounded))
                     .monospacedDigit()
             }
@@ -127,12 +128,12 @@ struct SolanaTokenDetailView: View {
             metaRow("Cluster", activeNetwork.displayName)
             metaRow("Symbol", token.symbol)
             metaRow("Decimals", "\(token.decimals)")
-            metaRow("Contract", token.mint, monospaced: true)
+            metaRow("Contract", token.mint, monospaced: true, copyable: true)
         }
         .padding(.horizontal, 16)
     }
 
-    private func metaRow(_ label: String, _ value: String, monospaced: Bool = false) -> some View {
+    private func metaRow(_ label: String, _ value: String, monospaced: Bool = false, copyable: Bool = false) -> some View {
         HStack(alignment: .top) {
             Text(label).font(.caption).foregroundStyle(.secondary).frame(width: 80, alignment: .leading)
             Text(value)
@@ -140,6 +141,17 @@ struct SolanaTokenDetailView: View {
                 .multilineTextAlignment(.leading)
                 .textSelection(.enabled)
             Spacer()
+            if copyable {
+                Button {
+                    UIPasteboard.general.string = value
+                    copiedContract = true
+                } label: {
+                    Image(systemName: copiedContract ? "checkmark" : "doc.on.doc").font(.caption)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(copiedContract ? Color.green : Color.accentColor)
+                .accessibilityLabel("Copy mint address")
+            }
         }
     }
 

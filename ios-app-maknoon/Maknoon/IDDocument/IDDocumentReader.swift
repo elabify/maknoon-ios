@@ -168,7 +168,10 @@ final class IDDocumentReader {
             latinSurname: latin?.surname,
             latinGivenNames: latin?.givenNames,
             nativeFullName: nativeFullName,
-            userDeclaredKind: parameters.kind,
+            // Chip is authoritative for passports (ADR-0037): an MRZ code starting
+            // with "P" is saved as a passport regardless of the pre-scan picker,
+            // which fixes a passport being mis-saved as "Other ID document".
+            userDeclaredKind: passport.documentType.prefix(1).uppercased() == "P" ? .passport : parameters.kind,
             personalNumber: passport.personalNumber,
             placeOfBirth: passport.placeOfBirth,
             photoFilename: nil,
@@ -293,7 +296,7 @@ final class IDDocumentReader {
             return "Couldn't unlock the document. Double-check the document number, birth date, and expiry date and try again."
         case .ResponseError(let reason, let sw1, let sw2):
             // Forward the chip's actual status word so we can
-            // diagnose. 0x6A88 = "referenced data not found" — chip
+            // diagnose. 0x6A88 = "referenced data not found": chip
             // refused to read the requested data group, usually
             // because the applet doesn't have it. 0x6982 = security
             // not satisfied. 0x6A82 = file not found. 0x6300 =

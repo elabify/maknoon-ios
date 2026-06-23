@@ -9,7 +9,7 @@
 // nickname + issuer/identifier on a single stacked column that fits
 // inside the top ~90 pt of the card. The top-right corner carries
 // the expiry status dot and (if a sanctions screen has been run for
-// this card) the sanctions shield — both visible at every stack
+// this card) the sanctions shield, both visible at every stack
 // position because they sit in the peek region. The bottom strip
 // (visible only when this card is fully revealed at the bottom of
 // the stack) carries issuance + expiry dates.
@@ -69,26 +69,34 @@ struct CredentialCard: View {
 
             Spacer(minLength: 12)
 
-            HStack(spacing: 8) {
-                Text("Issued \(issuedAtText)")
-                    .font(.caption2)
-                    .foregroundStyle(palette.foreground.opacity(0.7))
-                if let expText = expiryText {
-                    Text("·")
-                        .foregroundStyle(palette.foreground.opacity(0.4))
-                    Text(expText)
+            // The passport badge on the Identity list stays clean: no
+            // issued / expires / network (Sepolia) metadata strip (ADR-0039).
+            // The pinned-network detail (Musnad Registry + chips) lives on the
+            // tapped-in navy card, not here.
+            if case .passport = data.kind {
+                EmptyView()
+            } else {
+                HStack(spacing: 8) {
+                    Text("Issued \(issuedAtText)")
                         .font(.caption2)
                         .foregroundStyle(palette.foreground.opacity(0.7))
+                    if let expText = expiryText {
+                        Text("·")
+                            .foregroundStyle(palette.foreground.opacity(0.4))
+                        Text(expText)
+                            .font(.caption2)
+                            .foregroundStyle(palette.foreground.opacity(0.7))
+                    }
+                    if let net = data.networkLabel {
+                        Text("·")
+                            .foregroundStyle(palette.foreground.opacity(0.4))
+                        Text(net)
+                            .font(.caption2)
+                            .foregroundStyle(palette.foreground.opacity(0.7))
+                            .lineLimit(1)
+                    }
+                    Spacer()
                 }
-                if let net = data.networkLabel {
-                    Text("·")
-                        .foregroundStyle(palette.foreground.opacity(0.4))
-                    Text(net)
-                        .font(.caption2)
-                        .foregroundStyle(palette.foreground.opacity(0.7))
-                        .lineLimit(1)
-                }
-                Spacer()
             }
         }
         .padding(20)
@@ -172,7 +180,7 @@ struct CredentialCard: View {
         // Expiry traffic light: green when expiry is more than 30
         // days away (or absent), yellow within 30 days, red after.
         // Applies uniformly to verified credentials and scanned
-        // passport cards — both expose a real expiry the user cares
+        // passport cards, both expose a real expiry the user cares
         // about.
         let now = Date()
         guard let exp = data.expiresAt else { return .green }
@@ -268,7 +276,7 @@ extension WalletCardData {
             palette: palette,
             photo: nil,
             sanctionsBadge: sanctionsOutcome(from: cred.claims["sdnScreen"]),
-            networkLabel: chains.isEmpty ? nil : caip2LabelList(chains),
+            networkLabel: { let l = caip2LabelList(chains); return l.isEmpty ? nil : l }(),
             verifyCredential: cred,
             candidateBaseURLs: candidateBaseURLs
         )
@@ -297,7 +305,7 @@ extension WalletCardData {
         let palette = SchemaPalette(
             gradient: basePalette.gradient,
             foreground: basePalette.foreground,
-            humanLabel: "Passport (NFC)",
+            humanLabel: Loc.t("Passport"),
             iconSystemName: basePalette.iconSystemName,
         )
         // Default nickname = Latin full name when the user hasn't set
@@ -320,7 +328,7 @@ extension WalletCardData {
         return WalletCardData(
             id: "passport:\(doc.id.uuidString)",
             kind: .passport(uuid: doc.id),
-            typeLabel: "Passport (NFC)",
+            typeLabel: Loc.t("Passport"),
             nickname: nickname,
             issuerShort: issuerShort,
             identifier: "NFC Scan",
@@ -360,49 +368,49 @@ struct SchemaPalette {
             return SchemaPalette(
                 gradient: LinearGradient(colors: [Color(hex: 0x1a3d6d), Color(hex: 0x0d2447)], startPoint: .topLeading, endPoint: .bottomTrailing),
                 foreground: .white,
-                humanLabel: "Passport",
+                humanLabel: Loc.t("Passport"),
                 iconSystemName: "person.text.rectangle.fill"
             )
         case "elabify://schema/adgm/emiratesId/v1":
             return SchemaPalette(
                 gradient: LinearGradient(colors: [Color(hex: 0xb91c1c), Color(hex: 0x7f1010)], startPoint: .topLeading, endPoint: .bottomTrailing),
                 foreground: .white,
-                humanLabel: "Emirates ID",
+                humanLabel: Loc.t("Emirates ID"),
                 iconSystemName: "person.crop.rectangle.fill"
             )
         case "elabify://schema/global/musnadMaknoon/v1":
             return SchemaPalette(
                 gradient: LinearGradient(colors: [Color(hex: 0x93278f), Color(hex: 0x5e1660)], startPoint: .topLeading, endPoint: .bottomTrailing),
                 foreground: .white,
-                humanLabel: "Musnad-Maknoon membership",
+                humanLabel: Loc.t("Musnad-Maknoon membership"),
                 iconSystemName: "person.2.fill"
             )
         case "elabify://schema/global/walletControlEth/v1":
             return SchemaPalette(
                 gradient: LinearGradient(colors: [Color(hex: 0x475569), Color(hex: 0x1e293b)], startPoint: .topLeading, endPoint: .bottomTrailing),
                 foreground: .white,
-                humanLabel: "Ethereum wallet control",
+                humanLabel: Loc.t("Ethereum wallet control"),
                 iconSystemName: "diamond.fill"
             )
         case "elabify://schema/global/walletControlBtc/v1":
             return SchemaPalette(
                 gradient: LinearGradient(colors: [Color(hex: 0xd97706), Color(hex: 0x92400e)], startPoint: .topLeading, endPoint: .bottomTrailing),
                 foreground: .white,
-                humanLabel: "Bitcoin wallet control",
+                humanLabel: Loc.t("Bitcoin wallet control"),
                 iconSystemName: "bitcoinsign.circle.fill"
             )
         case "elabify://schema/global/corporateIdentity/v1":
             return SchemaPalette(
                 gradient: LinearGradient(colors: [Color(hex: 0x0f172a), Color(hex: 0x1e293b)], startPoint: .topLeading, endPoint: .bottomTrailing),
                 foreground: Color(hex: 0xfde68a),
-                humanLabel: "Corporate identity",
+                humanLabel: Loc.t("Corporate identity"),
                 iconSystemName: "building.2.fill"
             )
         case "elabify://schema/global/corporateOfficer/v1":
             return SchemaPalette(
                 gradient: LinearGradient(colors: [Color(hex: 0x0f172a), Color(hex: 0x1e293b), Color(hex: 0x422006)], startPoint: .topLeading, endPoint: .bottomTrailing),
                 foreground: Color(hex: 0xfde68a),
-                humanLabel: "Corporate officer",
+                humanLabel: Loc.t("Corporate officer"),
                 iconSystemName: "person.badge.shield.checkmark.fill"
             )
         default:
@@ -410,7 +418,7 @@ struct SchemaPalette {
             return SchemaPalette(
                 gradient: LinearGradient(colors: [Color(hex: 0x5b6370), Color(hex: 0x1a1a1a)], startPoint: .topLeading, endPoint: .bottomTrailing),
                 foreground: .white,
-                humanLabel: humanLabel.isEmpty ? "Verified credential" : humanLabel,
+                humanLabel: humanLabel.isEmpty ? Loc.t("Verified credential") : humanLabel,
                 iconSystemName: "doc.text.fill"
             )
         }

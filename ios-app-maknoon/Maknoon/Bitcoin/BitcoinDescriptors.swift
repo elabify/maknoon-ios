@@ -4,13 +4,13 @@
 // Three flavours, picked by `BitcoinWallet.open` based on what the
 // wallet metadata has cached:
 //
-//   1. `watchOnlyFromCachedKey(...)` — wallet has cachedXpub +
+//   1. `watchOnlyFromCachedKey(...)`: wallet has cachedXpub +
 //      cachedFingerprint persisted on the descriptor. Used on every
 //      software-wallet open AFTER the first one, and on every
 //      hardware-wallet open. Returns a watch-only descriptor; cannot
-//      sign. NO seed access — therefore NO biometric prompt.
+//      sign. NO seed access, therefore NO biometric prompt.
 //
-//   2. `deriveFromSeed(...)` — used ONCE at wallet-creation time (and
+//   2. `deriveFromSeed(...)`: used ONCE at wallet-creation time (and
 //      as a fallback for legacy wallets whose cache is empty).
 //      Reads the BIP39 entropy from the Identity Sandwich (one
 //      biometric/passcode prompt), derives the account xpub +
@@ -19,7 +19,7 @@
 //      Also returns a watch-only descriptor pair (so the BDK Wallet
 //      built from this is watch-only, even at creation).
 //
-//   3. `transientSignerWallet(...)` — used ONLY at send time. Reads
+//   3. `transientSignerWallet(...)`: used ONLY at send time. Reads
 //      the BIP39 entropy under a "Authorize Bitcoin send" prompt,
 //      builds a secret-descriptor BDK Wallet against an in-memory
 //      Persister, and returns it. The transient wallet's only job
@@ -34,7 +34,7 @@ enum BitcoinDescriptorError: LocalizedError {
     case descriptorFailed(String)
     var errorDescription: String? {
         switch self {
-        case .sandwichLocked:           return "Identity Sandwich is locked"
+        case .sandwichLocked:           return "Maknoon is locked"
         case .descriptorFailed(let m):  return "Could not build descriptor: \(m)"
         }
     }

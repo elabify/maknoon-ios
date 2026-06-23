@@ -1,13 +1,13 @@
 // Native "collect a customer's credential" sheet for
-// window.maknoon.identity.collect — the cross-device merchant→customer
+// window.maknoon.identity.collect: the cross-device merchant→customer
 // verify step.
 //
 // The merchant runs the camera; the customer presents a credential from
 // their own wallet (open share or any presentation QR: a raw presentation,
 // a rotating multi-frame QR, or a one-shot drop envelope). We verify it
 // offline (signatures, Merkle proofs, delegation, expiry), then enforce the
-// merchant's policy: required schema + claims present, and — for the
-// sanctions credential — the disclosed `sanctionsScreenedAt` within
+// merchant's policy: required schema + claims present, and (for the
+// sanctions credential) the disclosed `sanctionsScreenedAt` within
 // `maxAgeSec`. The cryptographic verification is the shipped
 // `PresentationVerifier.verifyOffline`; the freshness check mirrors the
 // verifier server's attestationFresh gate on a Merkle-proven claim.
@@ -70,9 +70,9 @@ struct MiniAppCollectSheet: View {
     /// "Scan again" button is shown.
     @State private var showRetry = false
     /// The most recent DENY verdict, kept so the merchant can return it to the
-    /// dApp via "Decline" instead of the sheet auto-closing on a fixable miss.
+    /// app via "Decline" instead of the sheet auto-closing on a fixable miss.
     @State private var lastDenied: [String: Any]?
-    /// Set once a result has been returned to the dApp (via scan OR server
+    /// Set once a result has been returned to the app (via scan OR server
     /// poll), so the two paths can't both resolve.
     @State private var done = false
 
@@ -104,7 +104,7 @@ struct MiniAppCollectSheet: View {
                     .font(.caption).foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                 // Customer can scan THIS to present (easiest), or the merchant
-                // can scan the customer's presentation below — first wins.
+                // can scan the customer's presentation below; first wins.
                 if let url = request.requestURL, let img = BadgeQR.render(Data(url.utf8), scale: 7) {
                     VStack(spacing: 4) {
                         ZStack {
@@ -245,7 +245,7 @@ struct MiniAppCollectSheet: View {
         if let badge = try? JSONDecoder().decode(BadgePayload.self, from: Data(payload.utf8)),
            badge.v == "elabify-badge-1" {
             banner = .warn
-            status = "That's a privacy badge — it shares no attributes. Ask the customer to show their Attribute QR (single or rotating)."
+            status = "That's a privacy badge, it shares no attributes. Ask the customer to show their Attribute QR (single or rotating)."
             return
         }
         // 5) anything else: an unrecognized code (a payment QR, a website, etc.).
@@ -290,7 +290,7 @@ struct MiniAppCollectSheet: View {
         let result: [String: Any] = [
             "decision": decision,
             "reason": reasons.first ?? "ok",
-            // Named missing claims + a human message so the dApp (and the
+            // Named missing claims + a human message so the app (and the
             // merchant) can say exactly which attributes the customer must add.
             "missing": missing,
             "message": message ?? "",
@@ -314,7 +314,7 @@ struct MiniAppCollectSheet: View {
         // A denial is usually fixable (the customer disclosed the wrong fields,
         // or showed the wrong QR). Pause + show exactly what's wrong; "Scan
         // again" retries without an app round-trip, and the toolbar's "Decline"
-        // returns this verdict to the dApp.
+        // returns this verdict to the app.
         lastDenied = result
         pauseForRetry(message ?? "The customer's credential was declined.")
     }
@@ -325,7 +325,7 @@ struct MiniAppCollectSheet: View {
     /// customer scans the hosted request and taps Approve, their wallet POSTs
     /// the Presentation to /v1/verify/callback; the server verifies it and
     /// stashes the verdict keyed by requestId. We poll /v1/verify/result/:id
-    /// until it appears — completing the round trip without the merchant
+    /// until it appears, completing the round trip without the merchant
     /// scanning the customer.
     private func pollForServerVerdict(requestId: String) async {
         let base = HolderStore.elabifyDropHost
@@ -343,7 +343,7 @@ struct MiniAppCollectSheet: View {
         }
     }
 
-    /// Map the verifier server's authoritative verdict to the dApp result.
+    /// Map the verifier server's authoritative verdict to the app result.
     /// GRANT resolves immediately; DENY pauses with the reason + Decline
     /// affordance (mirrors the scan path).
     private func finishFromServer(_ verdict: VerifyResponse) {

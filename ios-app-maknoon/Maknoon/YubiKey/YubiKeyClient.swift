@@ -57,7 +57,7 @@ final class YubiKeyClient {
             case .missingSignature:
                 return "The YubiKey didn't return a signature."
             case .nfcRequired:
-                return "Adding a YubiKey to the Identity Sandwich needs an NFC tap. USB-C is supported for reading the device serial, but FIDO2 isn't reachable over USB-C on iPhone."
+                return "Adding a YubiKey as a second factor needs an NFC tap. USB-C is supported for reading the device serial, but FIDO2 isn't reachable over USB-C on iPhone."
             }
         }
     }
@@ -202,7 +202,7 @@ final class YubiKeyClient {
         salt: Data,
         deviceSerial: String,
         pin: String?
-    ) async throws -> (credentialIdHex: String, secret: Data) {
+    ) async throws -> (credentialIdHex: String, secret: Data, pinProtected: Bool) {
         #if canImport(YubiKit) && MAKNOON_NFC
         precondition(salt.count == 32, "wrap salt must be 32 bytes")
         LogStore.shared.info("YubiKey", "enrollHMACSecretOverNFC: starting (serial=\(deviceSerial), pin=\(pin?.isEmpty == false ? "set" : "none"))")
@@ -213,36 +213,57 @@ final class YubiKeyClient {
             YubiKitManager.shared.stopNFCConnection()
         }
         let ctap = try await openCTAP2(on: connection)
-        let ext = try await ctap.getInfoExtensions()
-        guard ext.contains("hmac-secret") else {
-            LogStore.shared.error("YubiKey", "enrollHMACSecretOverNFC: authenticator does not list hmac-secret in getInfo.extensions")
+        return try await enrollCore(ctap, label: label, salt: salt, deviceSerial: deviceSerial, pin: pin)
+        #else
+        throw Error.nfcRequired
+        #endif
+    }
+
+    #if canImport(YubiKit) && MAKNOON_NFC
+    /// The CTAP2 hmac-secret enroll, given an already-open CTAP2 session.
+    /// Shared by `enrollHMACSecretOverNFC` (its own tap) and
+    /// `registerAndEnrollOverNFC` (one tap that also reads the serial).
+    private func enrollCore(
+        _ ctap: CTAP2Client,
+        label: String,
+        salt: Data,
+        deviceSerial: String,
+        pin: String?
+    ) async throws -> (credentialIdHex: String, secret: Data, pinProtected: Bool) {
+        let info = try await ctap.getInfo()
+        guard info.extensions.contains("hmac-secret") else {
+            LogStore.shared.error("YubiKey", "enrollCore: authenticator does not list hmac-secret in getInfo.extensions")
             throw Error.fido2("This YubiKey's firmware does not advertise the hmac-secret extension. Maknoon needs hmac-secret to derive a stable wrap key; try a YubiKey 5 series with firmware 5.2 or newer.")
         }
-        // PIN protocol v1 setup.
+        // A PIN is only used when the key actually has one set (#47). A no-PIN
+        // key does hmac-secret with user presence (the touch) alone; we record
+        // `pinProtected` so unlock knows whether to prompt for the PIN.
+        let pinProtected = (info.clientPinSet == true)
+        if pinProtected, (pin ?? "").isEmpty {
+            throw Error.fido2("This YubiKey has a FIDO2 PIN set. Enter the PIN to continue.")
+        }
+        // PIN-protocol-v1 ECDH: the shared secret also encrypts the hmac-secret
+        // salt, so we establish it whether or not a PIN is used.
         let authPub = try await ctap.getKeyAgreement()
         let platformPriv = P256.KeyAgreement.PrivateKey()
         let shared = try PINProtocolV1.sharedSecret(
             platformPriv: platformPriv,
             authenticatorPub: authPub
         )
-        let pinToken: Data
-        if let pin, !pin.isEmpty {
-            pinToken = try await ctap.getPinToken(
-                pin: pin,
+        let cdh = wrapClientDataHash(salt: salt, deviceSerial: deviceSerial)
+        let pinUvAuthParam: Data?
+        if pinProtected {
+            let pinToken = try await ctap.getPinToken(
+                pin: pin ?? "",
                 platformPriv: platformPriv,
                 authenticatorPub: authPub
             )
-            LogStore.shared.info("YubiKey", "enrollHMACSecretOverNFC: pinToken acquired")
+            pinUvAuthParam = PINProtocolV1.authenticate(key: pinToken, message: cdh)
+            LogStore.shared.info("YubiKey", "enrollCore: pinToken acquired (PIN-protected key)")
         } else {
-            // No-PIN keys: there's no pinToken; the YubiKey will
-            // still gate makeCredential on user presence (NFC tap).
-            // We cannot satisfy CTAP2 PIN auth so makeCredential's
-            // pinUvAuthParam path is skipped; some firmware rejects
-            // this. Document the limitation rather than guess.
-            throw Error.fido2("This YubiKey has no FIDO2 PIN. Set a PIN on the key (yubico-authenticator > FIDO2 > Set PIN) before enrolling it in the Identity Sandwich.")
+            pinUvAuthParam = nil
+            LogStore.shared.info("YubiKey", "enrollCore: no-PIN key, enrolling with user presence only")
         }
-        let cdh = wrapClientDataHash(salt: salt, deviceSerial: deviceSerial)
-        let pinUvAuthParam = PINProtocolV1.authenticate(key: pinToken, message: cdh)
 
         let userId = randomBytes(count: 16)
         let credResult = try await ctap.makeCredentialHMACSecret(
@@ -253,7 +274,7 @@ final class YubiKeyClient {
             clientDataHash: cdh,
             pinUvAuthParam: pinUvAuthParam
         )
-        LogStore.shared.info("YubiKey", "enrollHMACSecretOverNFC: credential created (id=\(credResult.credentialId.prefix(8).map { String(format: "%02x", $0) }.joined())..., \(credResult.credentialId.count) bytes)")
+        LogStore.shared.info("YubiKey", "enrollCore: credential created (\(credResult.credentialId.count) bytes)")
 
         let assertResult = try await ctap.getAssertionHMACSecret(
             rpId: Self.rpId,
@@ -265,15 +286,70 @@ final class YubiKeyClient {
             sharedSecret: shared,
             pinUvAuthParam: pinUvAuthParam
         )
-        LogStore.shared.info("YubiKey", "enrollHMACSecretOverNFC: hmac-secret output decoded (\(assertResult.hmacSecretOutput.count) bytes)")
+        LogStore.shared.info("YubiKey", "enrollCore: hmac-secret output decoded (\(assertResult.hmacSecretOutput.count) bytes)")
         return (
             credentialIdHex: credResult.credentialId.hexString,
-            secret: assertResult.hmacSecretOutput
+            secret: assertResult.hmacSecretOutput,
+            pinProtected: pinProtected
         )
+    }
+
+    /// Read the management-applet serial on an already-open NFC connection.
+    /// Tolerant: returns nil for FIDO-only keys that have no management applet
+    /// (the caller falls back to the credential id as the device serial).
+    private func readManagementSerial(on connection: YKFNFCConnection) async -> String? {
+        await withCheckedContinuation { (cont: CheckedContinuation<String?, Never>) in
+            connection.managementSession { session, _ in
+                guard let session else { cont.resume(returning: nil); return }
+                session.getDeviceInfo { info, _ in
+                    if let serial = info?.serialNumber, serial != 0 {
+                        cont.resume(returning: "\(serial)")
+                    } else {
+                        cont.resume(returning: nil)
+                    }
+                }
+            }
+        }
+    }
+
+    /// One-tap register + enroll: on a single NFC connection, read the
+    /// management serial (when present) and then run the hmac-secret enroll.
+    /// Returns the device serial to register under (the management serial when
+    /// available, else a credential-derived id) plus the enroll result. The
+    /// caller seals the wrap + records the device + promotion off-NFC.
+    func registerAndEnrollOverNFC(
+        label: String,
+        salt: Data,
+        pin: String?
+    ) async throws -> (serial: String, credentialIdHex: String, secret: Data, pinProtected: Bool) {
+        #if canImport(YubiKit) && MAKNOON_NFC
+        precondition(salt.count == 32, "wrap salt must be 32 bytes")
+        defer { observer.clearAllPendingState() }
+        let connection = try await waitForNFCConnection(prompt: "Tap your YubiKey to register it")
+        defer { YubiKitManager.shared.stopNFCConnection() }
+        // Management serial first (same tap); tolerate FIDO-only keys.
+        let rawSerial = await readManagementSerial(on: connection)
+        let ctap = try await openCTAP2(on: connection)
+        // deviceSerial in the clientDataHash is not load-bearing for the wrap
+        // key (which is keyed on credential+salt); pass the best id we have.
+        let provisionalSerial = rawSerial.map { "yk-\($0)" }
+        let result = try await enrollCore(
+            ctap,
+            label: label,
+            salt: salt,
+            deviceSerial: provisionalSerial ?? "",
+            pin: pin
+        )
+        // Stable per-key serial: management serial when present, else a short
+        // credential-derived id (FIDO-only keys), so the device record + the
+        // deterministic device id are reproducible.
+        let serial = provisionalSerial ?? "yk-\(result.credentialIdHex.prefix(24))"
+        return (serial: serial, credentialIdHex: result.credentialIdHex, secret: result.secret, pinProtected: result.pinProtected)
         #else
         throw Error.nfcRequired
         #endif
     }
+    #endif
 
     /// Recompute the hmac-secret output for an enrolled YubiKey at
     /// unlock time. Same (credential, salt) → same output, by design
@@ -298,24 +374,32 @@ final class YubiKeyClient {
             YubiKitManager.shared.stopNFCConnection()
         }
         let ctap = try await openCTAP2(on: connection)
+        let info = try await ctap.getInfo()
+        // Use a PIN only when the key has one set; a no-PIN key unlocks with the
+        // touch alone. (Whether the unlock UI prompted for a PIN was decided from
+        // the recorded pinProtected flag; here we trust the live device state.)
+        let pinProtected = (info.clientPinSet == true)
+        if pinProtected, (pin ?? "").isEmpty {
+            throw Error.fido2("This YubiKey has a FIDO2 PIN set. Enter the PIN to continue.")
+        }
         let authPub = try await ctap.getKeyAgreement()
         let platformPriv = P256.KeyAgreement.PrivateKey()
         let shared = try PINProtocolV1.sharedSecret(
             platformPriv: platformPriv,
             authenticatorPub: authPub
         )
-        let pinToken: Data
-        if let pin, !pin.isEmpty {
-            pinToken = try await ctap.getPinToken(
-                pin: pin,
+        let cdh = wrapClientDataHash(salt: salt, deviceSerial: deviceSerial)
+        let pinUvAuthParam: Data?
+        if pinProtected {
+            let pinToken = try await ctap.getPinToken(
+                pin: pin ?? "",
                 platformPriv: platformPriv,
                 authenticatorPub: authPub
             )
+            pinUvAuthParam = PINProtocolV1.authenticate(key: pinToken, message: cdh)
         } else {
-            throw Error.fido2("This YubiKey has no FIDO2 PIN. Set a PIN on the key before unlocking.")
+            pinUvAuthParam = nil
         }
-        let cdh = wrapClientDataHash(salt: salt, deviceSerial: deviceSerial)
-        let pinUvAuthParam = PINProtocolV1.authenticate(key: pinToken, message: cdh)
         let assertResult = try await ctap.getAssertionHMACSecret(
             rpId: Self.rpId,
             clientDataHash: cdh,
@@ -368,7 +452,7 @@ final class YubiKeyClient {
         LogStore.shared.info("YubiKey", "recomputeSecretOverNFC: getAssertion returned signature (\(signature.count)B)")
         return Data(SHA256.hash(data: signature))
         #else
-        LogStore.shared.error("YubiKey", "recomputeSecretOverNFC: MAKNOON_NFC not compiled in — this build cannot do NFC")
+        LogStore.shared.error("YubiKey", "recomputeSecretOverNFC: MAKNOON_NFC not compiled in, this build cannot do NFC")
         throw Error.nfcRequired
         #endif
     }
@@ -410,7 +494,7 @@ final class YubiKeyClient {
         // NFCReaderError code that we surface verbatim.
         let cap = YubiKitDeviceCapabilities.supportsISO7816NFCTags
         LogStore.shared.info("YubiKey", "waitForNFCConnection: YubiKitDeviceCapabilities.supportsISO7816NFCTags=\(cap) (advisory)")
-        // Don't reuse `observer.currentNFC` — after a CTAP2 error
+        // Don't reuse `observer.currentNFC`: after a CTAP2 error
         // (wrong PIN, etc.) the cached reference is stale: iOS may
         // not have called didDisconnectNFC yet, but the NFC session
         // is dead on the device side. Reusing it leaves the user

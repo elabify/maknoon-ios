@@ -14,7 +14,7 @@
 //      request body. The issuer verifies the assertion against the
 //      attestation it received during enrollment.
 //
-// Both calls require a real device — the simulator returns
+// Both calls require a real device; the simulator returns
 // `notSupported` from DCAppAttestService. App Store builds use
 // the production environment; development builds use sandbox.
 // The Apple Developer entitlement is gated by MAKNOON_NFC since

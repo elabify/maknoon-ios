@@ -105,7 +105,7 @@ struct MockHardwareWallet: HardwareWallet {
 
     /// Inline EIP-55 mixed-case checksum so the Mock doesn't need to
     /// import WalletCore. Lowercase hex of the 20 address bytes,
-    /// hash via SHA-256 (instead of keccak256 — this is a mock,
+    /// hash via SHA-256 (instead of keccak256: this is a mock,
     /// the address string format is the demo property, not the
     /// hash). Real device path is in `LedgerBLE.eip55Checksum`.
     private static func eip55(addressHex20: Data) -> String {

@@ -1,8 +1,8 @@
 // Holder-side authentication of a CommerceRequest (ADR-0031). Two checks:
 //   1. The embedded VerifierRequest's signature (reusing VerifierRequestValidator)
-//      — authenticates the merchant identity + the integrity of the ask, and
+//      authenticates the merchant identity + the integrity of the ask, and
 //      yields the trust tier (registered / self-signed / unknown).
-//   2. `merchantSig` over `paymentTerms` against the same verifier pubkey — so a
+//   2. `merchantSig` over `paymentTerms` against the same verifier pubkey, so a
 //      relay/server cannot tamper with the payment terms or, crucially, swap the
 //      `responseKey` the holder seals its response to. Without this, a malicious
 //      relay could substitute its own key and read the response (defeating
@@ -47,7 +47,7 @@ enum CommerceRequestValidator {
 
         // 2. Verify merchantSig over paymentTerms against the verifier pubkey.
         // Use the inline pubkey (self-signed) or, for a registered merchant that
-        // omits it, resolve the pubkey from the registry — same source the
+        // omits it, resolve the pubkey from the registry, same source the
         // verifierRequest tier check above used.
         let resolvedPubHex: String?
         if let inline = request.verifierRequest.verifierPublicKey {

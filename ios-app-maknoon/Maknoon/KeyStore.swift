@@ -2,13 +2,13 @@
 //
 // Two access classes:
 //
-//   1. Biometric-gated (Face ID per use) — used for the master seed.
+//   1. Biometric-gated (Face ID per use), used for the master seed.
 //      Items are written with .userPresence so iOS prompts the user
 //      before returning bytes. The LAContext attached at load time
 //      lets us localise the prompt and reuse a successful auth across
 //      multiple back-to-back loads (Apple caches for ~10 seconds).
 //
-//   2. Non-biometric — used for the ephemeral SE key handle, the
+//   2. Non-biometric, used for the ephemeral SE key handle, the
 //      delegation certificate, the master public key, and any
 //      hardware attestation. These need device-unlock but no Face
 //      ID prompt; they unlock implicitly when the user has unlocked
@@ -137,6 +137,21 @@ enum KeyStore {
         }
     }
 
+    // MARK: -- string convenience (UTF-8)
+
+    /// Save a string value under `key` (UTF-8). Non-biometric,
+    /// device-only by default; pass `requireBiometric: true` to gate it.
+    static func saveString(_ value: String, forKey key: String, requireBiometric: Bool = false) throws {
+        try save(Data(value.utf8), forKey: key, requireBiometric: requireBiometric)
+    }
+
+    /// Load a string value for `key` (UTF-8). Returns nil if absent or
+    /// if the bytes are not valid UTF-8.
+    static func loadString(forKey key: String, localizedReason: String? = nil) throws -> String? {
+        guard let data = try load(forKey: key, localizedReason: localizedReason) else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
     /// Wipe every item this app has written. Used by the
     /// "Reset wallet" flow in Settings and by the recovery path before
     /// restoring a fresh master from a seed.
@@ -163,12 +178,27 @@ enum KeyStoreKeys {
     /// Biometric-gated. The combined master ML-DSA-65 seed is derived
     /// from these two on demand via BIP39 PBKDF2.
     static let masterMaterial = "master.material"
-    /// Hardware-wrapped form of the master material. When this key
-    /// is present, `masterMaterial` is absent: the unlock path
-    /// requires a registered hardware device to derive the wrap key
-    /// before the entropy can be decrypted. Non-biometric: the
-    /// device is the stronger gate than Face ID.
+    /// LEGACY (pre-ADR-0032) per-material wrap envelope. No longer read
+    /// or written: the second factor is now the CEK scheme below. Kept
+    /// only as a named constant so a stale on-disk item from an older
+    /// build is recognisable; `wipeAll` clears it by service. Reset +
+    /// restore-from-backup (the clean-cut migration) replaces it.
     static let wrappedMasterMaterial = "master.wrappedMaterial"
+    /// ADR-0032 second-factor (CEK scheme). The 32-byte BIP39 entropy
+    /// sealed ONCE under the random content-encryption key (CEK):
+    /// AES-256-GCM(CEK, entropy), stored as nonce||ct||tag hex. Present
+    /// iff the second factor is ON; in that state `masterMaterial` (the
+    /// plain biometric item) is absent, so the entropy can only be
+    /// recovered by tapping an enrolled device to unwrap the CEK.
+    /// Non-biometric, device-only: the hardware key is the gate.
+    static let sealedEntropyUnderCEK = "secondFactor.sealedEntropyUnderCek"
+    /// ADR-0032 second-factor (CEK scheme). The BIP39 passphrase string
+    /// kept in a separate slot while the second factor is ON. The
+    /// entropy stays hardware-gated under the CEK; the passphrase is
+    /// needed alongside the recovered entropy to rebuild the master.
+    /// Empty string is the no-passphrase case. Non-biometric,
+    /// device-only (matching Android's split).
+    static let passphraseUnder2FA = "secondFactor.passphrase"
     /// 1952-byte ML-DSA-65 master public key. Non-biometric (it's public).
     static let masterPublicKey = "master.publicKey"
     /// SecureEnclave key handle (opaque, ~88 bytes) for the ephemeral. Non-biometric.

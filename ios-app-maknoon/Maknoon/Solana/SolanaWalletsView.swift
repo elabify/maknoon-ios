@@ -66,47 +66,36 @@ struct SolanaWalletsView: View {
             AddSolanaWalletSheet { _ in showAdd = false }
                 .environment(store)
         }
-        .alert("Rename wallet", isPresented: Binding(
-            get: { renameTarget != nil },
-            set: { if !$0 { renameTarget = nil } }
-        )) {
-            TextField("Label", text: $renameDraft)
-            Button("Save") {
-                if let t = renameTarget, !renameDraft.isEmpty {
-                    store.solanaWalletStore.rename(id: t.id, to: renameDraft)
-                }
-                renameTarget = nil
-            }
-            Button("Cancel", role: .cancel) { renameTarget = nil }
-        } message: {
-            Text("Enter a new label for this Solana wallet.")
+        .sheet(item: $renameTarget) { target in
+            renameSheet(target: target)
+                .environment(store)
         }
     }
 
     private func walletRow(_ w: SolanaWalletDescriptor) -> some View {
-        let isActive = store.solanaWalletStore.activeWallet?.id == w.id
-        return HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(w.label).font(.callout.weight(.semibold))
-                    if isActive {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
-                            .font(.caption)
-                    }
+        Button {
+            store.solanaWalletStore.setActive(w.id)
+        } label: {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(w.label).font(.headline)
+                    Text(subtitle(for: w)).font(.caption).foregroundStyle(.secondary)
                 }
-                Text(subtitle(for: w)).font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                if store.solanaWalletStore.activeWallet?.id == w.id {
+                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.secondary)
+                }
             }
-            Spacer()
         }
+        .buttonStyle(.plain)
         // allowsFullSwipe: false prevents a continued right-swipe from
-        // auto-firing Delete. The user has to tap the exposed Delete
+        // auto-firing Remove. The user has to tap the exposed Remove
         // button explicitly.
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
             Button(role: .destructive) {
                 store.solanaWalletStore.remove(id: w.id)
             } label: {
-                Label("Delete", systemImage: "trash")
+                Label("Remove", systemImage: "trash")
             }
             Button {
                 renameDraft = w.label
@@ -115,6 +104,32 @@ struct SolanaWalletsView: View {
                 Label("Rename", systemImage: "pencil")
             }
             .tint(.blue)
+        }
+    }
+
+    @ViewBuilder
+    private func renameSheet(target: SolanaWalletDescriptor) -> some View {
+        NavigationStack {
+            Form {
+                Section("Wallet label") {
+                    TextField("e.g. Daily", text: $renameDraft)
+                }
+                Section {
+                    Button("Save") {
+                        if !renameDraft.isEmpty {
+                            store.solanaWalletStore.rename(id: target.id, to: renameDraft)
+                        }
+                        renameTarget = nil
+                    }
+                }
+            }
+            .navigationTitle("Rename")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Cancel") { renameTarget = nil }
+                }
+            }
         }
     }
 

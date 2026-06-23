@@ -37,6 +37,12 @@ final class IDDocumentStore {
     /// Persist a freshly-read document. Writes the photo and any raw
     /// chip blobs (SOD/DG1/DG2/...) to their own files; the IDDocument
     /// JSON keeps only filename references.
+    /// Whether a document with the same dedupe key (type + issuer + number + DOB +
+    /// expiry) is already saved under a different record id (ADR-0037 de-dup).
+    func isDuplicate(_ doc: IDDocument) -> Bool {
+        documents.contains { $0.id != doc.id && $0.dedupeKey == doc.dedupeKey }
+    }
+
     func add(
         _ doc: IDDocument,
         photo: UIImage?,
@@ -226,48 +232,97 @@ final class IDDocumentStore {
 
     // MARK: -- backup snapshot / restore (full encrypted backup, v4)
 
-    /// Encrypted-backup snapshot of every ID document this store
-    /// holds. Carries both the metadata (UserDefaults JSON) and the
-    /// on-disk binary content from IDDocumentChipData/ and
-    /// IDDocumentPhotos/ as base64 blobs keyed by filename so a
-    /// restore can re-create the exact filesystem layout.
+    /// Encrypted-backup snapshot of every ID document this store holds, in
+    /// the cross-platform INLINE shape (ADR-0035, Phase 4): each document
+    /// carries its chip blobs + portrait as inline base64 fields (`sod`,
+    /// `dg1`, `dg2`, `dg11`, `dg12`, `dg15`, `portraitJpeg`) on the same
+    /// object as its metadata, matching Android's `IDDocument` wire shape
+    /// exactly. (The previous iOS form split them into filename-keyed
+    /// `chipData`/`photos` maps, which Android could not produce.)
     struct Backup: Codable, Sendable {
-        let documents: [IDDocument]
-        /// Filename → base64. Mirrors IDDocumentChipData/ exactly.
-        let chipData: [String: String]
-        /// Filename → base64. Mirrors IDDocumentPhotos/ exactly.
-        let photos: [String: String]
+        let documents: [Entry]
+
+        /// One document = its IDDocument metadata + inline binary blobs.
+        /// Encodes by composing IDDocument's own Codable (so every metadata
+        /// key matches the local store + Android) and adding the blob keys.
+        /// On the wire iOS also emits IDDocument's `*Filename` pointers;
+        /// they are device-local and ignored on restore (Android omits them
+        /// and ignores them on decode), so cross-restore is unaffected.
+        struct Entry: Codable, Sendable {
+            let document: IDDocument
+            let sod: Data?
+            let dg1: Data?
+            let dg2: Data?
+            let dg11: Data?
+            let dg12: Data?
+            let dg15: Data?
+            let portraitJpeg: Data?
+
+            private enum BlobKeys: String, CodingKey {
+                case sod, dg1, dg2, dg11, dg12, dg15, portraitJpeg
+            }
+
+            init(
+                document: IDDocument, sod: Data?, dg1: Data?, dg2: Data?,
+                dg11: Data?, dg12: Data?, dg15: Data?, portraitJpeg: Data?
+            ) {
+                self.document = document
+                self.sod = sod; self.dg1 = dg1; self.dg2 = dg2
+                self.dg11 = dg11; self.dg12 = dg12; self.dg15 = dg15
+                self.portraitJpeg = portraitJpeg
+            }
+
+            init(from decoder: Decoder) throws {
+                document = try IDDocument(from: decoder)
+                let c = try decoder.container(keyedBy: BlobKeys.self)
+                sod = try c.decodeIfPresent(Data.self, forKey: .sod)
+                dg1 = try c.decodeIfPresent(Data.self, forKey: .dg1)
+                dg2 = try c.decodeIfPresent(Data.self, forKey: .dg2)
+                dg11 = try c.decodeIfPresent(Data.self, forKey: .dg11)
+                dg12 = try c.decodeIfPresent(Data.self, forKey: .dg12)
+                dg15 = try c.decodeIfPresent(Data.self, forKey: .dg15)
+                portraitJpeg = try c.decodeIfPresent(Data.self, forKey: .portraitJpeg)
+            }
+
+            func encode(to encoder: Encoder) throws {
+                try document.encode(to: encoder)
+                var c = encoder.container(keyedBy: BlobKeys.self)
+                try c.encodeIfPresent(sod, forKey: .sod)
+                try c.encodeIfPresent(dg1, forKey: .dg1)
+                try c.encodeIfPresent(dg2, forKey: .dg2)
+                try c.encodeIfPresent(dg11, forKey: .dg11)
+                try c.encodeIfPresent(dg12, forKey: .dg12)
+                try c.encodeIfPresent(dg15, forKey: .dg15)
+                try c.encodeIfPresent(portraitJpeg, forKey: .portraitJpeg)
+            }
+        }
     }
 
     func captureBackup() -> Backup {
-        var chipData: [String: String] = [:]
-        var photos: [String: String] = [:]
-        if let chipFiles = try? FileManager.default.contentsOfDirectory(at: Self.chipDataDir, includingPropertiesForKeys: nil) {
-            for url in chipFiles where url.isFileURL {
-                if let bytes = try? Data(contentsOf: url) {
-                    chipData[url.lastPathComponent] = bytes.base64EncodedString()
+        let entries = documents.map { doc in
+            Backup.Entry(
+                document: doc,
+                sod: loadBytes(filename: doc.sodFilename),
+                dg1: loadBytes(filename: doc.dg1Filename),
+                dg2: loadBytes(filename: doc.dg2Filename),
+                dg11: loadBytes(filename: doc.dg11Filename),
+                dg12: loadBytes(filename: doc.dg12Filename),
+                dg15: loadBytes(filename: doc.dg15Filename),
+                portraitJpeg: doc.photoFilename.flatMap {
+                    try? Data(contentsOf: Self.photosDir.appendingPathComponent($0))
                 }
-            }
+            )
         }
-        if let photoFiles = try? FileManager.default.contentsOfDirectory(at: Self.photosDir, includingPropertiesForKeys: nil) {
-            for url in photoFiles where url.isFileURL {
-                if let bytes = try? Data(contentsOf: url) {
-                    photos[url.lastPathComponent] = bytes.base64EncodedString()
-                }
-            }
-        }
-        return Backup(documents: documents, chipData: chipData, photos: photos)
+        return Backup(documents: entries)
     }
 
     /// Clean-slate replace. Empties the chip-data + photo directories,
-    /// drops the in-memory documents list, then writes back exactly
-    /// what the backup carried. Any current ID-document state on this
-    /// device is gone after this call.
+    /// drops the in-memory documents list, then writes the inline blobs
+    /// back to fresh files (filename = "<doc.id>.<group>.bin" / ".jpg",
+    /// re-derived, not trusted from the source device). Any current
+    /// ID-document state on this device is gone after this call.
     func applyBackup(_ backup: Backup) {
-        // A reset may have removed the directories before a restore;
-        // re-create them so the writes below land.
         Self.ensureStorageDirectories()
-        // Wipe current state on disk first.
         if let chipFiles = try? FileManager.default.contentsOfDirectory(at: Self.chipDataDir, includingPropertiesForKeys: nil) {
             for url in chipFiles { try? FileManager.default.removeItem(at: url) }
         }
@@ -275,19 +330,39 @@ final class IDDocumentStore {
             for url in photoFiles { try? FileManager.default.removeItem(at: url) }
         }
         documents = []
-        // Restore binary files first so any UI read that races us
-        // sees a consistent state (metadata + files together).
-        for (filename, b64) in backup.chipData {
-            if let bytes = Data(base64Encoded: b64) {
-                try? bytes.write(to: Self.chipDataDir.appendingPathComponent(filename), options: .atomic)
+        var restored: [IDDocument] = []
+        for entry in backup.documents {
+            var doc = entry.document
+            let id = doc.id.uuidString
+            func writeChip(_ bytes: Data?, _ group: String) -> String? {
+                guard let bytes else { return nil }
+                let filename = "\(id).\(group).bin"
+                do {
+                    try bytes.write(to: Self.chipDataDir.appendingPathComponent(filename), options: .atomic)
+                    return filename
+                } catch { return nil }
             }
-        }
-        for (filename, b64) in backup.photos {
-            if let bytes = Data(base64Encoded: b64) {
-                try? bytes.write(to: Self.photosDir.appendingPathComponent(filename), options: .atomic)
+            // Rewrite files from the inline blobs and re-stamp the pointers;
+            // ignore any filename the source device wrote into the metadata.
+            doc.sodFilename = writeChip(entry.sod, "sod")
+            doc.dg1Filename = writeChip(entry.dg1, "dg1")
+            doc.dg2Filename = writeChip(entry.dg2, "dg2")
+            doc.dg11Filename = writeChip(entry.dg11, "dg11")
+            doc.dg12Filename = writeChip(entry.dg12, "dg12")
+            doc.dg15Filename = writeChip(entry.dg15, "dg15")
+            if let portrait = entry.portraitJpeg {
+                let filename = "\(id).jpg"
+                if (try? portrait.write(to: Self.photosDir.appendingPathComponent(filename), options: .atomic)) != nil {
+                    doc.photoFilename = filename
+                } else {
+                    doc.photoFilename = nil
+                }
+            } else {
+                doc.photoFilename = nil
             }
+            restored.append(doc)
         }
-        documents = backup.documents
+        documents = restored
         persist()
     }
 }

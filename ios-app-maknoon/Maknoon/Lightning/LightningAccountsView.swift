@@ -28,7 +28,7 @@ struct LightningAccountsView: View {
                 } header: {
                     Text("LNDHub accounts")
                 } footer: {
-                    Text("Each account is one LNDHub custodial wallet — server URL, username, password. Same Zeus/BlueWallet import URL format works here.")
+                    Text("Each account is one LNDHub custodial wallet: server URL, username, password. Same Zeus/BlueWallet import URL format works here.")
                         .font(.caption)
                 }
             }
@@ -52,14 +52,13 @@ struct LightningAccountsView: View {
     @ViewBuilder
     private func accountRow(_ a: LightningAccount) -> some View {
         HStack(spacing: 12) {
-            WalletThumbprint(seed: a.thumbprintSeed, size: 36, systemImage: "bolt.fill")
             VStack(alignment: .leading, spacing: 2) {
                 Text(a.label).font(.callout.weight(.semibold))
                 Text(subtitle(for: a)).font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
             if a.id == store.lightningAccountStore.activeAccount?.id {
-                Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                Image(systemName: "checkmark.circle.fill").foregroundStyle(.secondary)
             }
         }
         .contentShape(Rectangle())

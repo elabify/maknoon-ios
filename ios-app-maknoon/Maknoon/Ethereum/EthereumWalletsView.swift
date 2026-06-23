@@ -59,11 +59,6 @@ struct EthereumWalletsView: View {
             store.ethereumWalletStore.setActive(w.id)
         } label: {
             HStack(spacing: 12) {
-                WalletThumbprint(
-                    seed: w.address ?? w.id.uuidString,
-                    size: 36,
-                    systemImage: "diamond.fill"
-                )
                 VStack(alignment: .leading, spacing: 2) {
                     Text(w.label).font(.headline)
                     Text(subtitle(for: w))
@@ -71,7 +66,7 @@ struct EthereumWalletsView: View {
                 }
                 Spacer()
                 if store.ethereumWalletStore.activeWalletId == w.id {
-                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.secondary)
                 }
             }
         }
@@ -133,6 +128,25 @@ struct EthereumWalletsView: View {
 
 // MARK: -- AddEthereumWalletSheet
 
+// Add-Ethereum-wallet flow (ADR-0033 universal Add-wallet anatomy,
+// identical to the Android reference per source). Ethereum is chain-
+// agnostic (coinType 60, the same address on every EVM network), so
+// there is NO network picker in the create path; the network dropdown
+// appears ONLY in the Auto-Discovery scan subsection. Ethereum supports
+// BOTH Ledger and Trezor.
+//
+//   Software : Wallet Label -> Account -> Add wallet, then a divider +
+//              Auto Discovery (software sweep, network dropdown).
+//   Hardware : Device chips + inline "Add New Device" -> Account (Ledger:
+//              stepper; Trezor: fixed 0) -> readiness card -> Add wallet,
+//              then a divider + Auto Discovery (device sweep, network
+//              dropdown).
+//   Passphrase (Trezor): collected in the connection step
+//              (DeviceReadyConfirmationSheet) on Add / Discover tap; the
+//              one choice applies to both. Ledger has no passphrase step.
+//
+// UI copy says "second factor" / "security key", never "Identity Sandwich".
+
 struct AddEthereumWalletSheet: View {
     var onCreated: (() -> Void)? = nil
     @Environment(HolderStore.self) private var store
@@ -146,10 +160,9 @@ struct AddEthereumWalletSheet: View {
 
     @State private var source: Source = .software
     @State private var label = ""
-    @State private var selectedDeviceId: UUID?
     @State private var account: UInt32 = 0
-    /// Trezor-only hidden-wallet selector for the direct-add path.
-    /// `.standard` reproduces exact Ledger behavior (empty passphrase).
+    /// Trezor-only hidden-wallet selection, collected in the connection
+    /// step (not inline). `.standard` reproduces exact Ledger behavior.
     @State private var hwPassphrase: HiddenWalletSelection = .standard
     /// Host-typed passphrase, used only when `hwPassphrase == .hostTyped`.
     @State private var hwHostPassphrase: String = ""
@@ -162,30 +175,37 @@ struct AddEthereumWalletSheet: View {
     /// wallet; the user can still adjust it.
     @State private var softwareAccount: UInt32 = 0
     @State private var didSeedSoftwareAccount = false
+    @State private var selectedDeviceId: UUID?
+    /// Auto-Discovery "scan network" for both software and hardware
+    /// discover, independent of the (now removed) create-path network.
+    @State private var scanNetwork: EthereumNetwork = .mainnet
     @State private var creating = false
     @State private var errorText: String?
-    @State private var discoverSource: DiscoverEthereumWalletsView.Source?
-    @State private var showUnlock: Bool = false
-    /// Populated when the user taps Create on the hardware tab.
-    /// Drives the pre-tap "get the device ready" sheet.
     @State private var pendingReadyOp: PendingHardwareOperation?
-    /// Populated when the user taps Discover with a hardware device
-    /// selected. Same sheet, different purpose copy.
     @State private var pendingReadyDiscover: PendingHardwareOperation?
-    /// Initial network the wallet opens on after creation. Drives
-    /// the per-wallet network selection map; not stored on the
-    /// descriptor itself. Defaults to mainnet (or Sepolia for the
-    /// software discover path, which is testnet-friendly).
-    @State private var initialNetwork: EthereumNetwork = .mainnet
+    @State private var showSoftwareDiscover: Bool = false
+    @State private var hardwareDiscoverSource: DiscoverEthereumWalletsView.Source?
+    @State private var showAddDevice: Bool = false
 
     private var ethereumDevices: [RegisteredDevice] {
         store.devices.devicesSupporting(.ethereum)
     }
 
+    private var selectedDevice: RegisteredDevice? {
+        guard let id = selectedDeviceId else { return nil }
+        return store.devices.find(id: id)
+    }
+
+    private var isTrezor: Bool { selectedDevice?.kind == .trezor }
+
+    /// Trezor's account is fixed to 0 (a hidden-wallet passphrase makes
+    /// the index ambiguous); Ledger keeps the 0..N stepper.
+    private var effectiveAccount: UInt32 { isTrezor ? 0 : account }
+
     var body: some View {
         NavigationStack {
             Form {
-                if store.sandwich == nil {
+                if store.sandwich == nil && source == .software {
                     lockedBannerSection
                 }
                 Section("Source") {
@@ -193,12 +213,7 @@ struct AddEthereumWalletSheet: View {
                         ForEach(Source.allCases) { Text($0.rawValue).tag($0) }
                     }
                     .pickerStyle(.segmented)
-                    .onChange(of: source) { _, _ in
-                        // Errors and in-flight state belong to the
-                        // tab the user was just on, not the one they
-                        // just switched to.
-                        errorText = nil
-                    }
+                    .onChange(of: source) { _, _ in errorText = nil }
                     Text(sourceFooter)
                         .font(.caption).foregroundStyle(.secondary)
                 }
@@ -208,10 +223,9 @@ struct AddEthereumWalletSheet: View {
                     softwareDiscoverSection
                 } else {
                     hardwareDeviceSection
-                    if let devId = selectedDeviceId,
-                       let dev = store.devices.find(id: devId) {
+                    if let dev = selectedDevice {
                         hardwareWalletSection(dev)
-                        hardwareCreateSection
+                        hardwareCreateSection(dev)
                         hardwareDiscoverSection(dev)
                     }
                 }
@@ -224,30 +238,73 @@ struct AddEthereumWalletSheet: View {
                     didSeedSoftwareAccount = true
                 }
             }
+            .onChange(of: selectedDeviceId) { _, _ in
+                // A fresh device selection starts from the standard wallet;
+                // the passphrase choice is re-collected in the connection step.
+                hwPassphrase = .standard
+                hwHostPassphrase = ""
+                errorText = nil
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") { dismiss() }
                 }
             }
-            .sheet(isPresented: $showUnlock) {
-                HardwareUnlockView(enrollments: store.pendingHardwareUnlock)
-                    .environment(store)
-            }
-            .sheet(item: $discoverSource) { src in
-                DiscoverEthereumWalletsView(
-                    source: src,
-                    network: initialNetwork,
-                    onCompleted: {
-                        dismiss()
-                        onCreated?()
+            .sheet(isPresented: $showAddDevice) {
+                NavigationStack {
+                    AddHardwareDeviceFlow(
+                        kinds: DeviceKind.walletCapableRegistrableCases
+                    ) { registered in
+                        showAddDevice = false
+                        if registered {
+                            // Land on the freshly registered Ethereum-capable
+                            // device so the user can add its wallet at once.
+                            source = .hardware
+                            if let dev = ethereumDevices.last {
+                                selectedDeviceId = dev.id
+                            }
+                        }
                     }
-                )
-                .environment(store)
+                    .environment(store)
+                    .navigationTitle("Add New Device")
+                    .navigationBarTitleDisplayMode(.inline)
+                }
+            }
+            .sheet(isPresented: $showSoftwareDiscover) {
+                NavigationStack {
+                    DiscoverEthereumWalletsView(
+                        source: .software,
+                        network: scanNetwork,
+                        passphrase: .constant(.standard),
+                        hostPassphrase: .constant(""),
+                        onCompleted: {
+                            dismiss()
+                            onCreated?()
+                        }
+                    )
+                    .environment(store)
+                }
+            }
+            .sheet(item: $hardwareDiscoverSource) { src in
+                NavigationStack {
+                    DiscoverEthereumWalletsView(
+                        source: src,
+                        network: scanNetwork,
+                        passphrase: $hwPassphrase,
+                        hostPassphrase: $hwHostPassphrase,
+                        onCompleted: {
+                            dismiss()
+                            onCreated?()
+                        }
+                    )
+                    .environment(store)
+                }
             }
             .sheet(item: $pendingReadyOp) { op in
                 DeviceReadyConfirmationSheet(
                     device: op.device,
                     purpose: op.purpose,
+                    showsPassphraseSelector: op.device.kind == .trezor,
                     onContinue: {
                         Task { @MainActor in
                             creating = true
@@ -255,17 +312,26 @@ struct AddEthereumWalletSheet: View {
                             creating = false
                         }
                     },
-                    onCancel: {}
+                    onCancel: {},
+                    onPassphraseSelection: { sel, pass in
+                        hwPassphrase = sel
+                        hwHostPassphrase = pass
+                    }
                 )
             }
             .sheet(item: $pendingReadyDiscover) { op in
                 DeviceReadyConfirmationSheet(
                     device: op.device,
                     purpose: op.purpose,
+                    showsPassphraseSelector: op.device.kind == .trezor,
                     onContinue: {
-                        discoverSource = .hardware(deviceId: op.device.id)
+                        hardwareDiscoverSource = .hardware(deviceId: op.device.id)
                     },
-                    onCancel: {}
+                    onCancel: {},
+                    onPassphraseSelection: { sel, pass in
+                        hwPassphrase = sel
+                        hwHostPassphrase = pass
+                    }
                 )
             }
         }
@@ -276,28 +342,16 @@ struct AddEthereumWalletSheet: View {
         case .software:
             return "Creates a wallet on this iPhone. One biometric or passcode confirmation at setup; everyday use is silent."
         case .hardware:
-            return "Pairs a wallet with a Ledger you've registered. Sending requires the device to confirm each transaction."
+            return "Pairs a wallet with a Ledger or Trezor you've registered. Sending requires the device to confirm each transaction."
         }
     }
 
     @ViewBuilder
     private var lockedBannerSection: some View {
         Section {
-            VStack(alignment: .leading, spacing: 8) {
-                Label("Identity Sandwich is locked", systemImage: "lock.shield.fill")
-                    .font(.callout.weight(.semibold))
-                    .foregroundStyle(.orange)
-                Text("Software wallets derive from your master seed and need the Sandwich unlocked. Hardware wallets do not. Tap below to unlock with your enrolled device.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Button {
-                    showUnlock = true
-                } label: {
-                    Label("Unlock with hardware device", systemImage: "key.radiowaves.forward")
-                }
-                .buttonStyle(.bordered)
-            }
-            .padding(.vertical, 4)
+            Text("Software wallets derive from your master seed and need your identity unlocked. Unlock from the Identity tab, or switch the Source to Hardware.")
+                .font(.caption)
+                .foregroundStyle(.red)
         }
     }
 
@@ -305,16 +359,38 @@ struct AddEthereumWalletSheet: View {
     private var hardwareDeviceSection: some View {
         if ethereumDevices.isEmpty {
             Section("Device") {
-                Text("No hardware devices registered yet. Add one from Settings → Devices first.")
+                Text("No Ledger or security key is registered yet. Register one to add its Ethereum wallet.")
                     .font(.caption).foregroundStyle(.secondary)
+                Button {
+                    showAddDevice = true
+                } label: {
+                    Label("Add New Device", systemImage: "plus")
+                }
             }
         } else {
             Section("Device") {
-                Picker("Device", selection: $selectedDeviceId) {
-                    Text("Pick a device").tag(UUID?.none)
-                    ForEach(ethereumDevices) { dev in
-                        Text("\(dev.label) (\(dev.kind.displayName))").tag(Optional(dev.id))
+                // Selectable device rows (ADR-0033 FilterChips), label
+                // "<dev.label> (<kind.displayName>)". Tapping a row selects
+                // it; the active row shows a leading checkmark.
+                ForEach(ethereumDevices) { dev in
+                    Button {
+                        selectedDeviceId = dev.id
+                    } label: {
+                        HStack {
+                            Image(systemName: dev.id == selectedDeviceId
+                                ? "checkmark.circle.fill" : "circle")
+                                .foregroundStyle(dev.id == selectedDeviceId ? Color.accentColor : Color.secondary)
+                            Text("\(dev.label) (\(dev.kind.displayName))")
+                            Spacer()
+                        }
+                        .contentShape(Rectangle())
                     }
+                    .buttonStyle(.plain)
+                }
+                Button {
+                    showAddDevice = true
+                } label: {
+                    Label("Add New Device", systemImage: "plus")
                 }
             }
         }
@@ -322,19 +398,7 @@ struct AddEthereumWalletSheet: View {
 
     private var softwareWalletSection: some View {
         Section {
-            TextField("Label (e.g. Daily)", text: $label)
-            Picker("Open on", selection: $initialNetwork) {
-                Section {
-                    ForEach(EthereumNetwork.displayOrdered.filter { !$0.isTestnet }, id: \.self) {
-                        Text($0.displayName).tag($0)
-                    }
-                }
-                Section("Testnets") {
-                    ForEach(EthereumNetwork.displayOrdered.filter { $0.isTestnet }, id: \.self) {
-                        Text($0.displayName).tag($0)
-                    }
-                }
-            }
+            TextField("Wallet Label", text: $label)
             Stepper(value: $softwareAccount, in: 0...20) {
                 HStack {
                     Text("Account")
@@ -351,7 +415,7 @@ struct AddEthereumWalletSheet: View {
             } label: {
                 HStack {
                     if creating { ProgressView().controlSize(.small) }
-                    Text(creating ? "Setting up…" : "Create")
+                    Text(creating ? "Setting up…" : "Add wallet")
                 }
             }
             .disabled(creating || !canCreate || softwareAccountInUse)
@@ -361,7 +425,7 @@ struct AddEthereumWalletSheet: View {
         } header: {
             Text("New Ethereum wallet")
         } footer: {
-            Text("The same wallet works on every EVM network; \"Open on\" just decides which one opens first. The account number fills in automatically to the next free one. You'll confirm with biometric or passcode once.")
+            Text("The same address works on every EVM network; switch networks from the wallet screen.")
                 .font(.caption)
         }
     }
@@ -376,84 +440,77 @@ struct AddEthereumWalletSheet: View {
 
     private func hardwareWalletSection(_ dev: RegisteredDevice) -> some View {
         Section {
-            Picker("Open on", selection: $initialNetwork) {
-                Section {
-                    ForEach(EthereumNetwork.displayOrdered.filter { !$0.isTestnet }, id: \.self) {
-                        Text($0.displayName).tag($0)
-                    }
-                }
-                Section("Testnets") {
-                    ForEach(EthereumNetwork.displayOrdered.filter { $0.isTestnet }, id: \.self) {
-                        Text($0.displayName).tag($0)
-                    }
-                }
-            }
-            Stepper("Account #\(account)", value: $account, in: 0...255)
             TextField(autoLabel(for: dev), text: $label)
             if dev.kind == .trezor {
-                Picker("Wallet", selection: $hwPassphrase) {
-                    ForEach(HiddenWalletSelection.allCases) { mode in
-                        Text(mode.rawValue).tag(mode)
-                    }
-                }
-                .pickerStyle(.segmented)
-                if hwPassphrase == .hostTyped {
-                    SecureField("Passphrase", text: $hwHostPassphrase)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                }
+                Text("Account 0.")
+                    .font(.caption).foregroundStyle(.secondary)
+            } else {
+                Stepper("Account #\(account)", value: $account, in: 0...255)
             }
             DerivationPathAdvancedField(
-                standardPath: BIP32Path.standardEthereum(account: account),
+                standardPath: BIP32Path.standardEthereum(account: effectiveAccount),
                 useCustom: $useCustomPath,
                 customPath: $customPath
             )
         } header: {
             Text("New Ethereum wallet")
         } footer: {
-            Text(dev.kind == .trezor
-                ? hwPassphrase.footer
-                : "Leave the label blank to use \"\(autoLabel(for: dev))\". The address is the same on every EVM network; \"Open on\" picks which one the wallet opens to first.")
+            Text("Leave the label blank to use \"\(autoLabel(for: dev))\". The same address works on every EVM network; switch networks from the wallet screen.")
                 .font(.caption)
         }
     }
 
-
-    private var hardwareCreateSection: some View {
+    private func hardwareCreateSection(_ dev: RegisteredDevice) -> some View {
         Section {
+            // Device-readiness card (ADR-0033): how to ready the device,
+            // no passphrase copy (that lives in the connection step).
+            Text(dev.kind == .ledger
+                ? "Unlock the Ledger and open the Ethereum app, then tap Add wallet."
+                : "Unlock your Trezor, then tap Add wallet.")
+                .font(.caption).foregroundStyle(.secondary)
             Button {
                 Task { await create() }
             } label: {
                 HStack {
                     if creating { ProgressView().controlSize(.small) }
-                    Text(creating ? "Setting up…" : "Create Single Wallet")
+                    Text(creating ? "Setting up…" : "Add wallet")
                 }
             }
             .disabled(creating || !canCreate)
             if let errorText {
                 Text(errorText).foregroundStyle(.red).font(.callout)
             }
-        } footer: {
-            Text("Imports just account #\(account) from the selected device. Use Discover existing wallets below if you don't know which accounts already hold value.")
-                .font(.caption)
         }
     }
 
     private var softwareDiscoverSection: some View {
         Section {
-            Button {
-                discoverSource = .software
-            } label: {
-                Label("Discover existing wallets…", systemImage: "magnifyingglass")
+            Picker("Chain to scan", selection: $scanNetwork) {
+                ForEach(EthereumNetwork.displayOrdered, id: \.self) { n in
+                    Text(n.displayName).tag(n)
+                }
             }
+            Button {
+                showSoftwareDiscover = true
+            } label: {
+                Label("Discover existing wallets", systemImage: "magnifyingglass")
+            }
+            .disabled(store.sandwich == nil)
+        } header: {
+            Text("Auto Discovery")
         } footer: {
-            Text("Scans accounts on \(initialNetwork.displayName) until 4 consecutive empty accounts are found, then stops. Use this when restoring from a backup that already has on-chain activity.")
+            Text("Scans for your Ethereum accounts on \(scanNetwork.displayName) that already have history, so you can re-add wallets created previously.")
                 .font(.caption)
         }
     }
 
     private func hardwareDiscoverSection(_ dev: RegisteredDevice) -> some View {
         Section {
+            Picker("Chain to scan", selection: $scanNetwork) {
+                ForEach(EthereumNetwork.displayOrdered, id: \.self) { n in
+                    Text(n.displayName).tag(n)
+                }
+            }
             Button {
                 if HardwareOperationPurpose.shouldPresent(for: dev.kind) {
                     pendingReadyDiscover = PendingHardwareOperation(
@@ -461,13 +518,15 @@ struct AddEthereumWalletSheet: View {
                         purpose: .ethereumDiscover
                     )
                 } else {
-                    discoverSource = .hardware(deviceId: dev.id)
+                    hardwareDiscoverSource = .hardware(deviceId: dev.id)
                 }
             } label: {
-                Label("Discover existing wallets…", systemImage: "magnifyingglass")
+                Label("Discover existing wallets", systemImage: "magnifyingglass")
             }
+        } header: {
+            Text("Auto Discovery")
         } footer: {
-            Text("Scans accounts on \(initialNetwork.displayName) from this device until 4 consecutive empty accounts are found, then stops.")
+            Text("Scans this device for your Ethereum accounts on \(scanNetwork.displayName) that already have history, so you can re-add wallets created previously.")
                 .font(.caption)
         }
     }
@@ -477,12 +536,12 @@ struct AddEthereumWalletSheet: View {
     /// the label because the Ethereum address is the same on every
     /// EVM network the wallet later opens on.
     private func autoLabel(for dev: RegisteredDevice) -> String {
-        "\(dev.label) #\(account)"
+        "\(dev.label) #\(effectiveAccount)"
     }
 
     private var canCreate: Bool {
         switch source {
-        case .software: return true
+        case .software: return store.sandwich != nil
         case .hardware: return selectedDeviceId != nil
         }
     }
@@ -496,28 +555,18 @@ struct AddEthereumWalletSheet: View {
             await createSoftware()
             creating = false
         case .hardware:
-            guard let devId = selectedDeviceId,
-                  let dev = store.devices.find(id: devId) else {
+            guard let dev = selectedDevice else {
                 errorText = "Pick a device first."
                 return
             }
-            // A host-typed hidden wallet needs its passphrase before we
-            // can derive its (distinct) address.
-            if dev.kind == .trezor, !hwPassphrase.isReady(hostPassphrase: hwHostPassphrase) {
-                errorText = "Enter the hidden-wallet passphrase first."
-                return
-            }
-            // Pre-flight the dedup check so the user gets an instant
-            // "already exists" error instead of being walked through
-            // the readiness sheet + BLE roundtrip before the same
-            // collision is caught inside createHardware. Skipped for a
-            // hidden wallet: it derives a different address at the same
-            // account index, so the standard wallet there is not a
-            // collision. The address-based check in createHardware
-            // catches a true duplicate after derivation.
-            if hwPassphrase == .standard,
-               let existing = existingHardwareWallet(deviceId: dev.id, account: account) {
-                errorText = "A wallet for \(dev.label) at account #\(account) already exists, labelled \"\(existing.label)\". Use Discover existing wallets if you're trying to recover a different account."
+            // Trezor is fixed to account 0 and may add a hidden wallet (a
+            // distinct address at the same index), so the account-based
+            // pre-check is skipped for it; the address-based dedup in
+            // createHardware catches a true duplicate after derivation.
+            // Ledger has no hidden wallets, so the early check is safe.
+            if dev.kind != .trezor,
+               let existing = existingHardwareWallet(deviceId: dev.id, account: effectiveAccount) {
+                errorText = "A wallet for \(dev.label) at account #\(effectiveAccount) already exists, labelled \"\(existing.label)\"."
                 return
             }
             if HardwareOperationPurpose.shouldPresent(for: dev.kind) {
@@ -544,37 +593,31 @@ struct AddEthereumWalletSheet: View {
 
     @MainActor
     private func createSoftware() async {
+        guard let sandwich = store.sandwich else {
+            errorText = "Software wallets derive from your master seed and need your identity unlocked. Unlock from the Identity tab, or switch the Source to Hardware."
+            return
+        }
         let account = softwareAccount
-        let trimmed = label.trimmingCharacters(in: .whitespaces)
-        let baseLabel = trimmed.isEmpty ? "Wallet" : trimmed
-        let suffixedLabel = "\(baseLabel) #\(account)"
-
         // Never create a second software wallet at the same account: it
         // would derive the identical address across every EVM network.
         if store.ethereumWalletStore.hasSoftwareWallet(account: account) {
-            errorText = "A software wallet at account #\(account) already exists. Pick a different account number."
+            errorText = "A software wallet at account \(account) already exists. Pick a different account number."
             return
         }
-
-        guard let sandwich = store.sandwich else {
-            // Surface the unlock sheet inline rather than just an
-            // error message. The banner at the top of the form also
-            // exposes the same affordance.
-            showUnlock = true
-            return
-        }
+        let trimmed = label.trimmingCharacters(in: .whitespaces)
+        let baseLabel = trimmed.isEmpty ? "Ethereum #\(account)" : trimmed
         do {
             let address = try EthereumDescriptors.addressFromSandwich(
                 sandwich: sandwich,
                 account: account,
-                biometricReason: "Set up your Ethereum wallet"
+                biometricReason: "Create \(baseLabel)"
             )
             let descriptor = EthereumWalletDescriptor(
-                label: suffixedLabel,
+                label: baseLabel,
                 kind: .software(account: account),
                 cachedAddress: address
             )
-            store.ethereumWalletStore.add(descriptor, initialNetwork: initialNetwork, makeActive: true)
+            store.ethereumWalletStore.add(descriptor, makeActive: true)
             dismiss()
             onCreated?()
         } catch {
@@ -584,16 +627,18 @@ struct AddEthereumWalletSheet: View {
 
     @MainActor
     private func createHardware() async {
-        guard let devId = selectedDeviceId,
-              let dev = store.devices.find(id: devId)
-        else {
+        guard let dev = selectedDevice else {
             errorText = "Pick a device first."
             return
         }
-        // Persist the hidden-wallet binding (writes a host-typed
-        // passphrase to the Keychain). nil for the standard wallet and
-        // for every Ledger add. Built before the BLE roundtrip so a
-        // Keychain failure surfaces immediately.
+        let account = effectiveAccount
+        if dev.kind == .trezor, !hwPassphrase.isReady(hostPassphrase: hwHostPassphrase) {
+            errorText = "Enter the hidden-wallet passphrase first."
+            return
+        }
+        // Persist the hidden-wallet binding (records only the entry
+        // method; the secret is never stored). nil for the standard
+        // wallet and for every Ledger add.
         let hidden = dev.kind == .trezor
             ? HardwarePassphraseRef.persist(selection: hwPassphrase)
             : nil
@@ -610,10 +655,9 @@ struct AddEthereumWalletSheet: View {
             ? "\(autoLabel(for: dev))\(suffix)"
             : "\(trimmed) #\(account)\(suffix)"
 
-        // Second-line defence for the standard wallet in case the user
-        // races the form (rapid double-tap). A hidden or custom-path
-        // wallet shares the account index, so it's deduped by address
-        // after derivation.
+        // A hidden or custom-path wallet shares the account index but
+        // derives a different address, so the account-based pre-check is
+        // skipped; the address-based check below catches a true dup.
         if hidden == nil, pathOverride == nil,
            let existing = existingHardwareWallet(deviceId: dev.id, account: account) {
             errorText = "A wallet for \(dev.label) at account #\(account) already exists, labelled \"\(existing.label)\"."
@@ -657,7 +701,7 @@ struct AddEthereumWalletSheet: View {
                 hidden: hidden,
                 derivationPath: pathOverride
             )
-            store.ethereumWalletStore.add(descriptor, initialNetwork: initialNetwork, makeActive: true)
+            store.ethereumWalletStore.add(descriptor, makeActive: true)
             store.devices.addEthereumWallet(deviceId: dev.id, walletId: descriptor.id)
             dismiss()
             onCreated?()

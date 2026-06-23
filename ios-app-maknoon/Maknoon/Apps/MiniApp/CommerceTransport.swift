@@ -1,7 +1,7 @@
 // HTTP client for the server-mediated "verify and pay" flow (ADR-0031). The
 // merchant hosts a signed CommerceRequest (small URL QR) and polls for the
 // holder's response; the holder fetches the request and posts back its
-// presentation + payment proof (txHash). The server is a relay — verification
+// presentation + payment proof (txHash). The server is a relay, verification
 // happens on the merchant device.
 
 import Foundation

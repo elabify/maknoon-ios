@@ -73,7 +73,7 @@ struct SolanaSPLToken: Codable, Identifiable, Hashable, Sendable {
     /// CoinGecko asset id derived from the token symbol. Used by
     /// the send view to display fiat captions and to enable the
     /// fiat-input denomination picker. Returns nil for tokens we
-    /// don't have a price feed for — the UI hides the fiat option
+    /// don't have a price feed for. The UI hides the fiat option
     /// in that case. Same pattern as `EthereumToken.coinGeckoId`.
     var coinGeckoId: String? {
         switch symbol.uppercased() {

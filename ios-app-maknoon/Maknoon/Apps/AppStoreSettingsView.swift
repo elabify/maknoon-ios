@@ -1,6 +1,6 @@
-// Settings page for managing configured dApps catalogs. Lists the
+// Settings page for managing configured Apps catalogs. Lists the
 // built-in Elabify catalog (read-only), every user-added catalog, and
-// an "Add dApps catalog" row that lets the user paste a URL.
+// an "Add Apps catalog" row that lets the user paste a URL.
 
 import SwiftUI
 
@@ -14,20 +14,20 @@ struct AppStoreSettingsView: View {
             Section {
                 row(
                     title: store.appStores.defaultStore.name,
-                    subtitle: "Curated by \(store.appStores.defaultStore.curator) - built in",
+                    subtitle: "Built in",
                     canRemove: false,
                     removeAction: nil
                 )
             } header: {
-                Text("Default dApps catalog")
+                Text("Default Apps catalog")
             } footer: {
-                Text("The Maknoon dApps catalog ships with Maknoon and cannot be removed.")
+                Text("The Maknoon Apps catalog ships with Maknoon and cannot be removed.")
                     .font(.caption)
             }
 
             Section {
                 if store.appStores.userStores.isEmpty {
-                    Text("No additional dApps catalogs configured.")
+                    Text("No additional Apps catalogs configured.")
                         .font(.callout).foregroundStyle(.secondary)
                 } else {
                     ForEach(store.appStores.userStores) { s in
@@ -44,13 +44,10 @@ struct AppStoreSettingsView: View {
                 Button {
                     showAddSheet = true
                 } label: {
-                    Label("Add dApps catalog…", systemImage: "plus.circle")
+                    Label("Add Apps catalog…", systemImage: "plus.circle")
                 }
             } header: {
-                Text("Additional dApps catalogs")
-            } footer: {
-                Text("Add an institution-curated dApps catalog by URL. The catalog is a JSON document Maknoon fetches and renders alongside the built-in one. Useful for issuers and verifier consortia that want to publish their own curated integration list.")
-                    .font(.caption)
+                Text("Additional Apps catalogs")
             }
 
             Section {
@@ -60,9 +57,6 @@ struct AppStoreSettingsView: View {
                 ))
             } header: {
                 Text("Beta apps")
-            } footer: {
-                Text("Beta dApps are experimental and may change or break. They are hidden by default; turn this on to see them in every catalog. Apps you have already installed stay available regardless.")
-                    .font(.caption)
             }
         }
         .navigationTitle("Apps")
@@ -109,8 +103,8 @@ private struct AddStoreSheet: View {
         NavigationStack {
             Form {
                 Section {
-                    TextField("Catalog name (e.g. MyBank dApps)", text: $name)
-                    TextField("https://example.com/dapps.json", text: $urlString)
+                    TextField("Catalog name (e.g. MyBank Apps)", text: $name)
+                    TextField("https://example.com/apps.json", text: $urlString)
                         .keyboardType(.URL)
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
@@ -118,7 +112,7 @@ private struct AddStoreSheet: View {
                         Text(error).font(.caption).foregroundStyle(.red)
                     }
                 } footer: {
-                    Text("The URL should serve a JSON dApps catalog matching Maknoon's schema. Maknoon fetches it and renders its entries alongside the built-in catalog.")
+                    Text("Enter the URL of an Apps catalog to add it alongside the built-in one.")
                         .font(.caption)
                 }
                 Section {
@@ -141,7 +135,7 @@ private struct AddStoreSheet: View {
                     .disabled(name.isEmpty || urlString.isEmpty)
                 }
             }
-            .navigationTitle("Add dApps catalog")
+            .navigationTitle("Add Apps catalog")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {

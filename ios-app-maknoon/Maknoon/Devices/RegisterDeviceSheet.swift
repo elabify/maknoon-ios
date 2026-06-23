@@ -31,6 +31,11 @@ struct RegisterDeviceSheet: View {
     /// ignored.
     enum Transport { case nfc, usb }
     @State private var transport: Transport = .nfc
+    /// YubiKey FIDO2 PIN, entered before the single register+enroll tap.
+    @State private var yubiKeyPin: String = ""
+    /// Shown once after enrolling a no-PIN YubiKey, before completing.
+    @State private var noPinWarning = false
+    @State private var pendingDoneRec: RegisteredDevice? = nil
 
     var body: some View {
         NavigationStack {
@@ -80,6 +85,15 @@ struct RegisterDeviceSheet: View {
                     onCancel: { pairingCoordinator.cancel() }
                 )
             }
+            .alert("Registered without a PIN", isPresented: $noPinWarning) {
+                Button("OK", role: .cancel) {
+                    if let rec = pendingDoneRec { onDone(.success(rec)) }
+                    pendingDoneRec = nil
+                    dismiss()
+                }
+            } message: {
+                Text("This YubiKey has no FIDO2 PIN, so anyone holding it can unlock your identity with a tap. For a stronger second factor, set a PIN on the key (Yubico Authenticator) and re-register it.")
+            }
         }
     }
 
@@ -109,17 +123,17 @@ struct RegisterDeviceSheet: View {
         Section {
             instructions
             if kind == .yubikey {
+                // A YubiKey is identity-only: registering it IS enrolling it into
+                // the Identity Sandwich, in a single NFC tap (read serial + FIDO2
+                // hmac-secret enroll). Enrollment needs FIDO2, which iPhone only
+                // exposes over NFC, so there is no USB-C path here.
+                TextField("Label (e.g. \"Backup key\")", text: $label)
+                SecureField("FIDO2 PIN (leave blank if the key has none)", text: $yubiKeyPin)
                 Button {
                     transport = .nfc
-                    Task { await identify() }
+                    Task { await registerAndEnrollYubiKey() }
                 } label: {
-                    Label("Tap with NFC", systemImage: "wave.3.right.circle.fill")
-                }
-                Button {
-                    transport = .usb
-                    Task { await identify() }
-                } label: {
-                    Label("Plug in via USB-C", systemImage: "cable.connector")
+                    Label("Tap with NFC to add", systemImage: "wave.3.right.circle.fill")
                 }
             } else {
                 Button {
@@ -137,8 +151,8 @@ struct RegisterDeviceSheet: View {
     private var instructions: some View {
         switch kind {
         case .yubikey:
-            Text("Add a YubiKey 5 series (any NFC-capable variant) or 5C. NFC is the recommended path: iOS shows its native NFC sheet, you tap the key to the top of the phone, Maknoon reads the serial. USB-C is a fallback for devices without NFC.").font(.callout)
-            Text("Identity Sandwich enrollment (a later step) requires NFC; FIDO2 isn't reachable over USB-C on iPhone.")
+            Text("Add a YubiKey 5 series (any NFC-capable variant). One tap registers it AND enrolls it as a second factor; there is no value in a YubiKey that isn't a factor, so the two are combined.").font(.callout)
+            Text("If your key has a FIDO2 PIN, enter it above; leave it blank for a no-PIN (tap-only) key. Enrollment uses FIDO2, which iPhone only exposes over NFC.")
                 .font(.caption).foregroundStyle(.secondary)
         case .ledger:
             Text("Unlock the Ledger Nano X so we can locally confirm the device serial.").font(.callout)
@@ -197,6 +211,76 @@ struct RegisterDeviceSheet: View {
         case .ledger:     return "Ledger"
         case .trezor:     return "Trezor"
         case .seedsigner: return "SeedSigner"
+        }
+    }
+
+    /// One-tap YubiKey flow: register + enroll into the Identity Sandwich in a
+    /// single NFC session, then seal the wrap. Rolls the registration back if
+    /// the seal fails so we never leave a bare, unenrolled YubiKey (#79).
+    @MainActor
+    private func registerAndEnrollYubiKey() async {
+        phase = .connecting
+        errorText = nil
+        do {
+            // ADR-0032: the salt IS the deviceSalt now (it drives both the
+            // YubiKey hmac-secret and the HKDF wrap key).
+            let deviceSalt = SecondFactorWrap.newDeviceSalt()
+            let labelToUse = label.trimmingCharacters(in: .whitespaces).isEmpty ? defaultLabel : label
+            let r = try await YubiKeyClient.shared.registerAndEnrollOverNFC(
+                label: labelToUse,
+                salt: deviceSalt,
+                pin: yubiKeyPin.isEmpty ? nil : yubiKeyPin
+            )
+            yubiKeyPin = ""
+            // This one-tap register+enroll only seals the FIRST device
+            // (mints a fresh CEK). When the second factor is already on,
+            // minting a new CEK here would orphan the other enrolled
+            // devices' wrappedCEKs, so refuse and point the user at the
+            // add-from-an-enrolled-device flow (which recovers + reuses
+            // the shared CEK).
+            guard try !IdentitySandwich.isSecondFactorOn() else {
+                throw IdentityWrapError.sealFailed("A security key is already enrolled. Add another from the enrolled device's detail screen so they share one wrap key.")
+            }
+            let rec = store.devices.register(kind: .yubikey, serial: r.serial, label: labelToUse)
+            guard let liveSandwich = store.sandwich else {
+                store.devices.remove(id: rec.id) // roll back: no bare key
+                throw SandwichError.masterUnavailable
+            }
+            do {
+                let seal = try IdentitySandwich.sealForSecondFactorEnroll(
+                    sandwich: liveSandwich,
+                    device: rec,
+                    secret: r.secret,
+                    deviceSalt: deviceSalt,
+                    existingCek: nil
+                )
+                store.sandwich?.cacheRecoveryMaterial(seal.material)
+                store.devices.setIdentityPromotion(
+                    deviceId: rec.id,
+                    promotion: RegisteredDevice.IdentityPromotion(
+                        credentialIdHex: r.credentialIdHex,
+                        enrolledAt: Date(),
+                        wrapProtocolVersion: 2,
+                        pinProtected: r.pinProtected,
+                        deviceSaltHex: bytesToHexLocal(deviceSalt),
+                        wrappedCekHex: seal.wrappedCekHex
+                    )
+                )
+            } catch {
+                store.devices.remove(id: rec.id) // roll back on seal failure
+                throw error
+            }
+            if r.pinProtected {
+                onDone(.success(rec))
+                dismiss()
+            } else {
+                // Surface the no-PIN warning before completing.
+                pendingDoneRec = rec
+                noPinWarning = true
+            }
+        } catch {
+            errorText = (error as? LocalizedError)?.errorDescription ?? "\(error)"
+            phase = .ready
         }
     }
 

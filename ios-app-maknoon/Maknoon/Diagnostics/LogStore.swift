@@ -2,7 +2,7 @@
 // retention of the last `maxEntries` events; call sites add via
 // `LogStore.shared.info / warn / error`.
 //
-// CRITICAL SECURITY RULE — read before adding new log calls:
+// CRITICAL SECURITY RULE, read before adding new log calls:
 //
 //   * NEVER log: BIP39 entropy, BIP39 mnemonic, sandwich passphrase,
 //     AES wrap keys, sandwich master keys, raw private keys.

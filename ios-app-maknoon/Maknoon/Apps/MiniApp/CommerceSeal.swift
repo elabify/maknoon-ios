@@ -6,7 +6,7 @@
 
 import Foundation
 
-/// What the holder POSTs and the merchant polls — opaque to the server.
+/// What the holder POSTs and the merchant polls, opaque to the server.
 struct CommerceSealedEnvelope: Codable, Sendable {
     let requestId: String
     let encapsulatedKey: String  // base64

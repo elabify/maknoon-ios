@@ -7,7 +7,7 @@
 // outcome is persisted on the IDDocument and surfaced as a shield
 // badge on the card.
 //
-// This is screening only — it does NOT mint a credential. The user can
+// This is screening only, it does NOT mint a credential. The user can
 // run it before or after issuing a verified credential; the issuer
 // independently screens at issuance time regardless.
 

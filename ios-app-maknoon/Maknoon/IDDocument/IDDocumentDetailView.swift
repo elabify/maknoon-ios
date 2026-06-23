@@ -21,7 +21,7 @@ struct IDDocumentDetailView: View {
         /// PendingPickupsStore is now polling in the background and
         /// will deposit the credential into the wallet as soon as
         /// the issuer's batch flushes. User is free to close this
-        /// screen — pending VCs appear at the top of the Identity
+        /// screen, pending VCs appear at the top of the Identity
         /// tab where they can be cancelled.
         case submittedForAnchor(credentialId: String)
         case failed(String)
@@ -37,12 +37,6 @@ struct IDDocumentDetailView: View {
     }
     @State private var sanctionsState: SanctionsState = .idle
     @State private var passiveAuthRunning = false
-
-    /// On-demand self-signed credential minted from this document for the
-    /// Present (QR) flow. Set to drive the present sheet; the credential is
-    /// not persisted as a separate card.
-    @State private var presentCredential: Credential?
-    @State private var presentError: String?
 
     /// The selected entry in the issuer Picker. Stored as a host /
     /// `host:port` string from `KnownIssuersStore`, or the sentinel
@@ -62,20 +56,14 @@ struct IDDocumentDetailView: View {
             Form {
                 photoSection(doc)
                 detailsSection(doc)
-                presentSection(doc)
                 chipAuthSection(doc)
                 issueVerifiedSection(doc)
                 nicknameSection(doc)
                 folderSection(doc)
                 deleteSection(doc)
             }
-            .navigationTitle(doc.nickname ?? doc.displayName)
+            .navigationTitle("Advanced options")
             .navigationBarTitleDisplayMode(.inline)
-            .sheet(item: $presentCredential) { cred in
-                NavigationStack {
-                    CredentialPresentView(credential: cred).environment(store)
-                }
-            }
             .onAppear { nicknameDraft = doc.nickname ?? "" }
             // Run on-device Passive Authentication once the view appears (and
             // whenever the document changes). Idempotent + cheap to re-run.
@@ -118,6 +106,11 @@ struct IDDocumentDetailView: View {
                     Text("\(doc.kindLabel) · \(doc.summary)")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    // Small schema version so different record schemas are
+                    // trackable (ADR-0037); replaces any unclear "v1" label.
+                    Text("ID schema \(doc.displaySchemaVersion)")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
                 }
                 Spacer()
             }
@@ -129,10 +122,9 @@ struct IDDocumentDetailView: View {
         Section("Details") {
             let docLabel = doc.userDeclaredKind?.documentNumberLabel ?? "Document number"
             row(docLabel, value: doc.documentNumber, monospaced: true)
-            if let pn = doc.personalNumber, !pn.isEmpty {
-                let label = doc.userDeclaredKind?.personalNumberLabel ?? "Personal number"
-                row(label, value: pn, monospaced: true)
-            }
+            // Personal number is intentionally not displayed (ADR-0039): it has
+            // no standardized ICAO 9303 meaning and most holders use the
+            // document number. The field stays in the model.
             // Given + Family rendered separately so each is a labelled
             // attribute the user can copy independently. Prefer the
             // MRZ-derived Latin form (which is what foreign verifiers
@@ -172,38 +164,10 @@ struct IDDocumentDetailView: View {
             if let pob = doc.formattedPlaceOfBirth, !pob.isEmpty {
                 row("Place of birth", value: pob)
             }
+            if !doc.documentType.isEmpty {
+                row("Document type", value: doc.documentType, monospaced: true)
+            }
             row("Saved", value: dateString(doc.readAt))
-        }
-    }
-
-    @ViewBuilder
-    private func presentSection(_ doc: IDDocument) -> some View {
-        Section {
-            Text("Present this passport as a self-signed credential: a QR another Maknoon user can verify on the spot, fully offline. It is signed by your post-quantum key and (on a real device) bound to this app via App Attest. No issuer, no network.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-            Button {
-                presentError = nil
-                guard let sandwich = store.sandwich else {
-                    presentError = "Unlock your identity first."
-                    return
-                }
-                do {
-                    presentCredential = try LocalCredentialFactory.mint(from: doc, sandwich: sandwich)
-                } catch {
-                    presentError = (error as? LocalizedError)?.errorDescription ?? "\(error)"
-                }
-            } label: {
-                Label("Present (show QR)", systemImage: "qrcode")
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(store.sandwich == nil)
-            if let presentError {
-                Text(presentError).font(.caption).foregroundStyle(.red)
-            }
-        } header: {
-            Text("Present")
         }
     }
 
@@ -267,7 +231,7 @@ struct IDDocumentDetailView: View {
                 Label("Submitted; anchoring in background", systemImage: "checkmark.seal")
                     .foregroundStyle(.green)
                     .font(.callout.weight(.semibold))
-                Text("Your credential has been minted server-side and is being anchored. You can close this screen and continue using the app — the credential will appear on the Identity tab as soon as the issuer's batch flushes. The pending pickup also shows at the top of the Identity tab with a cancel option.")
+                Text("Your credential has been minted server-side and is being anchored. You can close this screen and continue using the app. The credential will appear on the Identity tab as soon as the issuer's batch flushes. The pending pickup also shows at the top of the Identity tab with a cancel option.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Text("Credential: \(credentialId)")
@@ -408,9 +372,11 @@ struct IDDocumentDetailView: View {
             switch r.status {
             case .verified:     return ("Verified", .green, "checkmark.seal.fill")
             case .integrityOnly:
+                // The "signer expired / not in list" nuance lives in the
+                // description below, not the pill label.
                 return r.reason == "dsc_or_chain_expired"
-                    ? ("Authentic · signer expired", .orange, "clock.badge.exclamationmark.fill")
-                    : ("Genuine · signer not in list", .blue, "checkmark.seal")
+                    ? ("Authentic", .orange, "clock.badge.exclamationmark.fill")
+                    : ("Genuine", .blue, "checkmark.seal")
             case .failed:       return ("Failed", .red, "xmark.seal.fill")
             case .unavailable:  return ("Unavailable", .secondary, "questionmark.circle")
             }
@@ -491,7 +457,7 @@ struct IDDocumentDetailView: View {
 
     /// The base URL that the issuance POST should target. Returns nil
     /// when the user picked Custom and hasn't typed a parseable URL
-    /// yet — that nil disables the submit button so we don't fire
+    /// yet, that nil disables the submit button so we don't fire
     /// half-formed requests.
     // MARK: -- sanctions screening
 
@@ -707,7 +673,7 @@ struct IDDocumentDetailView: View {
 
     private func row(_ label: String, value: String, monospaced: Bool = false) -> some View {
         HStack {
-            Text(label).foregroundStyle(.secondary)
+            Text(LocalizedStringKey(label)).foregroundStyle(.secondary)
             Spacer()
             Text(value)
                 .font(monospaced ? .system(.body, design: .monospaced) : .body)

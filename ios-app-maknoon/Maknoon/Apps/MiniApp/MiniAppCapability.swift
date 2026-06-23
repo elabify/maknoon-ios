@@ -1,15 +1,15 @@
-// Single source of truth for mini-app capabilities: the things a dApp can
+// Single source of truth for mini-app capabilities: the things a app can
 // ask the host to do. Each capability token (the same string a namespace
 // handler declares as `requiredPermission`) has a consent tier, a
 // human-facing label + reason, and an SF Symbol for the install/settings UI.
 //
 // Tiers:
-//   .auto    — always available, low-risk; not declared, not shown, no consent
+//   .auto    : always available, low-risk; not declared, not shown, no consent
 //              (storage, fiat, device, haptics, biometric gate).
-//   .install — must be declared and SHOWN at install for the user to accept;
+//   .install : must be declared and SHOWN at install for the user to accept;
 //              granted for the app's lifetime (addressBook, wallet read,
 //              share, clipboard).
-//   .perUse  — declared at install AND prompted natively every time it runs
+//   .perUse  : declared at install AND prompted natively every time it runs
 //              (identity disclosure, payments, signing, camera scan, NFC tap).
 //
 // Trust: the host mediates all of these; raw sensors/keys never reach JS.
@@ -36,20 +36,20 @@ enum MiniAppCapabilityRegistry {
     /// this map are treated as `.auto` (no declaration or consent needed).
     static let specs: [String: MiniAppCapabilitySpec] = [
         "identity": .init(token: "identity", tier: .perUse,
-                          label: "Verify identity",
-                          reason: "Ask you to prove a verifiable credential",
+                          label: "Verify Credentials",
+                          reason: "Receive a customer's credentials and perform checks on them.",
                           icon: "person.text.rectangle"),
         "payment": .init(token: "payment", tier: .perUse,
-                         label: "Payments & addresses",
-                         reason: "Request payments and read your saved addresses",
+                         label: "Payments",
+                         reason: "Make a payment to a receiving address.",
                          icon: "creditcard"),
         "evm": .init(token: "evm", tier: .perUse,
                      label: "Ethereum wallet",
                      reason: "Connect and request signatures or transactions",
                      icon: "link"),
         "wallet": .init(token: "wallet", tier: .install,
-                        label: "Wallet addresses",
-                        reason: "See your wallet addresses",
+                        label: "Wallets",
+                        reason: "See your wallet labels, addresses, and assets across networks and chains.",
                         icon: "wallet.pass"),
         "scan": .init(token: "scan", tier: .perUse,
                       label: "Scan codes",

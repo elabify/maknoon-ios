@@ -6,7 +6,7 @@
 // resolves when the incoming transfer lands. The merchant receives funds
 // directly to their own (address-book) address; nothing is signed here.
 //
-// Returns { txHash|null, chain, network, amount, confirmedAt } to the dapp.
+// Returns { txHash|null, chain, network, amount, confirmedAt } to the app.
 
 import Foundation
 
@@ -28,7 +28,7 @@ final class PaymentBridgeHandler: MiniAppNamespaceHandler {
     func handle(method: String, params: Any?) async throws -> Any? {
         switch method {
         case "payment.lightningAccounts":
-            // List the user's Lightning accounts so the dApp can offer a picker.
+            // List the user's Lightning accounts so the app can offer a picker.
             return store.lightningAccountStore.accounts.map {
                 ["id": $0.id.uuidString, "label": $0.label]
             }
@@ -68,7 +68,7 @@ final class PaymentBridgeHandler: MiniAppNamespaceHandler {
         chain: String, networkRaw: String?, address: String,
         amount: Decimal, fiatText: String?, appTitle: String
     ) throws -> MiniAppPaymentCoordinator.Request {
-        // Lightning: no address/URI here — the sheet creates a BOLT11 invoice
+        // Lightning: no address/URI here, the sheet creates a BOLT11 invoice
         // on the active account. `amount` is in sats.
         if chain == "lightning" || chain == "ln" {
             // `address` carries the chosen Lightning account UUID (empty ⇒ active).

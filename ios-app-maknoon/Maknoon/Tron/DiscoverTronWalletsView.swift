@@ -25,6 +25,17 @@ struct DiscoverTronWalletsView: View {
     @Environment(\.dismiss) private var dismiss
     let network: TronNetwork
     var source: Source = .software
+    /// Trezor hidden-wallet choice, collected upstream in the connection
+    /// step (DeviceReadyConfirmationSheet) on the hardware path. The one
+    /// choice applies to both add and discover (ADR-0033). Passed as a
+    /// BINDING so the scan reads the LIVE committed value: the readiness
+    /// sheet sets it just before this sheet opens, and a plain snapshot
+    /// could capture the pre-selection `.standard` during the two-sheet
+    /// handoff (the bug that left the Trezor passphrase unsent). Software /
+    /// Ledger pass `.constant(.standard)` / `.constant("")`.
+    @Binding var passphrase: HiddenWalletSelection
+    /// Host-typed passphrase that pairs with `passphrase == .hostTyped`.
+    @Binding var hostPassphrase: String
     var onCompleted: (() -> Void)? = nil
 
     @State private var scanning: Bool = false
@@ -33,11 +44,6 @@ struct DiscoverTronWalletsView: View {
     @State private var selection: Set<String> = []
     @State private var error: String?
     @State private var addReport: [String]?
-    /// Trezor-only hidden-wallet selector. `.standard` reproduces exact
-    /// Ledger behavior (empty passphrase).
-    @State private var hwPassphrase: HiddenWalletSelection = .standard
-    /// Host-typed passphrase, used only when `hwPassphrase == .hostTyped`.
-    @State private var hwHostPassphrase: String = ""
     /// Hardware-only: also sweep well-known alternative derivation paths.
     @State private var alsoTryAltPaths: Bool = false
 
@@ -76,28 +82,8 @@ struct DiscoverTronWalletsView: View {
             } header: {
                 Text("Scanning")
             } footer: {
-                Text("Walks BIP44 accounts on \(network.displayName) under your Identity Sandwich seed until \(Self.emptyAccountGapLimit) consecutive empty accounts are found. Reads the seed once, then queries TronGrid for balance + recent activity per account.")
+                Text("Walks BIP44 accounts on \(network.displayName) under your recovery phrase until \(Self.emptyAccountGapLimit) consecutive empty accounts are found. Reads the seed once, then queries TronGrid for balance + recent activity per account.")
                     .font(.caption)
-            }
-
-            if isTrezorSource && !scanning && discovered.isEmpty && progress.isEmpty {
-                Section {
-                    Picker("Wallet", selection: $hwPassphrase) {
-                        ForEach(HiddenWalletSelection.allCases) { mode in
-                            Text(mode.rawValue).tag(mode)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    if hwPassphrase == .hostTyped {
-                        SecureField("Passphrase", text: $hwHostPassphrase)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                    }
-                } header: {
-                    Text("Hidden wallet")
-                } footer: {
-                    Text(hwPassphrase.footer).font(.caption)
-                }
             }
 
             if isHardwareSource && !scanning && discovered.isEmpty && progress.isEmpty {
@@ -119,7 +105,7 @@ struct DiscoverTronWalletsView: View {
                         Label("Start scan", systemImage: "magnifyingglass")
                     }
                     .disabled((source.isSoftware && store.sandwich == nil)
-                        || !hwPassphrase.isReady(hostPassphrase: hwHostPassphrase))
+                        || !passphrase.isReady(hostPassphrase: hostPassphrase))
                 } footer: {
                     Text("Requires biometric or passcode once.")
                         .font(.caption)
@@ -223,7 +209,7 @@ struct DiscoverTronWalletsView: View {
         switch source {
         case .software:
             guard let sandwich = store.sandwich else {
-                error = "Identity Sandwich is locked. Unlock with your hardware device first."
+                error = "Software wallets derive from your master seed and need your identity unlocked. Unlock from the Identity tab, or switch the Source to Hardware."
                 return
             }
             let material: MasterRecoveryMaterial
@@ -251,14 +237,14 @@ struct DiscoverTronWalletsView: View {
             // A Trezor hidden wallet derives in its own passphrase
             // session. Ledger / mock clients ignore this.
             if let trezor = client as? TrezorBLE {
-                trezor.applyPassphraseMode(hwPassphrase.choice(hostPassphrase: hwHostPassphrase))
+                trezor.applyPassphraseMode(passphrase.choice(hostPassphrase: hostPassphrase))
             }
             client.beginSession()
             hardwareClient = client
         }
         // A fresh hidden wallet has no activity to find, so keep account
         // 0 in the results when a passphrase is in play.
-        let keepEmptyFirst = isTrezorSource && hwPassphrase != .standard
+        let keepEmptyFirst = isTrezorSource && passphrase != .standard
 
         scanning = true
         progress = []
@@ -375,7 +361,7 @@ struct DiscoverTronWalletsView: View {
         // a host-typed passphrase to the Keychain). nil for software and
         // for every Ledger / standard sweep.
         let hidden = isTrezorSource
-            ? HardwarePassphraseRef.persist(selection: hwPassphrase)
+            ? HardwarePassphraseRef.persist(selection: passphrase)
             : nil
         let suffix = hidden == nil ? "" : " (Hidden)"
         for hit in discovered where selection.contains(hit.id) {
@@ -407,6 +393,21 @@ struct DiscoverTronWalletsView: View {
             }
             if let existing = dedupHit {
                 report.append("Account \(hit.account), already labelled \"\(existing.label)\", skipped.")
+                continue
+            }
+            // Relink-by-key (ADR-0033): re-point an ORPHANED wallet with the same
+            // address (its stored deviceId no longer resolves) instead of adding
+            // a duplicate.
+            if case .hardware(let deviceId) = source,
+               let orphan = store.tronWalletStore.wallets.first(where: { w in
+                   if case let .hardware(d, _, addr) = w.kind {
+                       return addr == hit.address && store.devices.find(id: d) == nil
+                   }
+                   return false
+               }) {
+                store.tronWalletStore.relink(walletId: orphan.id, toDeviceId: deviceId)
+                store.devices.addTronWallet(deviceId: deviceId, walletId: orphan.id)
+                report.append("Account \(hit.account) re-linked to existing \"\(orphan.label)\".")
                 continue
             }
             let pathSuffix = hit.derivationPath != nil ? " (Custom path)" : ""

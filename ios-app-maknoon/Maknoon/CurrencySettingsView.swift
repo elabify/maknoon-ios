@@ -22,7 +22,7 @@ struct CurrencySettingsView: View {
                         }
                     }
             } footer: {
-                Text("When on, Maknoon shows fiat-equivalent captions next to native amounts. Crypto is priced in USD from CoinGecko (https://api.coingecko.com) and then converted to your display currency using daily USD foreign-exchange rates from open.er-api.com. When off, no reference prices are displayed anywhere and Maknoon contacts neither service. There is no self-hosted spot-price source today.")
+                Text("Shows an approximate value in your chosen currency next to each amount. Turn off to stop Maknoon contacting any price service.")
                     .font(.caption)
             }
 
@@ -42,7 +42,34 @@ struct CurrencySettingsView: View {
                 } header: {
                     Text("Currency")
                 } footer: {
-                    Text("Used across Bitcoin, Lightning, Ethereum, and ERC-20 token displays. Native amounts always remain primary; the fiat caption is informational.")
+                    Text("The currency used for those approximate values.")
+                        .font(.caption)
+                }
+
+                Section {
+                    TextField("CoinGecko base URL", text: $prefs.coinGeckoBaseURL)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .keyboardType(.URL)
+                        .onChange(of: prefs.coinGeckoBaseURL) { _, _ in
+                            store.assetPrices.refreshAll(fiat: prefs.code)
+                        }
+                    TextField("USD FX rates URL", text: $prefs.fxBaseURL)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .keyboardType(.URL)
+                        .onChange(of: prefs.fxBaseURL) { _, _ in
+                            store.assetPrices.refreshAll(fiat: prefs.code)
+                        }
+                    Button("Reset to defaults") {
+                        prefs.coinGeckoBaseURL = FiatPreferences.defaultCoinGecko
+                        prefs.fxBaseURL = FiatPreferences.defaultFX
+                        store.assetPrices.refreshAll(fiat: prefs.code)
+                    }
+                } header: {
+                    Text("Price data sources")
+                } footer: {
+                    Text("Advanced: use your own price and exchange-rate sources instead of the defaults.")
                         .font(.caption)
                 }
 
@@ -76,7 +103,7 @@ struct CurrencySettingsView: View {
         return HStack {
             Text(label).foregroundStyle(.primary)
             Spacer()
-            Text(caption ?? "—")
+            Text(caption ?? "-")
                 .font(.callout.monospaced())
                 .foregroundStyle(.secondary)
         }

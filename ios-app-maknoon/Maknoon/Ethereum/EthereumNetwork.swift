@@ -253,7 +253,7 @@ enum EthereumNetwork: String, Codable, CaseIterable, Sendable {
     /// Block-explorer API base URL for tx history. Defaults to
     /// Blockscout instances because they accept the Etherscan-style
     /// query shape (`?module=account&action=txlist`) WITHOUT
-    /// requiring an API key — much friendlier than Etherscan v2's
+    /// requiring an API key, much friendlier than Etherscan v2's
     /// "register for a free key" gate. Users who want Etherscan-
     /// branded data can override the per-network URL in Settings
     /// to `https://api.etherscan.io/v2/api` and add their own key.

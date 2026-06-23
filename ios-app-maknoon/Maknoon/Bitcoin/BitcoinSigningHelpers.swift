@@ -1,6 +1,6 @@
 // Shared signing-dispatch helpers used by both the regular Send
 // flow (BitcoinSendView) and the RBF fee-bump flow (BumpFeeSheet).
-// Identical signing protocols across both paths — only the source
+// Identical signing protocols across both paths, only the source
 // of the unsigned PSBT differs.
 
 import BitcoinDevKit
@@ -50,7 +50,7 @@ enum BitcoinSigningHelpers {
         // BDK returns `true` only when the PSBT is fully finalized.
         // `false` can still mean "partial_sigs were added" for a
         // multi-sig setup, but for our single-sig wallets it always
-        // means "nothing matched" — surface that loudly instead of
+        // means "nothing matched", surface that loudly instead of
         // letting the user hit "Missing pubkey" on broadcast.
         let inputs = psbt.input()
         let totalSigs = inputs.reduce(0) { $0 + $1.partialSigs.count }

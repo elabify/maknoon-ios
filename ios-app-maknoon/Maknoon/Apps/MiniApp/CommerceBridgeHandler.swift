@@ -1,6 +1,6 @@
-// window.maknoon.commerce.collectAndCharge — the unified verify-and-pay bridge
+// window.maknoon.commerce.collectAndCharge: the unified verify-and-pay bridge
 // (ADR-0031). One call replaces the POS's separate identity.collect +
-// payment.receive: it builds + signs a CommerceRequest from the dApp's params,
+// payment.receive: it builds + signs a CommerceRequest from the app's params,
 // opens the native merchant sheet (engage holder, verify offline, broadcast), and
 // returns a single verdict { decision, reason, missing, message, disclosed, txHash }.
 
@@ -44,6 +44,15 @@ final class CommerceBridgeHandler: MiniAppNamespaceHandler {
         }
         let lane = CommerceLane(rawValue: (p["lane"] as? String) ?? "full") ?? .full
 
+        // Lightning is invoice-based: a "lightning" rail arrives carrying the
+        // merchant's Lightning ACCOUNT id (not a payable destination). Mint a
+        // fresh BOLT11 for the amount on that account here, on the merchant
+        // device, so the holder pays a real invoice. Other chains pass through
+        // untouched.
+        let resolvedRails = try await Self.mintLightningInvoices(
+            rails, store: store,
+            memo: (p["merchantName"] as? String) ?? appTitle)
+
         let built = try await CommerceRequestFactory.build(
             store: store,
             installedAppId: installedAppId,
@@ -54,13 +63,49 @@ final class CommerceBridgeHandler: MiniAppNamespaceHandler {
             identityMaxAgeSec: (identity["maxAgeSec"] as? NSNumber)?.int64Value,
             fiatAmount: (payment["fiatAmount"] as? String) ?? "0",
             fiatCode: (payment["fiatCode"] as? String) ?? "USD",
-            acceptedRails: rails,
+            acceptedRails: resolvedRails,
             reference: payment["reference"] as? String,
             floorMinor: (payment["floorMinor"] as? NSNumber)?.int64Value,
             lane: lane)
 
         return try await coordinator.present(.init(
-            appTitle: appTitle, commerce: built.request, responseKeypair: built.responseKeypair))
+            appTitle: appTitle, installedAppId: installedAppId,
+            commerce: built.request, responseKeypair: built.responseKeypair))
+    }
+
+    /// Replace each Lightning rail's account-id address with a freshly-minted
+    /// BOLT11 invoice for the amount, generated on the merchant's own Lightning
+    /// account (LNDHub addinvoice). Non-lightning rails pass through unchanged.
+    private static func mintLightningInvoices(
+        _ rails: [PaymentRail], store: HolderStore, memo: String
+    ) async throws -> [PaymentRail] {
+        var out: [PaymentRail] = []
+        for rail in rails {
+            guard rail.chain == "lightning" else { out.append(rail); continue }
+            // Lightning rail amounts are in SATOSHIS (integer), not BTC, the PoS
+            // sends sats for the Lightning leg. (Treating it as BTC here would
+            // 100,000,000x the invoice and the provider rejects it.)
+            guard let amount = rail.amount, let satsD = Double(amount), satsD > 0 else {
+                throw MiniAppBridgeError.invalidParams("Lightning rail needs a positive satoshi amount.")
+            }
+            let sats = Int64(satsD.rounded())
+            // rail.address carries the merchant's Lightning account id.
+            guard let accountId = UUID(uuidString: rail.address),
+                  let account = store.lightningAccountStore.accounts.first(where: { $0.id == accountId })
+            else {
+                throw MiniAppBridgeError.invalidParams("Select a Lightning account to receive into.")
+            }
+            guard let pw = (try? store.lightningAccountStore.password(for: account.id)) ?? nil else {
+                throw MiniAppBridgeError.invalidParams("Re-import the merchant Lightning account (no stored password).")
+            }
+            let client = LNDHubClient(account: account, password: pw)
+            let bolt11 = try await client.addInvoice(amountSat: Int64(sats), memo: memo)
+            out.append(PaymentRail(
+                chain: rail.chain, network: rail.network, asset: rail.asset,
+                address: bolt11, amount: rail.amount,
+                assetContract: rail.assetContract, assetDecimals: rail.assetDecimals, rpcURL: rail.rpcURL))
+        }
+        return out
     }
 
     private static func parseRails(_ any: Any?) -> [PaymentRail] {

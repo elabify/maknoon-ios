@@ -1,10 +1,10 @@
 // Per-INSTALLATION merchant verifier identity (ML-DSA-65), separate from the
 // holder's consumer Identity Sandwich.
 //
-// Each installed merchant dApp (the POS) gets its own stable verifier key + DID,
+// Each installed merchant app (the POS) gets its own stable verifier key + DID,
 // keyed by its installedAppId, so a merchant's settings are self-contained to
 // that installation (uninstall wipes it; reinstall starts fresh + re-registers).
-// The dApp signs its VerifierRequests / CommerceRequests with this key so the
+// The app signs its VerifierRequests / CommerceRequests with this key so the
 // customer's wallet resolves a consistent `verifierDid -> pubkey` against
 // Elabify's curated registry and shows "Verified: <Merchant>" once registered;
 // until then requests are self-signed (pubkey inlined) with this same stable key.

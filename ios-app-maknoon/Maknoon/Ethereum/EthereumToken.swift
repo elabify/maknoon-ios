@@ -37,7 +37,7 @@ struct EthereumToken: Codable, Hashable, Identifiable, Sendable {
     /// CoinGecko asset id derived from the token symbol. The same
     /// token on different chains shares one CoinGecko id (USDC on
     /// Base, Arbitrum, mainnet all map to "usd-coin"). Returns nil
-    /// for tokens we don't have a price feed for yet — the UI
+    /// for tokens we don't have a price feed for yet. The UI
     /// hides the fiat caption in that case.
     var coinGeckoId: String? {
         switch symbol.uppercased() {

@@ -1,6 +1,6 @@
-// window.maknoon.scan() — a native QR/barcode scanner for mini apps.
+// window.maknoon.scan(): a native QR/barcode scanner for mini apps.
 //
-// The dApp never gets the camera stream; it gets back the decoded string.
+// The app never gets the camera stream; it gets back the decoded string.
 // Gated by the "scan" capability + the OS camera permission + this explicit
 // sheet (the user sees what they're pointing at and can cancel).
 

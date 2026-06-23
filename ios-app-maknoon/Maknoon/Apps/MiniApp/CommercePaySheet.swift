@@ -25,7 +25,7 @@ struct CommercePaySheet: View {
     @State private var error: String?
     @State private var trustLabel: String?
     @State private var trustTier: CommerceRequestValidator.Tier = .unknown
-    /// Non-nil when the request fails authentication — blocks confirm.
+    /// Non-nil when the request fails authentication, blocks confirm.
     @State private var blockedReason: String?
     /// Non-nil while the pre-tap "ready your hardware device" sheet is showing.
     @State private var pendingReadyOp: PendingHardwareOperation?
@@ -35,9 +35,11 @@ struct CommercePaySheet: View {
     /// not yet sent. Hardware shows a Broadcast button on it; software
     /// broadcasts straight through. Holds everything `runBroadcast` needs.
     @State private var pendingBroadcast: PendingBroadcast?
+    /// Chain key of the settled payment, for the "View in wallet" deep-link.
+    @State private var paidChain: String?
 
     private var selectedHidden: HardwarePassphraseRef? {
-        candidates.first(where: { $0.id == selectedId })?.descriptor.hidden
+        candidates.first(where: { $0.id == selectedId })?.hidden
     }
 
     /// A signed-but-unsent payment: the identity disclosure plus the
@@ -50,20 +52,69 @@ struct CommercePaySheet: View {
         let rail: PaymentRail
         let rpcURLString: String
         let requestId: String
+        /// Lightning-only: the holder account that pays the BOLT11 in
+        /// runBroadcast (Lightning has no local "sign"; the pay is an
+        /// authenticated LNDHub call AFTER the identity post).
+        var lightningAccount: LightningAccount? = nil
+        /// Bitcoin hardware only: the original unsigned PSBT, needed to finalize
+        /// the partially-signed PSBT the device returns (software already
+        /// finalizes, so nil there).
+        var bitcoinUnsigned: String? = nil
     }
 
     enum Phase: Equatable { case loading, ready, working, signed, broadcasting, done(String) }
 
+    /// A payer wallet, tagged by chain. EVM carries its Ethereum descriptor +
+    /// network + asset; Solana carries its Solana descriptor + network + mint.
+    enum PayWallet {
+        case ethereum(EthereumWalletDescriptor)
+        case solana(SolanaWalletDescriptor)
+        case tron(TronWalletDescriptor)
+        case bitcoin(BitcoinWalletDescriptor)
+        case lightning(LightningAccount)
+    }
+
     struct Candidate: Identifiable {
         let id = UUID()
-        let descriptor: EthereumWalletDescriptor
+        let wallet: PayWallet
         let rail: PaymentRail
-        let network: EthereumNetwork
-        let asset: CommerceEVMPayment.Asset
+        let label: String
+        /// false => also show a separate gas line (paying a token).
+        let assetIsNative: Bool
+        // EVM-only (nil for Solana)
+        let ethNetwork: EthereumNetwork?
+        let ethAsset: CommerceEVMPayment.Asset?
+        // Solana-only (nil for EVM)
+        let solNetwork: SolanaNetwork?
+        let solMint: String?       // nil => native SOL
+        let solDecimals: Int
+        // Tron-only (nil for EVM/Solana)
+        let tronNetwork: TronNetwork?
+        let tronTokenContract: String?   // nil => native TRX
+        let tronDecimals: Int
+        // Bitcoin-only (nil for the others); native BTC, no token field.
+        let btcNetwork: BitcoinNetwork?
         var balanceText: String = "…"
+        /// Native-coin (gas) balance, always shown so the payer can see they can
+        /// cover fees even when paying a token.
+        var gasBalanceText: String = "…"
         var sufficient: Bool = false
-        var payable: Bool = false   // EVM software only for now
+        var payable: Bool = false
         var note: String?
+
+        /// Trezor host-passphrase ref for the selected hardware wallet (EVM +
+        /// Bitcoin; Solana/Tron/Lightning commerce are software-only).
+        var hidden: HardwarePassphraseRef? {
+            if case .ethereum(let d) = wallet { return d.hidden }
+            if case .bitcoin(let d) = wallet { return d.hidden }
+            if case .solana(let d) = wallet { return d.hidden }
+            if case .tron(let d) = wallet { return d.hidden }
+            return nil
+        }
+        var ethDescriptor: EthereumWalletDescriptor? {
+            if case .ethereum(let d) = wallet { return d }
+            return nil
+        }
     }
 
     private var terms: PaymentTerms { request.paymentTerms }
@@ -143,8 +194,17 @@ struct CommercePaySheet: View {
                 .buttonStyle(.borderedProminent)
                 Button("Cancel") { onClose() }.frame(maxWidth: .infinity)
             case .done:
-                Button(action: onClose) {
-                    Text("Close").frame(maxWidth: .infinity)
+                // Take the payer to the wallet they paid from so they can watch
+                // the tx confirm; falls back to a plain close if the chain is
+                // unknown.
+                Button(action: {
+                    if let key = paidChain, let chain = WalletChain(chainKey: key) {
+                        store.selectedTab = .wallet
+                        store.walletNavigationPath.append(chain)
+                    }
+                    onClose()
+                }) {
+                    Text("View in wallet").frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
             default:   // .loading, .ready
@@ -183,7 +243,7 @@ struct CommercePaySheet: View {
             Text("You don't have a verified credential matching this request.")
                 .font(.callout).foregroundStyle(.red)
         } else if requiredClaims.isEmpty {
-            Text("No personal attributes — payment only.").font(.callout).foregroundStyle(.secondary)
+            Text("No personal attributes, payment only.").font(.callout).foregroundStyle(.secondary)
         } else {
             ForEach(requiredClaims, id: \.self) { key in
                 HStack(alignment: .top) {
@@ -204,21 +264,26 @@ struct CommercePaySheet: View {
                 .font(.callout).foregroundStyle(.secondary)
         } else {
             ForEach(candidates) { c in
-                Button { if c.payable && c.sufficient { selectedId = c.id } } label: {
+                // Any wallet is selectable so the payer can inspect each one's
+                // balance; canConfirm is what gates on payable + sufficient.
+                Button { selectedId = c.id } label: {
                     HStack {
                         Image(systemName: selectedId == c.id ? "largecircle.fill.circle" : "circle")
-                            .foregroundStyle(c.payable && c.sufficient ? Color.accentColor : Color.secondary)
+                            .foregroundStyle(selectedId == c.id ? Color.accentColor : Color.secondary)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(c.descriptor.label).font(.callout.weight(.medium))
-                            Text("\(c.balanceText) \(c.asset.symbol) · \(c.network.rawValue)")
+                            Text(c.label).font(.callout.weight(.medium))
+                            // balanceText already includes the asset ticker.
+                            Text("\(c.balanceText) · \(c.rail.displayNetwork)")
                                 .font(.caption).foregroundStyle(c.sufficient ? Color.secondary : Color.red)
+                            if !c.assetIsNative {
+                                Text("Gas: \(c.gasBalanceText)").font(.caption).foregroundStyle(.secondary)
+                            }
                             if let note = c.note { Text(note).font(.caption2).foregroundStyle(.orange) }
                         }
                         Spacer()
                     }
                 }
                 .buttonStyle(.plain)
-                .disabled(!(c.payable && c.sufficient))
             }
         }
     }
@@ -243,19 +308,89 @@ struct CommercePaySheet: View {
         // Build candidates: each accepted EVM rail x each EVM wallet with an address.
         var built: [Candidate] = []
         for rail in terms.acceptedRails {
-            guard rail.chain == "ethereum", let net = EthereumNetwork(rawValue: rail.network ?? "") else { continue }
-            let asset = CommerceEVMPayment.Asset(symbol: rail.asset, contract: rail.assetContract,
-                                                 decimals: rail.assetDecimals ?? 18)
-            for desc in store.ethereumWalletStore.wallets where desc.address != nil {
-                // Both software and hardware (Ledger/Trezor) wallets can pay: the
-                // hardware leg signs on-device over BLE (see confirm()/signOnHardware).
-                var note: String?
-                if case .hardware(let deviceId, _, _) = desc.kind {
-                    note = store.devices.find(id: deviceId).map { "Signs on your \($0.kind.displayName)" }
+            if rail.chain == "ethereum", let net = EthereumNetwork(rawValue: rail.network ?? "") {
+                let asset = CommerceEVMPayment.Asset(symbol: rail.asset, contract: rail.assetContract,
+                                                     decimals: rail.assetDecimals ?? 18)
+                for desc in store.ethereumWalletStore.wallets where desc.address != nil {
+                    // Both software and hardware (Ledger/Trezor) wallets can pay: the
+                    // hardware leg signs on-device over BLE (see confirm()/signOnHardware).
+                    var note: String?
+                    if case .hardware(let deviceId, _, _) = desc.kind {
+                        note = store.devices.find(id: deviceId).map { "Signs on your \($0.kind.displayName)" }
+                    }
+                    built.append(Candidate(wallet: .ethereum(desc), rail: rail, label: desc.label,
+                                           assetIsNative: asset.isNative, ethNetwork: net, ethAsset: asset,
+                                           solNetwork: nil, solMint: nil, solDecimals: 0,
+                                           tronNetwork: nil, tronTokenContract: nil, tronDecimals: 6,
+                                           btcNetwork: nil,
+                                           payable: true, note: note))
                 }
-                built.append(Candidate(descriptor: desc, rail: rail, network: net, asset: asset,
-                                       payable: true, note: note))
-            }
+            } else if rail.chain == "solana", let net = SolanaNetwork(rawValue: rail.network ?? "") {
+                // P1: Solana commerce is software-only. Hardware Solana wallets are
+                // listed but flagged not-yet-payable.
+                let decimals = rail.assetDecimals ?? (rail.assetContract == nil ? 9 : 6)
+                for desc in store.solanaWalletStore.wallets {
+                    // Software + hardware (Ledger/Trezor) both pay: hardware signs
+                    // on-device over BLE (see prepare()).
+                    var note: String?
+                    if case .hardware(let deviceId, _, _) = desc.kind {
+                        note = store.devices.find(id: deviceId).map { "Signs on your \($0.kind.displayName)" }
+                    }
+                    built.append(Candidate(wallet: .solana(desc), rail: rail, label: desc.label,
+                                           assetIsNative: rail.assetContract == nil, ethNetwork: nil, ethAsset: nil,
+                                           solNetwork: net, solMint: rail.assetContract, solDecimals: decimals,
+                                           tronNetwork: nil, tronTokenContract: nil, tronDecimals: 6,
+                                           btcNetwork: nil,
+                                           payable: true, note: note))
+                }
+            } else if rail.chain == "tron", let net = TronNetwork(rawValue: rail.network ?? "") {
+                // P1: Tron commerce is software-only. Hardware Tron wallets are
+                // listed but flagged not-yet-payable.
+                let decimals = rail.assetDecimals ?? 6
+                for desc in store.tronWalletStore.wallets {
+                    // Software + hardware (Ledger/Trezor) both pay: hardware signs
+                    // raw_data on-device over BLE (see prepare()).
+                    var note: String?
+                    if case .hardware(let deviceId, _, _) = desc.kind {
+                        note = store.devices.find(id: deviceId).map { "Signs on your \($0.kind.displayName)" }
+                    }
+                    built.append(Candidate(wallet: .tron(desc), rail: rail, label: desc.label,
+                                           assetIsNative: rail.assetContract == nil, ethNetwork: nil, ethAsset: nil,
+                                           solNetwork: nil, solMint: nil, solDecimals: 0,
+                                           tronNetwork: net, tronTokenContract: rail.assetContract, tronDecimals: decimals,
+                                           btcNetwork: nil,
+                                           payable: true, note: note))
+                }
+            } else if rail.chain == "bitcoin", let net = BitcoinNetwork(rawValue: rail.network ?? "") {
+                // P1: Bitcoin commerce is software-only. Hardware Bitcoin wallets
+                // are listed but flagged not-yet-payable. Only wallets on the
+                // rail's network can pay.
+                for desc in store.bitcoinWalletStore.wallets where desc.network == net {
+                    // Software + hardware (Ledger/Trezor) both pay: hardware signs
+                    // the PSBT on-device over BLE (see prepare()/signOverBLE).
+                    var note: String?
+                    if case .hardware(let deviceId, _, _) = desc.kind {
+                        note = store.devices.find(id: deviceId).map { "Signs on your \($0.kind.displayName)" }
+                    }
+                    built.append(Candidate(wallet: .bitcoin(desc), rail: rail, label: desc.label,
+                                           assetIsNative: true, ethNetwork: nil, ethAsset: nil,
+                                           solNetwork: nil, solMint: nil, solDecimals: 0,
+                                           tronNetwork: nil, tronTokenContract: nil, tronDecimals: 6,
+                                           btcNetwork: net,
+                                           payable: true, note: note))
+                }
+            } else if rail.chain == "lightning" {
+                // Custodial LNDHub: any of the holder's Lightning accounts can pay
+                // the merchant-minted BOLT11 carried in rail.address.
+                for acct in store.lightningAccountStore.accounts {
+                    built.append(Candidate(wallet: .lightning(acct), rail: rail, label: acct.label,
+                                           assetIsNative: true, ethNetwork: nil, ethAsset: nil,
+                                           solNetwork: nil, solMint: nil, solDecimals: 0,
+                                           tronNetwork: nil, tronTokenContract: nil, tronDecimals: 6,
+                                           btcNetwork: nil,
+                                           payable: true, note: nil))
+                }
+            } else { continue }
         }
         candidates = built
         phase = .ready
@@ -267,27 +402,119 @@ struct CommercePaySheet: View {
     @MainActor private func fetchBalances() async {
         for idx in candidates.indices {
             let c = candidates[idx]
-            let rpc = store.ethereumSettings.rpcURL(for: c.network)
-            let wallet = EthereumWallet(descriptor: c.descriptor)
             do {
-                let bal: EthereumWeiValue
-                if let contract = c.asset.contract {
-                    let token = EthereumToken(network: c.network, contractAddress: contract,
-                                              symbol: c.asset.symbol, name: c.asset.symbol,
-                                              decimals: c.asset.decimals, curated: false)
-                    bal = try await wallet.tokenBalance(token: token, rpcURL: rpc)
-                } else {
-                    bal = try await wallet.balance(rpcURL: rpc)
-                }
-                candidates[idx].balanceText = bal.displayUnits(ticker: c.asset.symbol, decimals: c.asset.decimals, maxDecimals: 6)
-                if let amount = c.rail.amount, let need = EthereumWeiValue.fromUnits(amount, decimals: c.asset.decimals) {
-                    candidates[idx].sufficient = !(bal < need)
+                switch c.wallet {
+                case .ethereum(let desc):
+                    guard let net = c.ethNetwork, let asset = c.ethAsset else { continue }
+                    let rpc = store.ethereumSettings.rpcURL(for: net)
+                    let wallet = EthereumWallet(descriptor: desc)
+                    // Native (gas) balance always read so the payer can see they
+                    // can cover fees, even when paying an ERC-20.
+                    let native = try await wallet.balance(rpcURL: rpc)
+                    candidates[idx].gasBalanceText = native.displayUnits(ticker: net.ticker, decimals: 18, maxDecimals: 6)
+                    let bal: EthereumWeiValue
+                    if let contract = asset.contract {
+                        let token = EthereumToken(network: net, contractAddress: contract,
+                                                  symbol: asset.symbol, name: asset.symbol,
+                                                  decimals: asset.decimals, curated: false)
+                        bal = try await wallet.tokenBalance(token: token, rpcURL: rpc)
+                    } else {
+                        bal = native
+                    }
+                    candidates[idx].balanceText = bal.displayUnits(ticker: asset.symbol, decimals: asset.decimals, maxDecimals: 6)
+                    if let amount = c.rail.amount, let need = EthereumWeiValue.fromUnits(amount, decimals: asset.decimals) {
+                        candidates[idx].sufficient = !(bal < need)
+                    }
+                case .solana(let desc):
+                    guard let net = c.solNetwork else { continue }
+                    let rpc = store.solanaSettings.rpcURL(for: net)
+                    let wallet = SolanaWallet(descriptor: desc, network: net, rpcURL: rpc, sandwich: store.sandwich)
+                    let lamports = try await wallet.refreshBalance(biometricReason: "Show balance")
+                    candidates[idx].gasBalanceText = Self.fmtAmount(Double(lamports) / 1_000_000_000, "SOL")
+                    if let mint = c.solMint {
+                        let accounts = try await wallet.tokenAccounts(biometricReason: "Show balance")
+                        let raw = accounts.first(where: { $0.mint == mint })?.amount ?? 0
+                        candidates[idx].balanceText = Self.fmtAmount(Double(raw) / pow(10, Double(c.solDecimals)), c.rail.asset)
+                        if let amount = c.rail.amount, let need = try? CommerceSolanaPayment.baseUnits(amount, decimals: c.solDecimals) {
+                            candidates[idx].sufficient = raw >= need
+                        }
+                    } else {
+                        candidates[idx].balanceText = Self.fmtAmount(Double(lamports) / 1_000_000_000, "SOL")
+                        if let amount = c.rail.amount, let need = try? CommerceSolanaPayment.baseUnits(amount, decimals: 9) {
+                            candidates[idx].sufficient = lamports >= need
+                        }
+                    }
+                case .tron(let desc):
+                    guard let net = c.tronNetwork else { continue }
+                    let rpc = store.tronSettings.rpcURL(for: net)
+                    let wallet = TronWallet(descriptor: desc, network: net, rpcURL: rpc, sandwich: store.sandwich)
+                    let sun = try await wallet.refreshBalance(biometricReason: "Show balance")
+                    candidates[idx].gasBalanceText = Self.fmtAmount(Double(sun) / 1_000_000, "TRX")
+                    if let contract = c.tronTokenContract {
+                        let holder = try await wallet.resolvedAddress(biometricReason: "Show balance")
+                        let rawStr = try await TronTRC20TransferBuilder.balance(
+                            holderBase58: holder, contractBase58: contract, rpcURL: rpc)
+                        let raw = Decimal(string: rawStr) ?? 0
+                        let units = (raw as NSDecimalNumber).doubleValue / pow(10, Double(c.tronDecimals))
+                        candidates[idx].balanceText = Self.fmtAmount(units, c.rail.asset)
+                        if let amount = c.rail.amount,
+                           let needStr = try? CommerceTronPayment.baseUnits(amount, decimals: c.tronDecimals),
+                           let need = Decimal(string: needStr) {
+                            candidates[idx].sufficient = raw >= need
+                        }
+                    } else {
+                        candidates[idx].balanceText = Self.fmtAmount(Double(sun) / 1_000_000, "TRX")
+                        if let amount = c.rail.amount, let need = try? CommerceTronPayment.baseUnitsInt64(amount, decimals: 6) {
+                            candidates[idx].sufficient = sun >= need
+                        }
+                    }
+                case .bitcoin(let desc):
+                    guard let net = c.btcNetwork else { continue }
+                    let url = store.bitcoinSettings.electrumURL(for: net)
+                    let wallet = try BitcoinWallet.open(descriptor: desc, sandwich: store.sandwich)
+                    try await wallet.sync(electrumURL: url)
+                    let sats = await wallet.balance().total.toSat()
+                    candidates[idx].balanceText = Self.fmtAmount(Double(sats) / 100_000_000, "BTC")
+                    candidates[idx].gasBalanceText = candidates[idx].balanceText
+                    if let amount = c.rail.amount, let need = try? CommerceBitcoinPayment.satsFromBTC(amount) {
+                        candidates[idx].sufficient = sats >= need
+                    }
+                case .lightning(let acct):
+                    guard let pw = (try? store.lightningAccountStore.password(for: acct.id)) ?? nil else {
+                        candidates[idx].balanceText = "Re-import account"
+                        candidates[idx].payable = false
+                        continue
+                    }
+                    let client = LNDHubClient(account: acct, password: pw)
+                    let sats = try await client.balanceSat()
+                    candidates[idx].balanceText = "\(sats) sats"
+                    candidates[idx].gasBalanceText = candidates[idx].balanceText
+                    // The merchant-minted BOLT11 carries the amount; sufficiency
+                    // compares the holder's sat balance to the ask (Lightning rail
+                    // amounts are in satoshis, not BTC).
+                    if let amount = c.rail.amount, let need = Double(amount), need > 0 {
+                        candidates[idx].sufficient = Double(sats) >= need
+                    } else {
+                        candidates[idx].sufficient = true
+                    }
                 }
             } catch {
-                candidates[idx].balanceText = "—"
+                candidates[idx].balanceText = "-"
+                candidates[idx].gasBalanceText = "-"
                 candidates[idx].sufficient = false
             }
         }
+    }
+
+    /// Trim a decimal amount to ≤6 places + ticker (Solana display; EVM uses
+    /// EthereumWeiValue.displayUnits).
+    private static func fmtAmount(_ x: Double, _ ticker: String) -> String {
+        var s = String(format: "%.6f", x)
+        if s.contains(".") {
+            while s.hasSuffix("0") { s.removeLast() }
+            if s.hasSuffix(".") { s.removeLast() }
+        }
+        return "\(s) \(ticker)"
     }
 
     // MARK: - Confirm (disclose + sign), then Broadcast (send identity, then pay)
@@ -300,9 +527,26 @@ struct CommercePaySheet: View {
             error = "Select a wallet to pay from."
             return
         }
-        if case .hardware(let deviceId, _, _) = cand.descriptor.kind,
+        if case .ethereum(let desc) = cand.wallet,
+           case .hardware(let deviceId, _, _) = desc.kind,
            let dev = store.devices.find(id: deviceId) {
             pendingReadyOp = PendingHardwareOperation(device: dev, purpose: .ethereumSign)
+        } else if case .bitcoin(let desc) = cand.wallet,
+                  case .hardware(let deviceId, _, _) = desc.kind,
+                  let dev = store.devices.find(id: deviceId) {
+            // Show the "ready your device / open the Bitcoin app" prompt (and the
+            // Trezor passphrase field for a hidden wallet) before signing.
+            pendingReadyOp = PendingHardwareOperation(device: dev, purpose: .bitcoinWallet(network: desc.network))
+        } else if case .solana(let desc) = cand.wallet,
+                  case .hardware(let deviceId, _, _) = desc.kind,
+                  let dev = store.devices.find(id: deviceId) {
+            // "Open the Solana app" prompt (+ Trezor passphrase for a hidden wallet).
+            pendingReadyOp = PendingHardwareOperation(device: dev, purpose: .solanaSign)
+        } else if case .tron(let desc) = cand.wallet,
+                  case .hardware(let deviceId, _, _) = desc.kind,
+                  let dev = store.devices.find(id: deviceId) {
+            // "Open the Tron app" prompt (+ Trezor passphrase for a hidden wallet).
+            pendingReadyOp = PendingHardwareOperation(device: dev, purpose: .tronSign)
         } else {
             prepare()
         }
@@ -315,11 +559,10 @@ struct CommercePaySheet: View {
     /// broadcast straight through.
     private func prepare() {
         guard let matched, let cand = candidates.first(where: { $0.id == selectedId }),
-              let from = cand.descriptor.address, let amount = cand.rail.amount else {
+              let amount = cand.rail.amount else {
             error = "Couldn't prepare the payment."
             return
         }
-        let isSoftware = { if case .software = cand.descriptor.kind { return true } else { return false } }()
         phase = .working
         error = nil
         Task {
@@ -333,18 +576,202 @@ struct CommercePaySheet: View {
                     verifierDid: request.verifierRequest.verifierDid,
                     pendingRequest: request.verifierRequest,
                     store: store)
-                let rpc = store.ethereumSettings.rpcURL(for: cand.network)
-                let raw = try await signedRawTransfer(cand: cand, from: from, amount: amount, rpcURLString: rpc)
-                // The EIP-1559 tx hash is keccak256 of the signed raw tx, so
-                // it is known BEFORE broadcast. That lets us hand the merchant
-                // the identity + (future) txHash and only then move money.
-                let pending = PendingBroadcast(
-                    presentation: presentation,
-                    rawTx: raw,
-                    txHash: Self.ethTxHash(rawHex: raw),
-                    rail: cand.rail,
-                    rpcURLString: rpc,
-                    requestId: request.verifierRequest.requestId)
+                // Sign WITHOUT broadcasting; capture the pre-broadcast settlement
+                // ref (EVM: keccak txHash; Solana: first signature) so the
+                // merchant gets identity + ref before any money moves.
+                let pending: PendingBroadcast
+                var isSoftware = true
+                switch cand.wallet {
+                case .ethereum(let desc):
+                    guard let from = desc.address, let net = cand.ethNetwork else {
+                        throw CommercePayError("This wallet has no resolved address.")
+                    }
+                    if case .hardware = desc.kind { isSoftware = false }
+                    let rpc = store.ethereumSettings.rpcURL(for: net)
+                    let raw = try await signedRawTransfer(cand: cand, from: from, amount: amount, rpcURLString: rpc)
+                    pending = PendingBroadcast(presentation: presentation, rawTx: raw,
+                                               txHash: Self.ethTxHash(rawHex: raw), rail: cand.rail,
+                                               rpcURLString: rpc, requestId: request.verifierRequest.requestId)
+                case .solana(let desc):
+                    guard let net = cand.solNetwork else {
+                        throw CommercePayError("Unlock your identity to pay.")
+                    }
+                    let rpc = store.solanaSettings.rpcURL(for: net)
+                    switch desc.kind {
+                    case .software(let account):
+                        guard let sandwich = store.sandwich else {
+                            throw CommercePayError("Unlock your identity to pay.")
+                        }
+                        let signed = try await CommerceSolanaPayment.buildSignedTransfer(
+                            sandwich: sandwich, account: account, rpcURLString: rpc,
+                            recipient: cand.rail.address, amount: amount, mint: cand.solMint,
+                            decimals: cand.solDecimals, biometricReason: "Authorize \(amount) \(cand.rail.asset) payment")
+                        pending = PendingBroadcast(presentation: presentation, rawTx: signed.signed,
+                                                   txHash: signed.signature, rail: cand.rail,
+                                                   rpcURLString: rpc, requestId: request.verifierRequest.requestId)
+                    case .hardware(let deviceId, let account, let pubkeyBase58):
+                        isSoftware = false
+                        guard let dev = store.devices.find(id: deviceId) else {
+                            throw CommercePayError("Hardware device record is missing. Re-register it in Settings → Devices.")
+                        }
+                        guard let pubkeyBytes = WalletCore.Base58.decodeNoCheck(string: pubkeyBase58), pubkeyBytes.count == 32 else {
+                            throw CommercePayError("Stored signer public key did not decode as 32 bytes.")
+                        }
+                        // Connect the device (serial guard + Trezor passphrase +
+                        // derivation override), then sign on-device over BLE.
+                        let hardware = HardwareWalletFactory.make(kind: dev.kind == .ledger ? .ledger : .trezor)
+                        if let trezor = hardware as? TrezorBLE {
+                            trezor.applyPassphraseMode(try HardwarePassphraseRef.resolveChoice(desc.hidden, hostEntered: signingPassphrase))
+                        }
+                        hardware.setDerivationPathOverride(desc.derivationPath)
+                        hardware.beginSession()
+                        defer { hardware.endSession() }
+                        let connected = try await hardware.identifyDevice()
+                        guard connected == dev.serial else {
+                            throw IdentityWrapError.deviceSerialMismatch(expected: dev.serial, actual: connected)
+                        }
+                        let wallet = SolanaWallet(descriptor: desc, network: net, rpcURL: rpc, sandwich: store.sandwich)
+                        let signedB64: String
+                        if let mint = cand.solMint {
+                            let raw = try CommerceSolanaPayment.baseUnits(amount, decimals: cand.solDecimals)
+                            signedB64 = try await wallet.prepareHardwareSPLToken(
+                                mint: mint, decimals: UInt8(cand.solDecimals), rawAmount: raw,
+                                recipient: cand.rail.address, priorityFeeMicroLamports: 0,
+                                ledger: hardware, signerBase58: pubkeyBase58,
+                                signerPublicKey: pubkeyBytes, account: account)
+                        } else {
+                            let lamports = try CommerceSolanaPayment.baseUnits(amount, decimals: 9)
+                            signedB64 = try await wallet.prepareHardwareNative(
+                                recipient: cand.rail.address, lamports: lamports, priorityFeeMicroLamports: 0,
+                                ledger: hardware, signerBase58: pubkeyBase58,
+                                signerPublicKey: pubkeyBytes, account: account)
+                        }
+                        guard let ref = CommerceSolanaPayment.transactionSignature(signedBase64: signedB64) else {
+                            throw CommercePayError("Could not read the transaction signature.")
+                        }
+                        pending = PendingBroadcast(presentation: presentation, rawTx: signedB64,
+                                                   txHash: ref, rail: cand.rail,
+                                                   rpcURLString: rpc, requestId: request.verifierRequest.requestId)
+                    }
+                case .tron(let desc):
+                    guard let net = cand.tronNetwork else {
+                        throw CommercePayError("Unlock your identity to pay.")
+                    }
+                    let rpc = store.tronSettings.rpcURL(for: net)
+                    let wallet = TronWallet(descriptor: desc, network: net, rpcURL: rpc, sandwich: store.sandwich)
+                    let reason = "Authorize \(amount) \(cand.rail.asset) payment"
+                    switch desc.kind {
+                    case .software:
+                        let signedJSON: String
+                        if let contract = cand.tronTokenContract {
+                            let raw = try CommerceTronPayment.baseUnits(amount, decimals: cand.tronDecimals)
+                            signedJSON = try await wallet.prepareSoftwareTRC20(
+                                contractAddress: contract, rawAmount: raw,
+                                recipient: cand.rail.address, biometricReason: reason)
+                        } else {
+                            let sun = try CommerceTronPayment.baseUnitsInt64(amount, decimals: 6)
+                            signedJSON = try await wallet.prepareSoftwareNative(
+                                recipient: cand.rail.address, sunAmount: sun,
+                                feeLimitSun: 1_000_000, biometricReason: reason)
+                        }
+                        let txID = try CommerceTronPayment.txID(fromSignedJSON: signedJSON)
+                        pending = PendingBroadcast(presentation: presentation, rawTx: signedJSON,
+                                                   txHash: txID, rail: cand.rail,
+                                                   rpcURLString: rpc, requestId: request.verifierRequest.requestId)
+                    case .hardware(let deviceId, let account, let senderBase58):
+                        isSoftware = false
+                        guard let dev = store.devices.find(id: deviceId) else {
+                            throw CommercePayError("Hardware device record is missing. Re-register it in Settings → Devices.")
+                        }
+                        // Connect the device (serial guard + Trezor passphrase +
+                        // derivation override), then sign raw_data on-device (Ledger
+                        // OR Trezor) and assemble the signed wire JSON.
+                        let hardware = HardwareWalletFactory.make(kind: dev.kind == .ledger ? .ledger : .trezor)
+                        if let trezor = hardware as? TrezorBLE {
+                            trezor.applyPassphraseMode(try HardwarePassphraseRef.resolveChoice(desc.hidden, hostEntered: signingPassphrase))
+                        }
+                        hardware.setDerivationPathOverride(desc.derivationPath)
+                        hardware.beginSession()
+                        defer { hardware.endSession() }
+                        let connected = try await hardware.identifyDevice()
+                        guard connected == dev.serial else {
+                            throw IdentityWrapError.deviceSerialMismatch(expected: dev.serial, actual: connected)
+                        }
+                        let signedAndSig: TronDescriptors.TronUnsignedAndSignature
+                        if let contract = cand.tronTokenContract {
+                            let raw = try CommerceTronPayment.baseUnits(amount, decimals: cand.tronDecimals)
+                            signedAndSig = try await wallet.prepareHardwareTRC20(
+                                contractAddress: contract, recipient: cand.rail.address,
+                                rawAmount: raw, feeLimitSun: 100_000_000,
+                                ledger: hardware, senderBase58: senderBase58, account: account)
+                        } else {
+                            let sun = try CommerceTronPayment.baseUnitsInt64(amount, decimals: 6)
+                            signedAndSig = try await wallet.prepareHardwareNative(
+                                recipient: cand.rail.address, sunAmount: sun, feeLimitSun: 1_000_000,
+                                ledger: hardware, senderBase58: senderBase58, account: account)
+                        }
+                        let signedJSON = try CommerceTronPayment.assembleSignedJSON(
+                            envelopeJSON: signedAndSig.envelopeJSON, signatureRSV: signedAndSig.signatureRSV)
+                        let txID = try CommerceTronPayment.txID(fromSignedJSON: signedJSON)
+                        pending = PendingBroadcast(presentation: presentation, rawTx: signedJSON,
+                                                   txHash: txID, rail: cand.rail,
+                                                   rpcURLString: rpc, requestId: request.verifierRequest.requestId)
+                    }
+                case .bitcoin(let desc):
+                    guard let net = cand.btcNetwork else {
+                        throw CommercePayError("Unlock your identity to pay.")
+                    }
+                    let url = store.bitcoinSettings.electrumURL(for: net)
+                    let feeBase = store.bitcoinSettings.mempoolURL(for: net)
+                    let rec = (try? await BitcoinFeeEstimator.fetch(baseURL: feeBase)) ?? BitcoinFeeEstimator.fallback
+                    let feeRate = max(rec.satsPerVb(for: .halfHour), 1)
+                    let sats = try CommerceBitcoinPayment.satsFromBTC(amount)
+                    switch desc.kind {
+                    case .software(let account):
+                        guard let sandwich = store.sandwich else {
+                            throw CommercePayError("Unlock your identity to pay.")
+                        }
+                        let signed = try await CommerceBitcoinPayment.buildSignedTransfer(
+                            descriptor: desc, sandwich: sandwich, account: account,
+                            recipient: cand.rail.address, amountSat: sats, feeRateSatsPerVb: feeRate, electrumURL: url)
+                        pending = PendingBroadcast(presentation: presentation, rawTx: signed.signed,
+                                                   txHash: signed.txid, rail: cand.rail,
+                                                   rpcURLString: url, requestId: request.verifierRequest.requestId)
+                    case .hardware(let deviceId, let fingerprint, let xpub):
+                        isSoftware = false
+                        guard let device = store.devices.find(id: deviceId) else {
+                            throw CommercePayError("Hardware device record is missing. Re-register it in Settings → Devices.")
+                        }
+                        // Build the unsigned PSBT (watch-only), sign it on the
+                        // device over BLE, then finalize for the txid + broadcast.
+                        let unsigned = try await CommerceBitcoinPayment.buildUnsignedForHardware(
+                            descriptor: desc, recipient: cand.rail.address,
+                            amountSat: sats, feeRateSatsPerVb: feeRate, electrumURL: url)
+                        let signedB64 = try await BitcoinSigningHelpers.signOverBLE(
+                            unsignedBase64: unsigned, device: device,
+                            fingerprintHex: fingerprint, accountXpub: xpub, network: net,
+                            hidden: desc.hidden, derivationPath: desc.derivationPath,
+                            hostEntered: signingPassphrase)
+                        let txid = try CommerceBitcoinPayment.txid(fromSignedPSBT: signedB64, unsignedPSBT: unsigned)
+                        pending = PendingBroadcast(presentation: presentation, rawTx: signedB64,
+                                                   txHash: txid, rail: cand.rail,
+                                                   rpcURLString: url, requestId: request.verifierRequest.requestId,
+                                                   bitcoinUnsigned: unsigned)
+                    }
+                case .lightning(let acct):
+                    // No local signing. The settlement ref is the merchant-minted
+                    // BOLT11 (rail.address); the pay is an authenticated LNDHub
+                    // call in runBroadcast, AFTER the identity post. The merchant
+                    // matches the payment to the invoice it issued.
+                    let bolt11 = cand.rail.address
+                    guard !bolt11.isEmpty else {
+                        throw CommercePayError("Merchant did not provide a Lightning invoice.")
+                    }
+                    pending = PendingBroadcast(presentation: presentation, rawTx: bolt11,
+                                               txHash: bolt11, rail: cand.rail,
+                                               rpcURLString: "", requestId: request.verifierRequest.requestId,
+                                               lightningAccount: acct)
+                }
                 pendingBroadcast = pending
                 if isSoftware {
                     await runBroadcast(pending)   // one-tap, like other software sends
@@ -382,8 +809,30 @@ struct CommercePaySheet: View {
                 payment: .init(rail: pending.rail, txHash: pending.txHash))
             let sealed = try CommerceSeal.seal(serverResponse, toPublicKeyBase64: pub, requestId: pending.requestId)
             try await CommerceTransport.postResponse(baseURL: responseBaseURL, sealed)
-            // 2. Identity received -> send the payment on-chain.
-            let onChain = try await CommerceEVMPayment.broadcast(pending.rawTx, rpcURLString: pending.rpcURLString)
+            // 2. Identity received -> send the payment on-chain (per chain).
+            let onChain: String
+            if pending.rail.chain == "solana" {
+                onChain = try await CommerceSolanaPayment.broadcast(pending.rawTx, rpcURLString: pending.rpcURLString)
+            } else if pending.rail.chain == "tron" {
+                onChain = try await CommerceTronPayment.broadcast(pending.rawTx, rpcURLString: pending.rpcURLString)
+            } else if pending.rail.chain == "bitcoin" {
+                onChain = try await CommerceBitcoinPayment.broadcast(
+                    pending.rawTx, unsignedB64: pending.bitcoinUnsigned, electrumURL: pending.rpcURLString)
+            } else if pending.rail.chain == "lightning" {
+                guard let acct = pending.lightningAccount,
+                      let pw = (try? store.lightningAccountStore.password(for: acct.id)) ?? nil else {
+                    throw CommercePayError("Lightning account is unavailable. Re-import it under Wallet.")
+                }
+                let client = LNDHubClient(account: acct, password: pw)
+                // Pay the merchant's invoice (it carries the amount). NO retry on
+                // failure: a re-pay could double-spend if the first attempt
+                // actually settled (matches the Lightning send screen).
+                let result = try await client.payInvoice(pending.rawTx, amountSat: nil)
+                onChain = result.preimage
+            } else {
+                onChain = try await CommerceEVMPayment.broadcast(pending.rawTx, rpcURLString: pending.rpcURLString)
+            }
+            paidChain = pending.rail.chain
             phase = .done(onChain)
         } catch {
             self.error = "\(error.localizedDescription)"
@@ -412,19 +861,23 @@ struct CommercePaySheet: View {
     /// Route the payment signing on the wallet kind, returning the raw signed
     /// EIP-1559 transaction hex for broadcast.
     private func signedRawTransfer(cand: Candidate, from: String, amount: String, rpcURLString: String) async throws -> String {
-        let reason = "Authorize \(amount) \(cand.asset.symbol) payment"
-        switch cand.descriptor.kind {
+        // EVM-only path (Solana signs in prepare() via CommerceSolanaPayment).
+        guard let desc = cand.ethDescriptor, let asset = cand.ethAsset else {
+            throw CommercePayError("Unsupported wallet for this rail.")
+        }
+        let reason = "Authorize \(amount) \(asset.symbol) payment"
+        switch desc.kind {
         case .software(let account):
             guard let sandwich = store.sandwich else { throw CommercePayError("Unlock your identity to pay.") }
             return try await CommerceEVMPayment.buildSignedTransfer(
                 sandwich: sandwich, account: account, from: from, rpcURLString: rpcURLString,
-                recipient: cand.rail.address, amount: amount, asset: cand.asset, biometricReason: reason)
+                recipient: cand.rail.address, amount: amount, asset: asset, biometricReason: reason)
         case .hardware(let deviceId, let account, _):
             return try await signOnHardware(deviceId: deviceId, account: account, from: from,
                                             recipient: cand.rail.address, amount: amount,
-                                            asset: cand.asset, rpcURLString: rpcURLString,
-                                            hidden: cand.descriptor.hidden,
-                                            derivationPath: cand.descriptor.derivationPath,
+                                            asset: asset, rpcURLString: rpcURLString,
+                                            hidden: desc.hidden,
+                                            derivationPath: desc.derivationPath,
                                             hostEntered: signingPassphrase)
         }
     }
@@ -489,13 +942,13 @@ struct CommercePaySheet: View {
     }
 
     private static func attrValue(_ c: Credential?, _ key: String) -> String {
-        guard let c else { return "—" }
+        guard let c else { return "-" }
         if key == "sdnScreen", let obj = c.claims[key]?.anyValue as? [String: Any] {
             let result = (obj["result"] as? String) ?? "?"
             let when = (obj["screenedAt"] as? String).map { String($0.prefix(10)) } ?? ""
             return when.isEmpty ? "Sanctions: \(result)" : "Sanctions: \(result) (screened \(when))"
         }
-        return c.claims[key]?.displayText ?? "—"
+        return c.claims[key]?.displayText ?? "-"
     }
 }
 

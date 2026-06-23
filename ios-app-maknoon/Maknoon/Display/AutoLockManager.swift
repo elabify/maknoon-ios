@@ -37,7 +37,7 @@ final class AutoLockManager {
     var showCurtain: Bool = false
 
     /// Most recent user interaction. Tap, drag, scroll. NOT updated
-    /// when the user is in the lock screen itself — that would
+    /// when the user is in the lock screen itself, that would
     /// defeat the timer.
     private var lastActivityAt: Date = Date()
 
@@ -51,7 +51,7 @@ final class AutoLockManager {
     private var timer: Timer?
 
     /// Locks immediately on the next active transition if true. Set
-    /// when scene phase goes to background — the rule is "if you've
+    /// when scene phase goes to background. The rule is "if you've
     /// been gone past the threshold, we lock on return."
     private var enteredBackgroundAt: Date?
 
@@ -125,7 +125,7 @@ final class AutoLockManager {
         let policy: LAPolicy = .deviceOwnerAuthentication
         guard ctx.canEvaluatePolicy(policy, error: &error) else { return false }
         do {
-            let reason = NSLocalizedString("Unlock Maknoon", comment: "Auto-Lock biometric prompt")
+            let reason = Loc.t("Unlock Maknoon")
             let ok = try await ctx.evaluatePolicy(policy, localizedReason: reason)
             if ok { unlock() }
             return ok

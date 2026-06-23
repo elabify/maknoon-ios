@@ -32,7 +32,7 @@ private let chunkBytes = 750
 struct LocalFrameEnvelope: Codable {
     /// Sentinel string that lets the receiver detect this format quickly.
     /// Held at -1 (uncompressed base64 chunks) so the wire format stays
-    /// byte-for-byte identical to the React verifier's decoder — that
+    /// byte-for-byte identical to the React verifier's decoder; that
     /// cross-platform contract is what lets an iOS holder present to a
     /// React verifier. A -2 zlib-compressed variant was tried to shrink
     /// large presentations but reverted: it forced a cross-language
@@ -123,7 +123,7 @@ final class LocalFrameReceiver: ObservableObject {
     /// Try to consume a scanned QR payload as a `LocalFrameEnvelope`.
     /// Returns true when the payload was a recognised frame and has
     /// been ingested; false otherwise (caller can fall back to other
-    /// payload formats — Badge, DropEnvelope, raw Presentation, etc.).
+    /// payload formats: Badge, DropEnvelope, raw Presentation, etc.).
     @discardableResult
     func ingest(_ payload: String) -> Bool {
         guard let data = payload.data(using: .utf8),

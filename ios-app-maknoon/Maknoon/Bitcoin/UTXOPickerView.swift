@@ -70,7 +70,7 @@ struct UTXOPickerView: View {
                 Text(formatSats(amountNeededSat)).monospacedDigit()
             }
             if selectedSat < amountNeededSat {
-                Text("Add \(formatSats(amountNeededSat - selectedSat)) more — fee not included.")
+                Text("Add \(formatSats(amountNeededSat - selectedSat)) more, fee not included.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {

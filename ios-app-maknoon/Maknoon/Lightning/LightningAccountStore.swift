@@ -78,7 +78,7 @@ final class LightningAccountStore {
     /// in the iCloud encrypted backup. Accounts whose Keychain
     /// entry has gone missing are skipped silently (the backup will
     /// just lack those, which is the same as if they weren't
-    /// configured). Plaintext YAML export does NOT use this — it
+    /// configured). Plaintext YAML export does NOT use this, it
     /// would leak LNDHub credentials.
     func exportForEncryptedBackup() -> [LightningAccountWithSecret] {
         var out: [LightningAccountWithSecret] = []
@@ -119,34 +119,67 @@ final class LightningAccountStore {
 
     // MARK: -- lndhub:// URL parse
 
-    /// Parse a Zeus-style `lndhub://login:password@host[:port][/path]`
-    /// URL. Returns nil on malformed input. Accepts a trailing
-    /// `?tls=false` query (BlueWallet writes this for self-signed
-    /// hubs) and surfaces it through `allowInsecureTLS` on the
-    /// returned account. Caller decides the final label and persists
-    /// via `add(account:password:)`.
+    /// Parse an `lndhub://login:password@<server>` import URL. The
+    /// `lndhub://` scheme is a de-facto BlueWallet standard, but the
+    /// `<server>` part comes in two shapes, both accepted here (this
+    /// mirrors the Android `LightningAccountStore.parseImportURL`):
+    ///   1. Zeus / bare host:  `lndhub://login:password@host[:port][/path]`
+    ///      (https is implied).
+    ///   2. BlueWallet / LNbits: `lndhub://login:password@https://host[/path]`
+    ///      (the full scheme is embedded after the `@`).
+    /// Foundation's `URL`/`URLComponents` cannot parse shape 2 (the inner
+    /// `//` breaks authority parsing), so we hand-split. Accepts a
+    /// trailing `?tls=false` query (BlueWallet writes this for
+    /// self-signed hubs) and surfaces it through `allowInsecureTLS`.
+    /// Returns nil on malformed input. Caller decides the final label and
+    /// persists via `add(account:password:)`.
     static func parseImportURL(_ raw: String, defaultLabel: String? = nil) -> (account: LightningAccount, password: String)? {
-        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let parsed = URL(string: trimmed),
-              parsed.scheme?.lowercased() == "lndhub",
-              let host = parsed.host,
-              let user = parsed.user,
-              let pass = parsed.password
-        else { return nil }
+        var s = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard s.lowercased().hasPrefix("lndhub://") else { return nil }
+        s = String(s.dropFirst("lndhub://".count))
 
-        var server = "https://\(host)"
-        if let port = parsed.port { server += ":\(port)" }
-        let path = parsed.path
-        if !path.isEmpty && path != "/" { server += path }
+        // Split a trailing query (?tls=false) off the server, if present.
+        var query = ""
+        if let qIdx = s.firstIndex(of: "?") {
+            query = String(s[s.index(after: qIdx)...])
+            s = String(s[..<qIdx])
+        }
+
+        // login:password @ server. The first '@' is the userInfo
+        // separator: LNDHub login/password are opaque tokens without '@',
+        // and the server part never contains '@' in either shape.
+        guard let atIdx = s.firstIndex(of: "@") else { return nil }
+        let userInfo = String(s[..<atIdx])
+        var serverPart = String(s[s.index(after: atIdx)...])
+        while serverPart.hasSuffix("/") { serverPart = String(serverPart.dropLast()) }
+        guard !userInfo.isEmpty, !serverPart.isEmpty else { return nil }
+
+        // login:password on the first ':'.
+        guard let sepIdx = userInfo.firstIndex(of: ":") else { return nil }
+        let user = String(userInfo[..<sepIdx])
+        let pass = String(userInfo[userInfo.index(after: sepIdx)...])
+        guard !user.isEmpty, !pass.isEmpty else { return nil }
+
+        // Shape 2 already carries http(s)://; shape 1 implies https.
+        let lower = serverPart.lowercased()
+        let server = (lower.hasPrefix("https://") || lower.hasPrefix("http://"))
+            ? serverPart
+            : "https://\(serverPart)"
 
         // BlueWallet-style `?tls=false` opts into self-signed certs.
         var allowInsecureTLS = false
-        if let comps = URLComponents(string: trimmed),
-           let tls = comps.queryItems?.first(where: { $0.name.lowercased() == "tls" })?.value,
-           tls.lowercased() == "false" {
-            allowInsecureTLS = true
+        for item in query.split(separator: "&") {
+            let kv = item.split(separator: "=", maxSplits: 1).map(String.init)
+            if kv.count == 2, kv[0].lowercased() == "tls", kv[1].lowercased() == "false" {
+                allowInsecureTLS = true
+            }
         }
 
+        let host = URL(string: server)?.host
+            ?? server.components(separatedBy: "://").last?
+                .components(separatedBy: "/").first?
+                .components(separatedBy: ":").first
+            ?? server
         let label = defaultLabel?.trimmingCharacters(in: .whitespaces).isEmpty == false
             ? defaultLabel!
             : host

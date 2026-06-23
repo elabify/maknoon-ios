@@ -1,6 +1,6 @@
 // Network picker for the Ethereum wallet. Replaces the old `Menu`, which
 // always opened at the top with no way to reveal the current selection
-// (a real problem once the list grew past a screen — picking a testnet low
+// (a real problem once the list grew past a screen, picking a testnet low
 // in the list, then reopening, started back at the top). A List inside a
 // ScrollViewReader lets us scroll to and highlight the currently-selected
 // chain on open.

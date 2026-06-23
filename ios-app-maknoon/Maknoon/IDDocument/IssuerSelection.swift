@@ -17,7 +17,7 @@ enum IssuerSelection {
 
     /// The base URL the issuance / sanctions calls should target.
     /// Returns nil when the user picked Custom and hasn't typed a
-    /// parseable URL yet — callers use that nil to disable the submit
+    /// parseable URL yet, callers use that nil to disable the submit
     /// action so we don't fire half-formed requests.
     ///
     /// When `selectedEntry` is empty (picker hasn't seeded a selection
@@ -148,7 +148,7 @@ enum IDDocumentIssuance {
     /// The issuer builds pickup URLs from its configured base (typically
     /// `http://localhost:4000/...` in dev mode). When the holder reaches
     /// the issuer through a LAN IP, the localhost URL won't resolve from
-    /// the phone — rewrite it to use the same base we submitted to.
+    /// the phone, rewrite it to use the same base we submitted to.
     /// Production deployments configure ELABIFY_PICKUP_BASE_URL with
     /// their public hostname and this rewrite is a no-op.
     static func rewritePickupURLForLAN(_ url: String, fallbackBase: URL) -> String {

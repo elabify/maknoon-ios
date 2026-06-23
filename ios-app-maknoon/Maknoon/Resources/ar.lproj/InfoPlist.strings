@@ -1,0 +1,5 @@
+/* System permission prompts (Arabic). Machine-translated, pending human review. */
+"NFCReaderUsageDescription" = "يستخدم Maknoon تقنية NFC لقراءة مفتاح YubiKey عند لمسه لأعلى الـ iPhone، ولقراءة وثائق الهوية عند لمس هاتفك لصفحة الصورة.";
+"NSBluetoothAlwaysUsageDescription" = "يستخدم Maknoon تقنية Bluetooth للاتصال بمحفظة أجهزة Ledger من أجل التوقيع. لا تُرسَل أي بيانات إلى أي خادم.";
+"NSCameraUsageDescription" = "يحتاج Maknoon إلى الوصول إلى الكاميرا لمسح رموز QR من جهات الإصدار عند استلام بيانات الاعتماد.";
+"NSFaceIDUsageDescription" = "يستخدم Maknoon تقنية Face ID لفتح التطبيق والتفويض بالتوقيع باستخدام مفاتيح محفظتك وبيانات اعتمادك.";

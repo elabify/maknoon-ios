@@ -4,7 +4,7 @@
 // Presentation flows over the radio, and the sheet shows "Done."
 //
 // Multi-frame QR remains available as a fallback (button at the
-// bottom) for any scenario where BLE is denied or unavailable — but
+// bottom) for any scenario where BLE is denied or unavailable, but
 // the rotating-frame path is no longer the default share UX.
 
 import SwiftUI
@@ -96,7 +96,7 @@ struct BLEShareSheet: View {
             case .idle:                       return ("circle.dotted", .secondary, "Starting Bluetooth…")
             case .unsupported(let reason):    return ("exclamationmark.triangle.fill", .orange, reason)
             case .advertising:                return ("dot.radiowaves.left.and.right", .green, "Waiting for verifier to scan")
-            case .handshakeReceived:          return ("arrow.left.arrow.right", .blue, "Handshake — exchanging keys")
+            case .handshakeReceived:          return ("arrow.left.arrow.right", .blue, "Handshake, exchanging keys")
             case .payloadDelivered:           return ("checkmark.shield.fill", .green, "Delivered. Verifier has your credential.")
             case .error(let reason):          return ("xmark.shield.fill", .red, reason)
             }
@@ -135,7 +135,7 @@ struct BLEShareSheet: View {
                 let data = try JSONEncoder().encode(eng)
                 qrImage = BadgeQR.render(data)
             } catch {
-                // Fall back to LocalShareQrSheet — at least the user
+                // Fall back to LocalShareQrSheet, at least the user
                 // gets a working path.
                 fallbackToFrames = true
             }

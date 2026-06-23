@@ -8,7 +8,7 @@
 // (`/wallet/getnowblock`) and passed it in as a `BlockReference`.
 //
 // We deliberately keep the on-chain encoding work in TWC rather
-// than hand-rolling protobuf framing — TWC is validated against the
+// than hand-rolling protobuf framing. TWC is validated against the
 // Tron mainnet test vectors and matches the TRX format byte-for-byte.
 
 import Foundation

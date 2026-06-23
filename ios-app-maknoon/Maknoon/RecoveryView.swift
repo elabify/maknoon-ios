@@ -41,7 +41,7 @@ struct RecoveryView: View {
     /// Best-effort import report from the file restore path,
     /// wrapped in a stable Identifiable so `.sheet(item:)` doesn't
     /// see a fresh id each render.
-    @State fileprivate var fileImportReport: IdentifiedImportReport?
+    @State fileprivate var restoreDone: RestoreDone?
 
     var body: some View {
         ScrollView {
@@ -54,16 +54,31 @@ struct RecoveryView: View {
             }
             .padding(.horizontal, 4)
         }
-        .sheet(item: $fileImportReport) { wrapper in
-            SettingsImportReportSheet(report: wrapper.report) {
-                fileImportReport = nil
+        // Confirmation BEFORE continuing: shows what was restored and anything
+        // that could not be imported. Adopting the sandwich (which swaps to the
+        // main app) is deferred to the Continue button so a partial restore is
+        // never silently dropped. Mirrors the Android RESTORE_DONE step.
+        .sheet(item: $restoreDone) { done in
+            RestoreCompleteSheet(summary: done.summary) {
+                let s = done.sandwich
+                restoreDone = nil
+                store.adopt(s)
+                Task { await store.reissueCredentialsAfterRestore() }
             }
+            .interactiveDismissDisabled(true)
         }
     }
 
-    fileprivate struct IdentifiedImportReport: Identifiable {
+    fileprivate struct RestoreSummary {
+        let restored: [String]
+        let warnings: [String]
+        var hadWarnings: Bool { !warnings.isEmpty }
+    }
+
+    fileprivate struct RestoreDone: Identifiable {
         let id = UUID()
-        let report: SettingsBackupReport
+        let summary: RestoreSummary
+        let sandwich: IdentitySandwich
     }
 
     // MARK: -- picker
@@ -333,23 +348,40 @@ struct RecoveryView: View {
                 EncryptedBackup.applyWalletState(backup.walletState)
             }
 
-            // 2) Apply the snapshots that mutate live stores. Older
-            //    backups (plaintext v1/v2) leave these nil and we keep
-            //    whatever was on this device, which is usually nothing
-            //    post-onboarding-restore.
-            var pendingReport: SettingsBackupReport?
+            // 2) Apply the snapshots that mutate live stores, collecting a
+            //    summary of what came back + anything that couldn't be imported.
+            //    The labels match the export manifest exactly so the two can be
+            //    compared 1:1 (per-chain wallet counts included).
+            func walletCount(_ key: String) -> Int {
+                guard let b64 = backup.walletState?[key], let data = Data(base64Encoded: b64),
+                      let arr = (try? JSONSerialization.jsonObject(with: data)) as? [Any] else { return 0 }
+                return arr.count
+            }
+            var restored: [String] = ["Identity & recovery phrase"]
+            var warnings: [String] = []
+            for (label, key) in [("Bitcoin", "networks.bitcoin.wallets.v1"), ("Ethereum", "networks.ethereum.wallets.v2"), ("Solana", "networks.solana.wallets.v2"), ("Tron", "networks.tron.wallets.v2")] {
+                let n = walletCount(key); if n > 0 { restored.append("\(label) wallets (\(n))") }
+            }
+            if backup.walletState != nil { restored.append("Networks, RPC/explorer overrides, tokens, currency & display") }
             if let settings = backup.settings {
                 let report = settings.apply(to: store)
-                if report.hasGaps { pendingReport = report }
+                warnings.append(contentsOf: report.skipped)
+                if let note = report.versionNote { warnings.append(note) }
+                if !settings.knownIssuers.isEmpty { restored.append("Trusted issuers (\(settings.knownIssuers.count))") }
+                if let devs = settings.devices, !devs.isEmpty { restored.append("Hardware devices (\(devs.count))") }
+                if let ab = settings.addressBook, !ab.isEmpty { restored.append("Address book (\(ab.count))") }
             }
             if let lightning = backup.lightningAccounts, !lightning.isEmpty {
                 try? store.lightningAccountStore.importFromEncryptedBackup(lightning)
+                restored.append("Lightning accounts (\(lightning.count))")
             }
             if let creds = backup.credentials {
                 store.applyCredentialsBackup(creds)
+                restored.append("Credentials (\(creds.credentials.count))")
             }
             if let docs = backup.idDocuments {
                 store.idDocuments.applyBackup(docs)
+                restored.append("ID documents / passports (\(docs.documents.count))")
             }
 
             // 3) Refresh the in-memory stores (wallet lists, settings,
@@ -359,24 +391,70 @@ struct RecoveryView: View {
             store.reloadAfterRestore()
             displayPrefs.reload()
 
-            // 4) Adopt the sandwich LAST so the launch router swaps to
-            //    ContentView only after every store holds the restored
-            //    state: no empty-then-populate flash, and no window where
-            //    a store mutation could clobber the freshly written keys.
-            store.adopt(sandwich)
-
-            // Best-effort: ask each configured issuer to re-mint the latest
-            // credentials for this (identical) holder DID, replacing the
-            // backup copies and pulling any the backup lacked. Runs in an
-            // unstructured Task so it survives this view being torn down when
-            // the launch router swaps to the main app on adopt.
-            Task { await store.reissueCredentialsAfterRestore() }
-
-            if let pendingReport {
-                fileImportReport = IdentifiedImportReport(report: pendingReport)
-            }
+            // 4) Show the confirmation. Adopting the sandwich (which swaps to
+            //    the main app) happens on Continue, so the user sees what was
+            //    restored (and any warnings) before leaving this screen.
+            restoreDone = RestoreDone(
+                summary: RestoreSummary(restored: restored, warnings: warnings),
+                sandwich: sandwich
+            )
         } catch {
             errorMessage = "Restore failed: \(error.localizedDescription)"
+        }
+    }
+}
+
+// Restore confirmation: lists what was restored (and anything that couldn't be
+// imported) with a Continue button that adopts the identity and enters the app.
+private struct RestoreCompleteSheet: View {
+    let summary: RecoveryView.RestoreSummary
+    let onContinue: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack(spacing: 10) {
+                        Image(systemName: summary.hadWarnings ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
+                            .font(.title2)
+                            .foregroundStyle(summary.hadWarnings ? .orange : .green)
+                        Text(summary.hadWarnings ? "Restore completed with warnings" : "Restore complete")
+                            .font(.title3.weight(.semibold))
+                    }
+                    Text(summary.hadWarnings
+                        ? "Your wallet was restored, but some items could not be imported. Review them below before continuing."
+                        : "Everything in your backup was restored to this phone.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+
+                    if !summary.restored.isEmpty {
+                        Text("Restored").font(.subheadline.weight(.semibold))
+                        VStack(alignment: .leading, spacing: 4) {
+                            ForEach(summary.restored, id: \.self) { item in
+                                Label(item, systemImage: "checkmark").font(.callout)
+                            }
+                        }
+                    }
+
+                    if summary.hadWarnings {
+                        Text("Not imported").font(.subheadline.weight(.semibold)).foregroundStyle(.orange)
+                        VStack(alignment: .leading, spacing: 4) {
+                            ForEach(summary.warnings, id: \.self) { w in
+                                Text("• \(w)").font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+
+                    Button(action: onContinue) {
+                        Text("Continue").frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .padding(.top, 8)
+                }
+                .padding(20)
+            }
+            .navigationTitle("Restore")
+            .navigationBarTitleDisplayMode(.inline)
         }
     }
 }

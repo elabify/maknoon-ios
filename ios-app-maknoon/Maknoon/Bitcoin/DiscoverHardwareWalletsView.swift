@@ -33,11 +33,17 @@ struct DiscoverHardwareWalletsView: View {
     @State private var pendingReadyOp: PendingHardwareOperation?
     /// Per-account report shown after Add Selected runs.
     @State private var addReport: [String]?
-    /// Trezor-only hidden-wallet selector. `.standard` reproduces exact
-    /// Ledger behavior (empty passphrase).
-    @State private var hwPassphrase: HiddenWalletSelection = .standard
-    /// Host-typed passphrase, used only when `hwPassphrase == .hostTyped`.
-    @State private var hwHostPassphrase: String = ""
+    /// Trezor hidden-wallet choice, collected UPSTREAM in the connection
+    /// step (DeviceReadyConfirmationSheet) on the hardware add/discover tap.
+    /// The one choice applies to both add and discover (ADR-0033). Passed as
+    /// a BINDING so the scan reads the LIVE committed value: the readiness
+    /// sheet sets it just before this view opens, and a plain snapshot could
+    /// capture the pre-selection `.standard` during the two-sheet handoff
+    /// (the bug that left the Trezor passphrase unsent). Ledger passes
+    /// `.constant(.standard)` / `.constant("")`.
+    @Binding var hwPassphrase: HiddenWalletSelection
+    /// Host-typed passphrase that pairs with `hwPassphrase == .hostTyped`.
+    @Binding var hwHostPassphrase: String
     /// Also sweep well-known alternative paths: BIP44 (legacy), BIP49
     /// (nested segwit), BIP84 (native segwit) per account.
     @State private var alsoTryAltPaths: Bool = false
@@ -74,26 +80,6 @@ struct DiscoverHardwareWalletsView: View {
             } footer: {
                 Text("Maknoon will walk BIP44 accounts on this device + network until \(Self.emptyAccountGapLimit) consecutive empty accounts are found, then stop. Each account is a full Electrum scan and can take several seconds.")
                     .font(.caption)
-            }
-
-            if isTrezor && !scanning && found.isEmpty && progress.isEmpty {
-                Section {
-                    Picker("Wallet", selection: $hwPassphrase) {
-                        ForEach(HiddenWalletSelection.allCases) { mode in
-                            Text(mode.rawValue).tag(mode)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    if hwPassphrase == .hostTyped {
-                        SecureField("Passphrase", text: $hwHostPassphrase)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                    }
-                } header: {
-                    Text("Hidden wallet")
-                } footer: {
-                    Text(hwPassphrase.footer).font(.caption)
-                }
             }
 
             if !scanning && found.isEmpty && progress.isEmpty {
@@ -242,10 +228,22 @@ struct DiscoverHardwareWalletsView: View {
         defer { client.endSession() }
 
         do {
-            // Confirm the same physical device.
+            // Confirm the same physical device. A Ledger's serial is a
+            // platform-specific BLE id (iOS peripheral UUID vs Android MAC), so
+            // a record carried across platforms by an encrypted backup can never
+            // serial-match. When this is the SOLE registered device of its kind
+            // there is no ambiguity about which physical unit answered, so
+            // re-bind the stored serial to the live one (device id + wallet
+            // links unchanged) and proceed. Mirrors Android withHardwareDevice;
+            // with 2+ devices of a kind the hard guard stands. (ADR-0033)
             let liveSerial = try await client.identifyDevice()
-            guard liveSerial == device.serial else {
-                throw HardwareWalletError.transport("Connected device has serial \(liveSerial) which does not match the registered serial \(device.serial). Reconnect the correct device.")
+            if liveSerial != device.serial {
+                let sameKind = store.devices.devices.filter { $0.kind == device.kind }
+                if sameKind.count == 1 {
+                    store.devices.rebindSerial(deviceId: device.id, serial: liveSerial)
+                } else {
+                    throw HardwareWalletError.transport("Connected device has serial \(liveSerial) which does not match the registered serial \(device.serial). Reconnect the correct device.")
+                }
             }
             let fingerprint = try await client.getBitcoinMasterFingerprint(networkCoinType: network.coinType)
 
@@ -367,6 +365,22 @@ struct DiscoverHardwareWalletsView: View {
             }
             if let existing {
                 report.append("Account \(d.account) (\(network.displayName)), already labelled \"\(existing.label)\", skipped.")
+                continue
+            }
+            // Relink-by-key (ADR-0033): if a wallet with this SAME xpub already
+            // exists but is ORPHANED (its stored deviceId no longer resolves in
+            // the registry, e.g. after a device remove/re-add or a cross-device
+            // restore), re-point it to this device instead of adding a duplicate.
+            let orphan = store.bitcoinWalletStore.wallets.first { w in
+                guard w.network == network,
+                      case let .hardware(deviceId, _, walletXpub) = w.kind,
+                      walletXpub == d.xpub else { return false }
+                return store.devices.find(id: deviceId) == nil
+            }
+            if let orphan {
+                store.bitcoinWalletStore.relink(walletId: orphan.id, toDeviceId: device.id)
+                store.devices.addBitcoinWallet(deviceId: device.id, walletId: orphan.id)
+                report.append("Account \(d.account) (\(network.displayName)) re-linked to existing \"\(orphan.label)\".")
                 continue
             }
             let suffix = baseSuffix + (d.derivationPath != nil ? " (Custom path)" : "")

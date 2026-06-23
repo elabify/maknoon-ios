@@ -74,7 +74,15 @@ struct AddHardwareDeviceFlow: View {
         }
         .sheet(item: $discoverDevice, onDismiss: { onFinished(true) }) { dev in
             NavigationStack {
-                DiscoverHardwareWalletsView(device: dev, network: .mainnet)
+                // Post-register sweep defaults to the standard wallet; a
+                // hidden-wallet passphrase is collected on the per-network
+                // Add screen instead.
+                DiscoverHardwareWalletsView(
+                    device: dev,
+                    network: .mainnet,
+                    hwPassphrase: .constant(.standard),
+                    hwHostPassphrase: .constant("")
+                )
                     .environment(store)
                     .navigationTitle("Discover wallets")
                     .navigationBarTitleDisplayMode(.inline)
@@ -84,7 +92,7 @@ struct AddHardwareDeviceFlow: View {
 
     /// Present the Bitcoin discovery sweep for a freshly-registered
     /// device. Deferred a beat so the registration sheet finishes
-    /// dismissing first — iOS silently drops a sheet presented while
+    /// dismissing first, iOS silently drops a sheet presented while
     /// another is mid-dismiss.
     private func scheduleDiscovery(_ device: RegisteredDevice) {
         Task { @MainActor in
@@ -98,7 +106,7 @@ struct AddHardwareDeviceFlow: View {
         case .ledger:     return "Bluetooth hardware wallet for Bitcoin, Ethereum, Solana, and Tron."
         case .trezor:     return "Bluetooth hardware wallet for Bitcoin, Ethereum, Solana, and Tron."
         case .seedsigner: return "Air-gapped Bitcoin signer paired by scanning QR codes."
-        case .yubikey:    return "Security key that protects your Identity Sandwich."
+        case .yubikey:    return "Security key that protects your wallet."
         }
     }
 

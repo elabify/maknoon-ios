@@ -17,12 +17,16 @@ struct EthereumSendView: View {
     /// amount field uses the token's decimals + symbol, the balance
     /// row queries the token contract, and the broadcast path
     /// routes through the ERC-20 transfer payload.
-    let token: EthereumToken?
+    /// The asset being sent: nil = native ETH (or chain ticker); non-nil = an
+    /// ERC-20. Seeded from the init param and then USER-SWITCHABLE via the asset
+    /// dropdown (ADR-0033 Phase 2b round-2). All asset-dependent reads (ticker,
+    /// decimals, balance, CoinGecko id, native-vs-ERC20 branch) key off this.
+    @State private var token: EthereumToken?
     let onBroadcast: (String) -> Void
 
     init(wallet: EthereumWallet, token: EthereumToken? = nil, onBroadcast: @escaping (String) -> Void) {
         self.wallet = wallet
-        self.token = token
+        self._token = State(initialValue: token)
         self.onBroadcast = onBroadcast
     }
 
@@ -126,6 +130,7 @@ struct EthereumSendView: View {
             ScrollViewReader { proxy in
             Form {
                 networkChipSection
+                assetSection
                 payToSection
                 amountSection
                 feeSection
@@ -178,7 +183,7 @@ struct EthereumSendView: View {
                     Button("Cancel") { dismiss() }
                 }
             }
-            .task { await loadOnAppear() }
+            .task(id: token?.id) { await loadOnAppear() }
             .sheet(isPresented: $showScanner) {
                 ChainScanSheet { scanned in
                     showScanner = false
@@ -188,7 +193,7 @@ struct EthereumSendView: View {
                     } else if let frame = try? JSONDecoder().decode(LocalFrameEnvelope.self, from: Data(scanned.utf8)),
                               frame.v == LocalFrameEnvelope.version {
                         // A Verify & Pay request, not a send target.
-                        ensError = "That's a Verify & Pay code — use Wallet → Verify & Pay, not Send."
+                        ensError = "That's a Verify & Pay code. Use Wallet → Verify & Pay, not Send."
                     } else {
                         ensError = "That QR isn't an Ethereum address."
                     }
@@ -364,6 +369,49 @@ struct EthereumSendView: View {
     private var effectiveRecipient: String {
         if let resolved = resolvedENSAddress { return resolved }
         return recipient.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Asset dropdown: native (chain ticker) first, then the configured ERC-20s
+    /// alphabetically by symbol. Switching re-keys the balance/estimate load and
+    /// every asset-dependent computation (ADR-0033 Phase 2b round-2).
+    private var assetSection: some View {
+        let tokens = store.ethereumTokenStore.tokens(on: activeNetwork)
+            .sorted { $0.symbol.lowercased() < $1.symbol.lowercased() }
+        let currentLabel = token.map { "\($0.symbol) · \($0.name)" } ?? "\(activeNetwork.ticker) (native)"
+        return Section("Asset") {
+            Menu {
+                Button {
+                    token = nil
+                } label: {
+                    if token == nil {
+                        Label("\(activeNetwork.ticker) (native)", systemImage: "checkmark")
+                    } else {
+                        Text("\(activeNetwork.ticker) (native)")
+                    }
+                }
+                ForEach(tokens) { t in
+                    Button {
+                        token = t
+                    } label: {
+                        if token?.id == t.id {
+                            Label("\(t.symbol) · \(t.name)", systemImage: "checkmark")
+                        } else {
+                            Text("\(t.symbol) · \(t.name)")
+                        }
+                    }
+                }
+            } label: {
+                HStack {
+                    Text("Asset")
+                    Spacer()
+                    Text(currentLabel).foregroundStyle(.secondary)
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .foregroundStyle(.primary)
+        }
     }
 
     private var amountSection: some View {
@@ -892,6 +940,9 @@ struct EthereumSendView: View {
         submitting = true
         lastError = nil
         status = nil
+        // Fresh attempt: drop any tx retained from a previous broadcast failure
+        // so a stale signed tx can never be re-pushed for new inputs.
+        signedRawTx = nil
         do {
             // Native ETH: estimate against the EOA recipient.
             // ERC-20: estimate against the token contract with the
@@ -950,7 +1001,7 @@ struct EthereumSendView: View {
                 payload: token == nil ? .native : .erc20(recipient: effectiveRecipient)
             )
 
-            // Sign — software (TWC) or hardware (Ledger BLE),
+            // Sign: software (TWC) or hardware (Ledger BLE),
             // depending on the wallet kind.
             switch descriptor.kind {
             case .software(let account):
@@ -967,7 +1018,10 @@ struct EthereumSendView: View {
                 // Software path: broadcast inline. The biometric
                 // prompt + the existing review section have already
                 // given the user a confirmation step; no second tap
-                // adds safety here.
+                // adds safety here. Stash the signed tx FIRST so that if
+                // the broadcast RPC fails, it is retained for a re-push
+                // without re-signing (the Broadcast button reappears).
+                signedRawTx = rawTx
                 try await finalizeBroadcast(
                     rawTx: rawTx,
                     descriptor: descriptor,
@@ -990,7 +1044,11 @@ struct EthereumSendView: View {
             }
         } catch {
             lastError = (error as? LocalizedError)?.errorDescription ?? "Send failed: \(error)"
-            signedRawTx = nil
+            // Leave signedRawTx as-is: if signing succeeded and only the
+            // broadcast failed (software path), it stays populated so the
+            // Broadcast button reappears for a re-push without re-signing. A
+            // sign-time failure never set it (cleared at the top), so the
+            // primary button correctly returns to Send / re-sign.
         }
         submitting = false
     }

@@ -1,24 +1,31 @@
 // Cold-launch hardware-unlock screen.
 //
-// Shown when the Identity Sandwich is hardware-wrapped (one or more
-// devices were enrolled in past sessions) and the app has just
-// launched. Lists every enrolled device; the user picks whichever
-// one is at hand, and Maknoon drives the BLE handshake + wrap
-// challenge against that single device. OR-of-N: any single device
+// Shown when the second factor (ADR-0032 CEK scheme) is ON and the app
+// has just launched. Lists every enrolled device that carries a CEK
+// wrap; the user picks whichever one is at hand, and Maknoon recomputes
+// that device's secret, unwraps the shared CEK, opens the sealed
+// entropy, and rebuilds the wallet. OR-of-N: any single enrolled device
 // can unlock; no quorum or threshold.
 //
-// The view is intentionally not dismissable — closing it would
-// strand the app in a half-loaded state. A "Reset wallet" escape
-// hatch is exposed in case every enrolled device is genuinely
-// lost; resetting wipes the sandwich and routes back to
-// OnboardingView so the user can restore from their paper seed.
+// Clean-cut migration (ADR-0032): if the second factor is ON but no
+// enrolled device carries a v2 CEK wrap, the enrollment is from an older
+// build that this version cannot unlock. We surface a restore-from-
+// backup banner instead of any legacy unlock path.
+//
+// The view is intentionally not dismissable: closing it would strand
+// the app in a half-loaded state. A "Reset wallet" escape hatch is
+// exposed in case every enrolled device is genuinely lost; resetting
+// wipes the wallet and routes back to OnboardingView so the user can
+// restore from their backup / paper seed.
 
 import SwiftUI
 
 struct HardwareUnlockView: View {
     @Environment(HolderStore.self) private var store
     @Environment(\.dismiss) private var dismiss
-    let enrollments: [WrappedMaterialPersisted]
+    /// The enrolled devices that carry a CEK wrap (any one unlocks).
+    /// Empty in the clean-cut migration state.
+    let enrollments: [RegisteredDevice]
 
     @State private var unlockingDeviceId: UUID?
     @State private var lastError: String?
@@ -37,15 +44,19 @@ struct HardwareUnlockView: View {
     @State private var pendingUnlockRow: UUID? = nil
 
     private struct EnrolledRow: Identifiable {
-        let wrap: WrappedMaterialPersisted
-        let device: RegisteredDevice?
-        var id: UUID { wrap.deviceId }
+        let device: RegisteredDevice
+        var id: UUID { device.id }
     }
 
     private var rows: [EnrolledRow] {
-        enrollments.map { w in
-            EnrolledRow(wrap: w, device: store.devices.find(id: w.deviceId))
-        }
+        enrollments.map { EnrolledRow(device: $0) }
+    }
+
+    /// Clean-cut migration: second factor on, but nothing this build can
+    /// unlock. Driven by `store.secondFactorNeedsMigration`, with the
+    /// empty-enrollments case as a defensive fallback.
+    private var needsMigration: Bool {
+        store.secondFactorNeedsMigration || enrollments.isEmpty
     }
 
     var body: some View {
@@ -53,15 +64,19 @@ struct HardwareUnlockView: View {
             ScrollView {
                 VStack(spacing: 24) {
                     header
-                    deviceList
-                    if let lastError {
-                        Text(lastError)
-                            .font(.callout)
-                            .foregroundStyle(.red)
-                            .multilineTextAlignment(.leading)
-                            .padding(.horizontal, 16)
+                    if needsMigration {
+                        migrationBanner
+                    } else {
+                        deviceList
+                        if let lastError {
+                            Text(lastError)
+                                .font(.callout)
+                                .foregroundStyle(.red)
+                                .multilineTextAlignment(.leading)
+                                .padding(.horizontal, 16)
+                        }
+                        explainer
                     }
-                    explainer
                     escape
                 }
                 .padding(.vertical, 24)
@@ -79,18 +94,18 @@ struct HardwareUnlockView: View {
             isPresented: $showResetConfirm,
             titleVisibility: .visible
         ) {
-            Button("Reset and restore from paper seed", role: .destructive) {
+            Button("Reset and restore from backup", role: .destructive) {
                 resetWallet()
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Wipes the locked Identity Sandwich, every registered device, every credential, and every chain wallet. After reset you can restore from your 24-word paper seed and re-register your hardware devices. Only do this if every enrolled device is lost.")
+            Text("Wipes your locked keys, every registered device, every credential, and every chain wallet. After reset you can restore from your encrypted backup or your 24-word paper seed and re-register your security keys. Only do this if every enrolled security key is lost.")
         }
         .alert("YubiKey PIN", isPresented: $showYubiKeyPINPrompt) {
             SecureField("PIN", text: $yubiKeyPin)
             Button("Continue") {
                 guard let pendingId = pendingYubiKeyRow,
-                      let row = rows.first(where: { $0.wrap.deviceId == pendingId })
+                      let row = rows.first(where: { $0.device.id == pendingId })
                 else { return }
                 pendingYubiKeyRow = nil
                 Task { await unlock(with: row) }
@@ -100,7 +115,7 @@ struct HardwareUnlockView: View {
                 yubiKeyPin = ""
             }
         } message: {
-            Text("Enter your YubiKey FIDO2 PIN. Leave blank if no PIN is set on the key.")
+            Text("Enter your YubiKey's FIDO2 PIN to unlock.")
         }
         .sheet(item: $pendingReadyOp) { op in
             DeviceReadyConfirmationSheet(
@@ -108,7 +123,7 @@ struct HardwareUnlockView: View {
                 purpose: op.purpose,
                 onContinue: {
                     guard let pendingId = pendingUnlockRow,
-                          let row = rows.first(where: { $0.wrap.deviceId == pendingId })
+                          let row = rows.first(where: { $0.device.id == pendingId })
                     else { return }
                     pendingUnlockRow = nil
                     Task { await unlock(with: row) }
@@ -136,10 +151,36 @@ struct HardwareUnlockView: View {
     }
 
     private var headlineCopy: String {
-        if enrollments.count == 1 {
-            return "Your Identity Sandwich is wrapped by a registered device. Connect it and confirm to unlock."
+        if needsMigration {
+            return "Your security key enrollment is from an older version and can't be used to unlock on this build."
         }
-        return "Your Identity Sandwich is wrapped by \(enrollments.count) registered devices. Connect any one and confirm to unlock."
+        if enrollments.count == 1 {
+            return "Your keys are protected by a security key. Connect it and confirm to unlock."
+        }
+        return "Your keys are protected by \(enrollments.count) security keys. Connect any one and confirm to unlock."
+    }
+
+    /// Clean-cut migration banner (ADR-0032). No legacy unlock path is
+    /// offered; the user restores from their encrypted backup (which has
+    /// the entropy, second factor off) then re-adds their security key.
+    private var migrationBanner: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Update your security key", systemImage: "exclamationmark.triangle.fill")
+                .font(.callout.weight(.semibold))
+                .foregroundStyle(.orange)
+            Text("Your security key enrollment is from an older version. Restore from your encrypted backup to continue, then re-add your security key.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.thinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(Color.orange.opacity(0.5), lineWidth: 1)
+        )
+        .padding(.horizontal, 16)
     }
 
     private var deviceList: some View {
@@ -214,7 +255,7 @@ struct HardwareUnlockView: View {
         case .yubikey:
             return "Tap the YubiKey when it flashes. iOS holds the NFC session open for ~60s."
         case .seedsigner:
-            return "SeedSigner is Bitcoin-only and never unlocks the Identity Sandwich."
+            return "SeedSigner is Bitcoin-only and can't unlock your wallet."
         }
     }
 
@@ -233,16 +274,22 @@ struct HardwareUnlockView: View {
     }
 
     private func enrolledRow(_ row: EnrolledRow) -> some View {
-        let isUnlocking = unlockingDeviceId == row.wrap.deviceId
-        let isDisabled = row.device == nil || (unlockingDeviceId != nil && !isUnlocking)
+        let dev = row.device
+        let isUnlocking = unlockingDeviceId == dev.id
+        let isDisabled = unlockingDeviceId != nil && !isUnlocking
         return Button {
-            guard let dev = row.device else { return }
             if dev.kind == .yubikey {
                 yubiKeyPin = ""
-                pendingYubiKeyRow = row.wrap.deviceId
-                showYubiKeyPINPrompt = true
+                // Prompt for the PIN only when this key was enrolled PIN-protected
+                // (recorded at enrollment). A no-PIN key unlocks with the tap alone.
+                if dev.promotions.identity?.pinProtected ?? true {
+                    pendingYubiKeyRow = dev.id
+                    showYubiKeyPINPrompt = true
+                } else {
+                    Task { await unlock(with: row) }
+                }
             } else if HardwareOperationPurpose.shouldPresent(for: dev.kind) {
-                pendingUnlockRow = row.wrap.deviceId
+                pendingUnlockRow = dev.id
                 pendingReadyOp = PendingHardwareOperation(
                     device: dev,
                     purpose: .identitySandwichUnlock
@@ -252,17 +299,19 @@ struct HardwareUnlockView: View {
             }
         } label: {
             HStack(spacing: 12) {
-                Image(systemName: row.device?.kind.systemImage ?? "questionmark.circle")
+                Image(systemName: dev.kind.systemImage)
                     .font(.title2)
-                    .foregroundStyle(row.device == nil ? Color.secondary : Color.indigo)
+                    .foregroundStyle(Color.indigo)
                     .frame(width: 36)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(row.device?.label ?? "Unregistered device")
+                    Text(dev.label)
                         .font(.callout.weight(.semibold))
                     Text(subtitle(for: row))
                         .font(.caption).foregroundStyle(.secondary)
-                    Text("Wrapped \(formatRelative(row.wrap.wrappedAt))")
-                        .font(.caption2).foregroundStyle(.tertiary)
+                    if let enrolledAt = dev.promotions.identity?.enrolledAt {
+                        Text("Enrolled \(formatRelative(enrolledAt))")
+                            .font(.caption2).foregroundStyle(.tertiary)
+                    }
                 }
                 Spacer()
                 if isUnlocking {
@@ -284,17 +333,14 @@ struct HardwareUnlockView: View {
     }
 
     private func subtitle(for row: EnrolledRow) -> String {
-        if let dev = row.device {
-            return "\(dev.kind.displayName) · \(dev.serialDisplay)"
-        }
-        return "Serial \(row.wrap.deviceSerial) · registry record missing"
+        "\(row.device.kind.displayName) · \(row.device.serialDisplay)"
     }
 
     private var explainer: some View {
         VStack(alignment: .leading, spacing: 6) {
             Label("How this works", systemImage: "info.circle")
                 .font(.caption.weight(.semibold))
-            Text("Any single enrolled device unlocks the Identity Sandwich; you don't need all of them. The wrap key never leaves the device.")
+            Text("Any single enrolled device unlocks your wallet; you don't need all of them. The wrap key never leaves the device.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -312,7 +358,7 @@ struct HardwareUnlockView: View {
                 Label("Reset wallet (every device permanently lost)", systemImage: "trash")
             }
             .font(.caption)
-            Text("Only do this if every enrolled device is gone. You'll need your 24-word paper seed to restore.")
+            Text("Only do this if every enrolled security key is gone. You'll need your encrypted backup or 24-word paper seed to restore.")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -325,52 +371,30 @@ struct HardwareUnlockView: View {
 
     @MainActor
     private func unlock(with row: EnrolledRow) async {
-        guard let dev = row.device else { return }
-        unlockingDeviceId = row.wrap.deviceId
+        let dev = row.device
+        guard let promo = dev.promotions.identity, promo.hasSecondFactorWrap,
+              let saltHex = promo.deviceSaltHex else {
+            lastError = "This device's second-factor enrollment is incomplete. Restore from your encrypted backup, then re-add it."
+            return
+        }
+        let deviceSalt = bytesFromHexLocal(saltHex)
+        unlockingDeviceId = dev.id
         lastError = nil
         startCountdown(seconds: countdownSeconds(for: dev.kind))
         defer { stopCountdown() }
         do {
-            let sandwich: IdentitySandwich
+            let secret: Data
             switch dev.kind {
             case .yubikey:
-                // YubiKey FIDO2 over NFC. iOS shows its native NFC
-                // sheet; user taps the YubiKey to the top of the
-                // phone. The wrap key is the FIDO2 hmac-secret
-                // extension output, which is deterministic per
-                // (credential, salt) pair regardless of the FIDO2
-                // signature counter.
-                guard let promo = dev.promotions.identity else {
-                    throw IdentityWrapError.deviceSerialMismatch(
-                        expected: "YubiKey enrolled credential id",
-                        actual: "no promotion record"
-                    )
-                }
-                guard let wrapped = enrollments.first(where: { $0.deviceId == dev.id }) else {
-                    throw IdentityWrapError.deviceSerialMismatch(
-                        expected: enrollments.map { $0.deviceSerial }.joined(separator: " or "),
-                        actual: dev.serial
-                    )
-                }
-                // v1 enrollments used raw FIDO2 signatures whose
-                // counter drift made unlock impossible. Surface a
-                // clear "re-enroll required" message instead of
-                // attempting an unlock that will always fail.
-                if (promo.wrapProtocolVersion ?? 1) < 2 {
-                    throw IdentityWrapError.openFailed("This YubiKey enrollment uses the old wrap protocol that cannot reproduce its wrap key. Reset the wallet, restore from your 24-word phrase, then re-enroll this YubiKey to use the new hmac-secret protocol.")
-                }
-                let secret = try await YubiKeyClient.shared.recomputeHMACSecretOverNFC(
+                // YubiKey FIDO2 hmac-secret over NFC. The salt fed to
+                // the YubiKey IS the deviceSalt now (ADR-0032).
+                secret = try await YubiKeyClient.shared.recomputeHMACSecretOverNFC(
                     credentialIdHex: promo.credentialIdHex,
-                    salt: wrapped.salt,
+                    salt: deviceSalt,
                     deviceSerial: dev.serial,
                     pin: yubiKeyPin.isEmpty ? nil : yubiKeyPin
                 )
                 yubiKeyPin = ""
-                sandwich = try await IdentitySandwich.loadWrappedWithSecret(
-                    enrollments: enrollments,
-                    device: dev,
-                    secret: secret
-                )
             case .ledger, .trezor, .seedsigner:
                 let hardware = HardwareWalletFactory.make(kind: hardwareKind(for: dev.kind))
                 let identifiedSerial = try await hardware.identifyDevice()
@@ -380,12 +404,11 @@ struct HardwareUnlockView: View {
                         actual: identifiedSerial
                     )
                 }
-                sandwich = try await IdentitySandwich.loadWrapped(
-                    enrollments: enrollments,
-                    device: dev,
-                    hardware: hardware
-                )
+                let challenge = SecondFactorSignature.challenge(deviceSalt: deviceSalt)
+                let sig = try await hardware.signMessage(challenge)
+                secret = SecondFactorSignature.secret(fromSignature: sig)
             }
+            let sandwich = try IdentitySandwich.loadWithSecondFactor(device: dev, secret: secret)
             store.adopt(sandwich)
             store.showHardwareUnlock = false
             dismiss()

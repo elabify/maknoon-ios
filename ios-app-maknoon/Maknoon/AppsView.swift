@@ -1,11 +1,11 @@
 // Apps tab. Empty by default; populates from the AppStoreRegistry's
 // installedApps as the user installs integrations via the
-// BrowseAppStoreView ("+" toolbar) → tap a dApp → Install.
+// BrowseAppStoreView ("+" toolbar) → tap a app → Install.
 //
 // Connected-verifiers history is preserved beneath the installed-apps
 // section: a record of every credential disclosure the holder has
 // performed, regardless of whether the verifier ships through a
-// dApps catalog.
+// apps catalog.
 
 import SwiftUI
 
@@ -16,6 +16,18 @@ struct AppsView: View {
     @State private var selectedInstalled: AppStoreRegistry.InstalledApp?
     @State private var showSettings = false
     @State private var showBrowse = false
+    /// Set by the browser's onOpen (install completed / Open tapped). The
+    /// app is opened in the browse sheet's `onDismiss`, NOT inline: setting
+    /// the target while `showBrowse` is still dismissing makes SwiftUI drop
+    /// the second sheet (it cannot present one sheet while another on the
+    /// same view is mid-dismiss). Deferring to onDismiss guarantees the app
+    /// actually opens immediately after install.
+    @State private var pendingOpen: AppStoreRegistry.InstalledApp?
+    /// A mini app launched straight into its sandboxed host (the running
+    /// app, not its permissions/detail sheet). Auto-open-after-install lands
+    /// here so installing a mini app opens the app itself, matching Android;
+    /// only non-runnable entries fall back to the detail sheet.
+    @State private var runningApp: AppStoreRegistry.InstalledApp?
 
     var body: some View {
         Form {
@@ -43,10 +55,23 @@ struct AppsView: View {
         }
         .onAppear { refresh() }
         .task { await store.appStores.refresh() }
-        .sheet(isPresented: $showBrowse) {
+        .sheet(isPresented: $showBrowse, onDismiss: {
+            // Open the just-installed app now that the browser is fully
+            // dismissed (see pendingOpen). A runnable mini app opens straight
+            // into its host (the running app); anything else falls back to
+            // the detail sheet.
+            if let app = pendingOpen {
+                pendingOpen = nil
+                if app.entry.isMiniApp {
+                    runningApp = app
+                } else {
+                    selectedInstalled = app
+                }
+            }
+        }) {
             BrowseAppStoreView(onOpen: { app in
+                pendingOpen = app
                 showBrowse = false
-                selectedInstalled = app
             }).environment(store)
         }
         .sheet(isPresented: $showSettings) {
@@ -54,6 +79,10 @@ struct AppsView: View {
         }
         .sheet(item: $selectedInstalled) { app in
             InstalledAppDetailSheet(app: app)
+                .environment(store)
+        }
+        .sheet(item: $runningApp) { app in
+            RunningMiniAppSheet(app: app)
                 .environment(store)
         }
     }
@@ -87,7 +116,7 @@ struct AppsView: View {
                 .foregroundStyle(.tertiary)
             Text("No apps installed yet")
                 .font(.callout.weight(.semibold))
-            Text("Tap the + in the top right to browse the Maknoon dApps catalog (and any catalogs you have added in Settings > Apps).")
+            Text("Tap the + in the top right to browse the Maknoon Apps catalog (and any catalogs you have added in Settings > Apps).")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -189,6 +218,30 @@ struct AppsView: View {
     }
 }
 
+// MARK: -- running mini-app sheet
+
+/// Presents a mini app straight into its sandboxed host (the running app),
+/// wrapped in its own NavigationStack with a Close button. Used by the
+/// auto-open-after-install path so installing a mini app opens the app
+/// itself, not its permissions/detail sheet (matching Android).
+private struct RunningMiniAppSheet: View {
+    let app: AppStoreRegistry.InstalledApp
+    @Environment(HolderStore.self) private var store
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            MiniAppHostView(app: app)
+                .environment(store)
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button("Close") { dismiss() }
+                    }
+                }
+        }
+    }
+}
+
 // MARK: -- installed app detail sheet
 
 private struct InstalledAppDetailSheet: View {
@@ -243,12 +296,13 @@ private struct InstalledAppDetailSheet: View {
                             .frame(width: 56)
                         VStack(alignment: .leading, spacing: 4) {
                             Text(app.entry.title).font(.title3.weight(.semibold))
-                            Text("\(app.entry.channelLabel)\(app.entry.version.map { " · v\($0)" } ?? "") - curated by \(app.entry.curatedBy)")
+                            Text("\(app.entry.channelLabel)\(app.entry.version.map { " · v\($0)" } ?? "")")
                                 .font(.caption.weight(.medium))
                                 .foregroundStyle(app.entry.statusColor)
                         }
                     }
-                    DAppCompatibilityRow(requires: app.entry.requiresMaknoonVersion)
+                    DAppCompatibilityRow(requires: app.entry.requiresMaknoonVersion,
+                                         supersededAt: app.entry.supersededAtMaknoonVersion)
                     Text(app.entry.summary).font(.callout).foregroundStyle(.secondary)
                     Divider()
                     Text(app.entry.details).font(.callout)

@@ -11,7 +11,7 @@
 //   - When the issuer reports `.ready`, the store calls back to its
 //     owner (HolderStore.addCredential) and removes the entry.
 //   - Entries can be cancelled by the user; that just removes the
-//     row locally — the server-side credential is untouched and can
+//     row locally, the server-side credential is untouched and can
 //     still be re-fetched later through a fresh issuance request.
 //   - Persisted to UserDefaults so a pending pickup survives an app
 //     restart; the polling Task resumes on next launch.
@@ -22,7 +22,7 @@ import Observation
 /// One credential the issuer has minted that we haven't anchored +
 /// imported into the wallet yet.
 struct PendingPickup: Codable, Identifiable, Hashable, Sendable {
-    /// Stable id — the credentialId returned by the issuer when the
+    /// Stable id: the credentialId returned by the issuer when the
     /// packet was approved. Unique per credential.
     let id: String
     /// Same as `id`. Carried separately so the type is self-explanatory
@@ -45,7 +45,7 @@ struct PendingPickup: Codable, Identifiable, Hashable, Sendable {
     let startedAt: Date
 }
 
-// Not `@MainActor`-isolated — instantiated from HolderStore.init
+// Not `@MainActor`-isolated, instantiated from HolderStore.init
 // which is nonisolated. All public mutating entry points run on the
 // main actor (UI thread) by convention, mirroring the rest of
 // HolderStore's sub-stores; the background polling Task explicitly
@@ -54,7 +54,7 @@ struct PendingPickup: Codable, Identifiable, Hashable, Sendable {
 final class PendingPickupsStore {
     private(set) var pending: [PendingPickup] = []
     /// Per-id reason for the most recent poll error, if any. Sticky
-    /// until the entry succeeds or is cancelled — keeps a misbehaving
+    /// until the entry succeeds or is cancelled, keeps a misbehaving
     /// row visible in the UI without dropping it from the list.
     private(set) var lastError: [String: String] = [:]
 
@@ -134,7 +134,7 @@ final class PendingPickupsStore {
             }
             if pending.isEmpty { break }
             // Sleep between sweeps. CancellationError on the sleep
-            // means we were stopped — propagate it through the while
+            // means we were stopped, propagate it through the while
             // check on the next iteration.
             try? await Task.sleep(nanoseconds: Self.pollIntervalSeconds * 1_000_000_000)
         }

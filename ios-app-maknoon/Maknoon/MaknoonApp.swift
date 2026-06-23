@@ -36,6 +36,12 @@ struct MaknoonApp: App {
     /// Failures are surfaced via `bootError` so the user sees a clear
     /// banner instead of an empty-screen mystery.
     private func bootIdentity() async {
+        #if DEBUG
+        // ADR-0032: assert the second-factor wrap crypto is still
+        // byte-identical to Android before any enroll / unlock is
+        // trusted. Cheap, runs once at launch.
+        SecondFactorWrap.runParitySelfTest()
+        #endif
         wipeStaleKeychainOnFirstLaunchIfNeeded()
         do {
             _ = try store.loadIdentity()
@@ -97,8 +103,16 @@ struct ManagedRootView: View {
     var body: some View {
         ZStack {
             RootView()
+                // Re-root the whole UI when the app language changes so every
+                // view (incl. UIKit-bridged navigation titles + tab items, which
+                // don't re-resolve on a pure .environment(\.locale) change) rebuilds
+                // against the new locale. This is the "soft restart" that makes a
+                // language switch apply everywhere without quitting the app. Placed
+                // on RootView (not ManagedRootView) so the App-level .task /
+                // auto-lock config do not re-run; only the visible UI rebuilds.
+                .id(prefs.language)
                 // Touch-event tracking is handled by ActivityTrackingHost
-                // at the UIKit layer (window.sendEvent override) — see
+                // at the UIKit layer (window.sendEvent override). See
                 // ActivityTrackingHost.swift. Doing it here as a
                 // SwiftUI simultaneousGesture(DragGesture(minimumDistance: 0))
                 // interfered with NavigationStack's back-button tap
@@ -145,7 +159,7 @@ struct ManagedRootView: View {
 }
 
 /// Routes between OnboardingView and the main ContentView. A
-/// hardware-wrapped sandwich no longer blocks app launch — the
+/// hardware-wrapped sandwich no longer blocks app launch; the
 /// wallet, credentials browsing, and other non-identity ops stay
 /// available. Identity-dependent operations (presenting a
 /// credential, renewing a delegation, revealing the recovery
@@ -156,11 +170,11 @@ struct RootView: View {
 
     var body: some View {
         // OnboardingView only when there's nothing on disk at all.
-        // A wrapped (locked) sandwich is "provisioned" — the user
+        // A wrapped (locked) sandwich is "provisioned": the user
         // already onboarded, they just need to unlock for identity
         // ops.
         if store.isCompletingOnboarding
-            || (store.sandwich == nil && store.pendingHardwareUnlock.isEmpty) {
+            || (store.sandwich == nil && !store.isIdentityLocked) {
             // Keep onboarding on screen through the post-identity steps
             // (passport scan, first wallet) even though the sandwich has
             // already been adopted so those steps can sign / create a wallet.

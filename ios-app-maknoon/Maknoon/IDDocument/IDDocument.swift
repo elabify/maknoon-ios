@@ -29,8 +29,8 @@ enum IDDocumentKind: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var displayName: String {
         switch self {
-        case .passport: return "Passport"
-        case .other:    return "Other ID document"
+        case .passport: return Loc.t("Passport")
+        case .other:    return Loc.t("Other ID document")
         }
     }
 
@@ -44,9 +44,9 @@ enum IDDocumentKind: String, CaseIterable, Identifiable, Codable, Sendable {
     var blurb: String {
         switch self {
         case .passport:
-            return "Any ePassport with the chip symbol on the cover (most passports issued since around 2010)."
+            return Loc.t("Any ePassport with the chip symbol on the cover (most passports issued since around 2010).")
         case .other:
-            return "Other ICAO-compatible IDs (EU national ID cards, residence permits, similar formats)."
+            return Loc.t("Other ICAO-compatible IDs (EU national ID cards, residence permits, similar formats).")
         }
     }
 
@@ -56,22 +56,22 @@ enum IDDocumentKind: String, CaseIterable, Identifiable, Codable, Sendable {
     /// encoded into the MRZ on the data page of the document.
     var documentNumberLabel: String {
         switch self {
-        case .passport: return "Passport number"
-        case .other:    return "Document number"
+        case .passport: return Loc.t("Passport number")
+        case .other:    return Loc.t("Document number")
         }
     }
 
     var documentNumberHint: String {
         switch self {
         case .passport:
-            return "The 6 to 9-character passport number from the inside of the cover."
+            return ""
         case .other:
-            return "The number printed alongside the MRZ block, typically 6 to 9 characters."
+            return ""
         }
     }
 
     var personalNumberLabel: String {
-        "Personal number"
+        Loc.t("Personal number")
     }
 }
 
@@ -92,10 +92,10 @@ struct IDDocument: Codable, Identifiable, Hashable, Sendable {
     let documentNumber: String
     let nationality: String      // ISO 3166-1 alpha-3
     let issuingAuthority: String // ISO 3166-1 alpha-3
-    let sex: String?             // "M" / "F" / "X" — stored as-read
+    let sex: String?             // "M" / "F" / "X", stored as-read
     let dateOfBirth: String      // YYMMDD as read, or empty if unknown
     let dateOfExpiry: String     // YYMMDD as read
-    let documentType: String     // e.g. "P", "ID", "IP" — as read
+    let documentType: String     // e.g. "P", "ID", "IP", as read
 
     /// Latin surname parsed straight from the MRZ (DG1 tag 0x5B,
     /// before any DG11 override). For a Chinese passport reading
@@ -207,6 +207,11 @@ struct IDDocument: Codable, Identifiable, Hashable, Sendable {
     /// Advisory only; the issuer re-verifies authoritatively at issuance.
     var passiveAuthResult: PassiveAuthResult?
 
+    /// ID-document record schema version (ADR-0037), shown small in the detail
+    /// header so different schema versions are trackable. Optional in the wire so
+    /// older saved/backed-up records decode; treated as "1.0.0" when absent.
+    var schemaVersion: String? = nil
+
     /// User-visible best name. Prefers the Latin MRZ form so foreign
     /// systems, verifiers, and travel infrastructure all see the same
     /// string the user does. Falls back to the library-reported name
@@ -257,14 +262,29 @@ struct IDDocument: Codable, Identifiable, Hashable, Sendable {
     /// Falls back to a chip-derived guess for legacy saved docs
     /// that pre-date the type picker.
     var kindLabel: String {
+        // Chip is authoritative for passports (ADR-0037): an MRZ document type
+        // starting with "P" is always a Passport, regardless of the pre-scan
+        // picker. The user-declared kind only disambiguates the generic TD1 "I".
+        if documentType.prefix(1).uppercased() == "P" { return Loc.t("Passport") }
         if let userDeclaredKind { return userDeclaredKind.displayName }
         switch documentType.prefix(1).uppercased() {
-        case "P":  return "Passport"
-        case "I":  return "ID card"
-        case "A":  return "Residence permit"
-        case "V":  return "Visa"
-        default:   return "Document"
+        case "P":  return Loc.t("Passport")
+        case "I":  return Loc.t("ID card")
+        case "A":  return Loc.t("Residence permit")
+        case "V":  return Loc.t("Visa")
+        default:   return Loc.t("Document")
         }
+    }
+
+    /// Schema version to display ("1.0.0" when the record predates the field).
+    var displaySchemaVersion: String { schemaVersion ?? "1.0.0" }
+
+    /// Identity key for de-duplication (ADR-0037): a document is "the same" when
+    /// its type + issuer + number + DOB + expiry all match (normalized).
+    var dedupeKey: String {
+        [documentType, issuingAuthority, documentNumber, dateOfBirth, dateOfExpiry]
+            .map { $0.trimmingCharacters(in: .whitespaces).uppercased() }
+            .joined(separator: "|")
     }
 
     /// Place of birth normalized for display. Many issuers pack DG11
@@ -310,7 +330,7 @@ struct IDDocument: Codable, Identifiable, Hashable, Sendable {
 
     /// Tidy ICAO 9303 MRZ-style filler used by some issuers inside
     /// DG11 free-text fields. DG11 is UTF-8 (Doc 9303 Part 10), so
-    /// `<` here is never a real space substitute — issuers had
+    /// `<` here is never a real space substitute. Issuers had
     /// regular spaces available and explicitly chose `<` to separate
     /// components. We treat any run of `<` as a comma separator:
     ///   - `PENNSYLVANIA<USA`  → `PENNSYLVANIA, USA`
@@ -354,7 +374,7 @@ struct IDDocument: Codable, Identifiable, Hashable, Sendable {
         /// (a 1-year-old, valid) and a YY of 26 reads as 1926
         /// (a 99-year-old, still plausible).
         case birth
-        /// Date of expiry. Always 2000s — passports valid today
+        /// Date of expiry. Always 2000s, passports valid today
         /// expire between now and 2099. Picking the 1900s window
         /// for expiry is what produced the "1933" bug.
         case expiry

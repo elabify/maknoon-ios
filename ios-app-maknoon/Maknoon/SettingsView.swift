@@ -25,6 +25,12 @@ struct SettingsView: View {
     @State private var errorMessage: String?
     @State private var backupWorking = false
     @State private var backupStatus: String?
+    @State private var exportManifest: ExportManifest?
+
+    struct ExportManifest: Identifiable {
+        let id = UUID()
+        let items: [String]
+    }
     /// Set when `prepareBackupFile` detects a locked sandwich and
     /// triggers HardwareUnlockView. The encryptedBackupSection
     /// watches `store.sandwich` and re-runs the backup as soon as the
@@ -37,7 +43,7 @@ struct SettingsView: View {
 
     /// The route carries the decrypted material as an associated value
     /// for the reveal cases. This makes it structurally impossible to
-    /// present an empty (black) sheet — previously a separate
+    /// present an empty (black) sheet, previously a separate
     /// `revealedMaterial` @State could lag the route observer under
     /// iOS 26's stricter sheet recomposition.
     enum Route: Identifiable {
@@ -74,6 +80,28 @@ struct SettingsView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }
+                }
+            }
+            .sheet(item: $exportManifest) { manifest in
+                NavigationStack {
+                    List {
+                        Section {
+                            ForEach(manifest.items, id: \.self) { item in
+                                Label(item, systemImage: "checkmark").font(.callout)
+                            }
+                        } header: {
+                            Text("This backup includes")
+                        } footer: {
+                            Text("Compare this against the confirmation shown when you restore.")
+                        }
+                    }
+                    .navigationTitle("Backup saved")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button("Done") { exportManifest = nil }
+                        }
+                    }
                 }
             }
             .sheet(item: $route) { r in
@@ -172,7 +200,7 @@ struct SettingsView: View {
         } header: {
             Text("Reset Maknoon")
         } footer: {
-            Text("Wipes everything on this device: Identity Sandwich, every wallet on every chain, every label, every paired hardware device, the address book, ID documents, Lightning accounts, installed dApps, and every UserDefault setting. Equivalent to deleting and reinstalling the app. The only recovery paths are your 24-word phrase or an encrypted backup file.")
+            Text("Wipes everything on this iPhone, like deleting and reinstalling the app. The only way to restore is using your encrypted backup file and password.")
                 .font(.caption)
         }
         .confirmationDialog(
@@ -185,7 +213,7 @@ struct SettingsView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This wipes every key, wallet, label, device, and credential on this iPhone. You'll need your 24-word phrase or an encrypted backup file to recover. Maknoon will close once the wipe completes; reopen the app to start fresh.")
+            Text("Wipes everything on this iPhone. The only way to restore is using your encrypted backup file and password. Maknoon will close once the wipe completes; reopen the app to start fresh.")
         }
         .alert(
             "Maknoon has been reset",
@@ -280,7 +308,7 @@ struct SettingsView: View {
         } header: {
             Text("Recovery")
         } footer: {
-            Text("Show or verify your 24-word seed phrase for advanced or offline use. Verify encrypted backup tests that a saved backup file opens with your passphrase, without changing anything on this device.")
+            Text("Show or verify your 24-word seed phrase for advanced or offline use. Verify encrypted backup tests that a saved backup file opens with your password, without changing anything on this device.")
         }
     }
 
@@ -304,7 +332,7 @@ struct SettingsView: View {
     private var encryptedBackupSection: some View {
         Section {
             if BackupState.hasPassphrase {
-                Text("Save an encrypted backup so you can restore on a new device without retyping your 24 words.")
+                Text("Save an encrypted backup using your password so you can restore on this device or another.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Button {
@@ -322,14 +350,12 @@ struct SettingsView: View {
                         .foregroundStyle(backupStatus.hasPrefix("Saved") ? .green : .red)
                 }
             } else {
-                Text("You did not set a passphrase at onboarding, so we cannot encrypt a backup. The 24 offline words remain your only recovery path.")
+                Text("You did not set a password at onboarding, so we cannot encrypt a backup. The 24 offline words remain your only recovery path.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
         } header: {
             Text("Encrypted backup")
-        } footer: {
-            Text("The file is AES-256-GCM with a key derived from your passphrase (PBKDF2-SHA256, 600,000 iterations) AND signed with your post-quantum master signature (ML-DSA-65). Without the passphrase the file is useless, to an attacker and to you.")
         }
         // Auto-retry the backup after the user unlocks the sandwich
         // (HardwareUnlockView was triggered from inside
@@ -395,7 +421,7 @@ struct SettingsView: View {
             // The retry hook lives on the encryptedBackupSection's
             // onChange(of: store.sandwich) observer.
             pendingBackupRetry = true
-            backupStatus = "Identity Sandwich is locked. Tap your enrolled device to unlock; the backup will run as soon as you do."
+            backupStatus = "Maknoon is locked. Tap your enrolled device to unlock; the backup will run as soon as you do."
             store.showHardwareUnlock = true
             return
         }
@@ -422,12 +448,32 @@ struct SettingsView: View {
                 idDocuments: idDocumentsSnapshot.documents.isEmpty ? nil : idDocumentsSnapshot,
                 walletState: walletStateSnapshot
             )
+            // Manifest of what this backup contains, shown after save so it can
+            // be eyeballed against the restore confirmation (and so a new config
+            // that silently isn't being backed up is easy to spot).
+            func walletCount(_ key: String) -> Int {
+                guard let b64 = walletStateSnapshot?[key], let data = Data(base64Encoded: b64),
+                      let arr = (try? JSONSerialization.jsonObject(with: data)) as? [Any] else { return 0 }
+                return arr.count
+            }
+            var manifest: [String] = ["Identity & recovery phrase"]
+            for (label, key) in [("Bitcoin", "networks.bitcoin.wallets.v1"), ("Ethereum", "networks.ethereum.wallets.v2"), ("Solana", "networks.solana.wallets.v2"), ("Tron", "networks.tron.wallets.v2")] {
+                let n = walletCount(key); if n > 0 { manifest.append("\(label) wallets (\(n))") }
+            }
+            if walletStateSnapshot != nil { manifest.append("Networks, RPC/explorer overrides, tokens, currency & display") }
+            if !snapshot.knownIssuers.isEmpty { manifest.append("Trusted issuers (\(snapshot.knownIssuers.count))") }
+            if let devs = snapshot.devices, !devs.isEmpty { manifest.append("Hardware devices (\(devs.count))") }
+            if let ab = snapshot.addressBook, !ab.isEmpty { manifest.append("Address book (\(ab.count))") }
+            if !lightning.isEmpty { manifest.append("Lightning accounts (\(lightning.count))") }
+            if !credentialsSnapshot.credentials.isEmpty { manifest.append("Credentials (\(credentialsSnapshot.credentials.count))") }
+            if !idDocumentsSnapshot.documents.isEmpty { manifest.append("ID documents / passports (\(idDocumentsSnapshot.documents.count))") }
             EncryptedBackup.presentBackupPicker(blob: blob) { url, error in
                 backupWorking = false
                 if let error {
                     backupStatus = "Save failed: \(error.localizedDescription)"
                 } else if let url {
                     backupStatus = "Saved \(url.lastPathComponent)"
+                    exportManifest = ExportManifest(items: manifest)
                 }
                 // user-cancelled path: leave previous status visible.
             }
@@ -493,7 +539,7 @@ struct SettingsView: View {
                     bullet("Your encrypted backup, if you set one up")
                 }
 
-                Text("Use Lockdown only after you are absolutely sure your backups are safe and accessible. To prove that, the next step asks you to retype all 24 words and your passphrase.")
+                Text("Use Lockdown only after you are absolutely sure your backups are safe and accessible. To prove that, the next step asks you to retype all 24 words and your password.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
 
@@ -546,13 +592,13 @@ struct SettingsView: View {
     private var lockdownTypePassphraseView: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                Text("Type your passphrase")
+                Text("Type your password")
                     .font(.title3.weight(.semibold))
-                Text("Must match the passphrase you set during onboarding.")
+                Text("Must match the password you set during onboarding.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
 
-                SecureField("Passphrase", text: $lockdownTypedPassphrase)
+                SecureField("Password", text: $lockdownTypedPassphrase)
                     .textFieldStyle(.roundedBorder)
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.never)
@@ -605,7 +651,7 @@ struct SettingsView: View {
     private func checkWords() async {
         guard let sandwich = store.sandwich else { return }
         do {
-            let material = try sandwich.recoveryMaterial(localizedReason: "Lockdown — verify phrase")
+            let material = try sandwich.recoveryMaterial(localizedReason: "Lockdown: verify phrase")
             let actualWords = material.words.map { $0.lowercased() }
             let typed = lockdownTypedWords
                 .lowercased()
@@ -630,15 +676,15 @@ struct SettingsView: View {
     private func checkPassphrase() async {
         guard let sandwich = store.sandwich else { return }
         do {
-            let material = try sandwich.recoveryMaterial(localizedReason: "Lockdown — verify passphrase")
+            let material = try sandwich.recoveryMaterial(localizedReason: "Lockdown, verify password")
             if lockdownTypedPassphrase != material.passphrase {
-                errorMessage = "Passphrase does not match. Try again."
+                errorMessage = "Password does not match. Try again."
                 return
             }
             errorMessage = nil
             lockdownStep = .confirm
         } catch {
-            errorMessage = "Could not verify passphrase: \(error)"
+            errorMessage = "Could not verify password: \(error)"
         }
     }
 
@@ -740,9 +786,9 @@ private struct RevealSheet: View {
 
     private var passphraseReminder: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Label("You also have a passphrase", systemImage: "key.horizontal")
+            Label("You also have a password", systemImage: "key.horizontal")
                 .font(.callout.weight(.medium))
-            Text("During onboarding you set a passphrase. It is NOT shown here. Make sure it is backed up in your password manager (1Password, Bitwarden, iCloud Keychain), kept separate from this 24-word phrase. Without BOTH the phrase and the passphrase, the wallet cannot be recovered.")
+            Text("During onboarding you set a password. It is NOT shown here. Make sure it is backed up in your password manager (1Password, Bitwarden, iCloud Keychain), kept separate from this 24-word phrase. Without BOTH the phrase and the password, the wallet cannot be recovered.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

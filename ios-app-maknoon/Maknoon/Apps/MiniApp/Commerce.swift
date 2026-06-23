@@ -1,4 +1,4 @@
-// Maknoon Pay — the client-side, peer-to-peer "verify and pay" protocol
+// Maknoon Pay, the client-side, peer-to-peer "verify and pay" protocol
 // (ADR-0031). These types COMPOSE around the canonical `VerifierRequest` and
 // `Presentation` rather than mutating them, so the byte-for-byte canonicalization
 // contract with the verifier server stays intact. The commerce exchange is

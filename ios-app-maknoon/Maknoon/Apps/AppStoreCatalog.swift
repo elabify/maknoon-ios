@@ -1,9 +1,9 @@
-// Wire format for a dApps catalog: a curated list of integrations
+// Wire format for a apps catalog: a curated list of integrations
 // that Maknoon can install into the Apps tab. By default Maknoon
-// fetches the Maknoon dApps catalog published from the public
+// fetches the Maknoon apps catalog published from the public
 // elabify/maknoon-dapps repo via GitHub Pages; users can add additional
 // catalog URLs in Settings > Apps so other institutions (issuers,
-// verifier consortia, dApp aggregators) can publish their own lists.
+// verifier consortia, app aggregators) can publish their own lists.
 //
 // `AppStoreRegistry.refresh()` fetches each catalog URL and decodes
 // the JSON into this shape. A catalog that returns no entries simply
@@ -42,16 +42,20 @@ struct AppStoreEntry: Codable, Identifiable, Hashable, Sendable {
     let curatedBy: String     // human-readable curator label
 
     // --- Versioning / release channel (all optional) ------------------
-    /// Semantic version of the dApp being offered, e.g. "0.1.0". Shown at
+    /// Semantic version of the app being offered, e.g. "0.1.0". Shown at
     /// install time. Distinct from `MiniAppManifest.version` (the bundle
     /// cache key); for a single-version entry they should match.
     let version: String?
     /// Release channel. "beta" or "stable" (default stable when omitted).
     /// Drives the badge chip in place of the legacy `statusLabel`.
     let channel: String?
-    /// Minimum Maknoon (app) version this dApp targets, e.g. "0.4.1".
+    /// Minimum Maknoon (app) version this app targets, e.g. "0.4.1".
     /// Used to render a compatibility badge. Omitted ⇒ "unknown support".
     let requiresMaknoonVersion: String?
+    /// Upper bound: the Maknoon (app) version at/above which this app version
+    /// is superseded (no longer supported). Omitted ⇒ no upper bound. Compatible
+    /// iff `requiresMaknoonVersion` ≤ host < `supersededAtMaknoonVersion`.
+    let supersededAtMaknoonVersion: String?
 
     // --- Mini-app fields (all optional) -------------------------------
     // An entry that carries a `manifestURL` is a runnable mini app: an
@@ -92,6 +96,7 @@ struct AppStoreEntry: Codable, Identifiable, Hashable, Sendable {
         version: String? = nil,
         channel: String? = nil,
         requiresMaknoonVersion: String? = nil,
+        supersededAtMaknoonVersion: String? = nil,
         manifestURL: URL? = nil,
         manifestSha256: String? = nil,
         permissions: [String]? = nil,
@@ -107,6 +112,7 @@ struct AppStoreEntry: Codable, Identifiable, Hashable, Sendable {
         self.version = version
         self.channel = channel
         self.requiresMaknoonVersion = requiresMaknoonVersion
+        self.supersededAtMaknoonVersion = supersededAtMaknoonVersion
         self.manifestURL = manifestURL
         self.manifestSha256 = manifestSha256
         self.permissions = permissions
@@ -142,7 +148,7 @@ struct AppStoreEntry: Codable, Identifiable, Hashable, Sendable {
     }
 }
 
-// The built-in Maknoon dApps catalog, published from the public
+// The built-in Maknoon apps catalog, published from the public
 // elabify/maknoon-dapps repo via GitHub Pages. Ships empty and is
 // refreshed from `url` at runtime via `AppStoreRegistry.refresh()`; the
 // catalog the server returns may legitimately contain no entries (and
@@ -151,9 +157,9 @@ enum DefaultAppStore {
     static let catalogURL = URL(string: "https://elabify.github.io/maknoon-dapps/catalog.json")!
     static let catalog = AppStoreCatalog(
         id: "elabify.maknoon-dapps",
-        name: "Maknoon dApps",
+        name: "Maknoon Apps",
         curator: "Elabify",
-        summary: "First-party dApps curated by Elabify. Bundled with Maknoon; cannot be removed.",
+        summary: "First-party Apps bundled with Maknoon; cannot be removed.",
         url: catalogURL,
         apps: []
     )

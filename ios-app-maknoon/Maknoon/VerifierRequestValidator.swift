@@ -157,7 +157,7 @@ enum VerifierRequestValidator {
 }
 
 /// Thin client for `GET /v1/verifier-registry/:did`. Returns nil on 404
-/// or any network error — the caller falls back to "Verifier DID not in
+/// or any network error, the caller falls back to "Verifier DID not in
 /// registry" semantics.
 enum VerifierRegistryClient {
     static func lookup(host: URL, did: String) async -> VerifierRegistryRecord? {

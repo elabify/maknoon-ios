@@ -1,6 +1,6 @@
 // Per-presentation history. Every successful Share records an entry
 // keyed by the recipient verifier's DID (or `did:elabify:open` when the
-// holder shared without a scanned verifier request — the "anyone with
+// holder shared without a scanned verifier request, the "anyone with
 // the QR" case). The Apps tab "Connected verifiers" section reads from
 // here.
 //

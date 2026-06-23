@@ -17,14 +17,14 @@
 //
 // Lifecycle:
 //
-//   * `generateFresh(passphrase:)` — pick fresh 32 bytes of entropy,
+//   * `generateFresh(passphrase:)`: pick fresh 32 bytes of entropy,
 //     derive master, create ephemeral, sign first delegation, persist.
-//   * `restoreFromMnemonic(words:passphrase:)` — rebuild master from a
+//   * `restoreFromMnemonic(words:passphrase:)`: rebuild master from a
 //     paper / iCloud-restored 24-word phrase plus passphrase.
-//   * `loadFromKeychain()` — reattach on subsequent launches.
-//   * `renewIfExpiring(now:)` — refresh delegation when within an hour
+//   * `loadFromKeychain()`: reattach on subsequent launches.
+//   * `renewIfExpiring(now:)`: refresh delegation when within an hour
 //     of expiry.
-//   * `signChallenge(_:)` — sign with the SE ephemeral, fast path.
+//   * `signChallenge(_:)`: sign with the SE ephemeral, fast path.
 //
 // All cert canonicalization routes through ElabifyCore.canonicalize()
 // from the Swift binding, which is KAT-proven byte-identical with the
@@ -95,9 +95,25 @@ final class IdentitySandwich {
     /// which deletes the plain biometric Keychain item as a defense-
     /// in-depth measure against jailbreak-with-Face-ID attackers.
     /// Cache lives only for the duration of the loaded sandwich;
-    /// cold launches re-route through HardwareUnlockView per the
-    /// wrap envelope and repopulate via `loadWrappedWithSecret`.
+    /// cold launches re-route through HardwareUnlockView when the
+    /// second factor is on and repopulate via `loadWithSecondFactor`.
     private var sessionMaterial: MasterRecoveryMaterial?
+
+    /// In-session cache of the second-factor CEK, populated at first
+    /// enrollment and at every hardware unlock. Adding ANOTHER second
+    /// factor needs the shared CEK to wrap it for the new device; with
+    /// this cache the add taps only the NEW device (no need to dig out
+    /// an already-enrolled key just to recover the CEK). The CEK is no
+    /// more sensitive than `sessionMaterial` (which already holds the
+    /// entropy), and lives only for the loaded sandwich; a cold launch
+    /// repopulates it via `loadWithSecondFactor`.
+    private var sessionCek: Data?
+
+    /// Read the in-session CEK if one is cached (see `sessionCek`).
+    var cachedSecondFactorCek: Data? { sessionCek }
+
+    /// Populate the in-session CEK cache.
+    func cacheSecondFactorCek(_ cek: Data) { self.sessionCek = cek }
 
     /// did:elabify-style holder DID derived from the master pubkey.
     /// Stable across renewals, across passphrase-aware recovery on a
@@ -161,43 +177,29 @@ final class IdentitySandwich {
     /// Three-state result of attempting to load a sandwich from
     /// Keychain. `notProvisioned` routes to OnboardingView;
     /// `loaded` proceeds to the wallet; `wrappedAwaitingHardware`
-    /// carries every enrolled device's wrap so the unlock UI can
-    /// let the user pick whichever device is at hand.
+    /// signals the second factor (CEK scheme) is ON: the plain
+    /// entropy seal is gone and the caller must drive the unlock UI
+    /// with the enrolled devices that carry a CEK wrap.
     enum LoadResult {
         case notProvisioned
         case loaded(IdentitySandwich)
-        case wrappedAwaitingHardware([WrappedMaterialPersisted])
+        case wrappedAwaitingHardware
     }
 
-    /// Read the current wrap envelope from Keychain, if any. Handles
-    /// the v1 single-blob legacy shape transparently so devices that
-    /// promoted under Phase 2.25 don't break when this code lands.
-    static func loadWrapEnvelope() throws -> WrapEnvelope? {
-        guard let data = try KeyStore.load(forKey: KeyStoreKeys.wrappedMasterMaterial)
-        else { return nil }
-        if let env = try? JSONDecoder().decode(WrapEnvelope.self, from: data) {
-            return env
-        }
-        // v1 fallback: the item was a single WrappedMaterialPersisted
-        // before the envelope existed. Wrap it into a fresh v2
-        // envelope but DON'T persist yet — the next promotion /
-        // demotion call will rewrite under the new shape naturally.
-        if let single = try? JSONDecoder().decode(WrappedMaterialPersisted.self, from: data) {
-            return WrapEnvelope(blobs: [single])
-        }
-        return nil
-    }
-
-    private static func saveWrapEnvelope(_ env: WrapEnvelope) throws {
-        let blob = try JSONEncoder().encode(env)
-        try KeyStore.save(blob, forKey: KeyStoreKeys.wrappedMasterMaterial, requireBiometric: false)
+    /// True iff the second factor (ADR-0032 CEK scheme) is currently ON:
+    /// the entropy is sealed under the CEK (sealedEntropyUnderCEK present)
+    /// and the plain biometric `masterMaterial` item is therefore absent.
+    /// In this state a cold launch must route through the hardware-unlock
+    /// flow; routine reads of the plain item will not find the entropy.
+    static func isSecondFactorOn() throws -> Bool {
+        try KeyStore.load(forKey: KeyStoreKeys.sealedEntropyUnderCEK) != nil
     }
 
     /// Reload an existing sandwich from Keychain. Returns
-    /// `.wrappedAwaitingHardware` if the material is sealed by one
-    /// or more hardware devices; the caller drives the unlock UI
-    /// and then calls `loadWrapped(...)` once a device produced its
-    /// signature.
+    /// `.wrappedAwaitingHardware` when the second factor (CEK scheme)
+    /// is ON; the caller drives the unlock UI with the enrolled
+    /// devices and then calls `loadWithSecondFactor(...)` once a
+    /// device produced its secret.
     static func loadFromKeychain() throws -> LoadResult {
         guard
             let _masterPk = try KeyStore.load(forKey: KeyStoreKeys.masterPublicKey),
@@ -207,11 +209,21 @@ final class IdentitySandwich {
         else {
             return .notProvisioned
         }
-        if let env = try loadWrapEnvelope(), !env.blobs.isEmpty {
-            // Hardware-locked: launcher must drive the unlock UI.
-            // We don't construct a sandwich here because we don't
-            // have the plain master material until a device signs.
-            return .wrappedAwaitingHardware(env.blobs)
+        if try isSecondFactorOn() {
+            // Second factor ON: the plain entropy seal is gone. We
+            // can't build a usable sandwich until a device unwraps the
+            // CEK, so the launcher drives the hardware-unlock UI.
+            return .wrappedAwaitingHardware
+        }
+        // Clean-cut migration: a legacy (pre-CEK) second-factor
+        // enrollment left the old `wrappedMasterMaterial` item and
+        // deleted the plain biometric `masterMaterial`. The new code
+        // cannot open the old envelope, so signal awaiting-hardware
+        // with no v2-wrapped devices; loadIdentity then surfaces the
+        // restore-from-backup migration banner. Checked via the
+        // non-biometric legacy item so no Face ID prompt fires here.
+        if try KeyStore.load(forKey: KeyStoreKeys.wrappedMasterMaterial) != nil {
+            return .wrappedAwaitingHardware
         }
         let cert = try JSONDecoder().decode(DelegationCert.self, from: _certData)
         return .loaded(IdentitySandwich(
@@ -222,235 +234,99 @@ final class IdentitySandwich {
         ))
     }
 
-    /// Open a wrapped sandwich using whichever device the user
-    /// connected. Picks the matching wrap blob by deviceId, then
-    /// verifies the connected serial matches what was recorded at
-    /// enrollment time.
-    static func loadWrapped(
-        enrollments: [WrappedMaterialPersisted],
-        device: RegisteredDevice,
-        hardware: HardwareWallet
-    ) async throws -> IdentitySandwich {
-        guard let wrapped = enrollments.first(where: { $0.deviceId == device.id }) else {
-            throw IdentityWrapError.deviceSerialMismatch(
-                expected: enrollments.map { $0.deviceSerial }.joined(separator: " or "),
-                actual: device.serial
-            )
-        }
-        guard device.serial == wrapped.deviceSerial else {
-            throw IdentityWrapError.deviceSerialMismatch(
-                expected: wrapped.deviceSerial,
-                actual: device.serial
-            )
-        }
-        let challenge = IdentityWrap.challenge(salt: wrapped.salt, deviceSerial: wrapped.deviceSerial)
-        let signature = try await hardware.signMessage(challenge)
-        let key = try IdentityWrap.deriveWrapKey(signature: signature, salt: wrapped.salt)
-        let plaintext = try IdentityWrap.open(
-            sealedBox: wrapped.sealedBox,
-            key: key,
-            deviceSerial: wrapped.deviceSerial
-        )
-        // Persist the unwrapped material back to the biometric
-        // Keychain slot so in-session ops (delegation renewal,
-        // recovery-phrase reveal, iCloud backup, AND enrolling
-        // another device) don't need a fresh hardware tap. Cold
-        // launches still go through the wrap because loadFromKeychain
-        // checks the envelope before yielding the biometric slot.
-        try KeyStore.save(plaintext, forKey: KeyStoreKeys.masterMaterial, requireBiometric: true)
+    // MARK: -- second-factor wrap (ADR-0032 CEK scheme)
 
-        guard
-            let masterPk = try KeyStore.load(forKey: KeyStoreKeys.masterPublicKey),
-            let handle   = try KeyStore.load(forKey: KeyStoreKeys.ephemeralKeyHandle),
-            let ephPk    = try KeyStore.load(forKey: KeyStoreKeys.ephemeralPublicKey),
-            let certData = try KeyStore.load(forKey: KeyStoreKeys.delegationCert)
-        else {
-            throw SandwichError.masterUnavailable
-        }
-        let cert = try JSONDecoder().decode(DelegationCert.self, from: certData)
-        return IdentitySandwich(
-            masterPublicKey: masterPk,
-            ephemeralPublicKey: ephPk,
-            ephemeralKeyHandle: handle,
-            delegation: cert
-        )
-    }
-
-    // MARK: -- hardware wrap promotion
-
-    /// Enroll a hardware device into the Identity Sandwich. Reads
-    /// the plain master material from Keychain (Face ID prompt the
-    /// first time per session), derives a device-specific AES-256
-    /// key via HKDF over the device's deterministic signature, and
-    /// appends the sealed copy to the wrap envelope. Any one device
-    /// in the envelope can unwrap the same plaintext later.
-    ///
-    /// Re-enrolling the same device (same deviceId) replaces its
-    /// existing blob in place; no orphans.
-    ///
-    /// First-time promotion: drops the plain biometric item so cold
-    /// launches genuinely require the hardware. Subsequent
-    /// promotions leave the biometric item intact (it was already
-    /// gone from the first promotion, or it was restored at unlock).
-    /// Result of a hardware-wrap promotion. `wrapped` is the new
-    /// blob added to the wrap envelope; `material` carries the
-    /// unwrapped entropy + passphrase so the caller can cache it on
-    /// the live IdentitySandwich (the biometric Keychain item gets
-    /// deleted on first enrollment, so the cache is the only path
-    /// for in-session recoveryMaterial reads afterwards).
-    struct PromotionResult {
-        let wrapped: WrappedMaterialPersisted
+    /// Result of sealing the wrap for one enrolled device. The caller
+    /// persists `wrappedCekHex` (with the deviceSalt it passed in) on
+    /// that device's IdentityPromotion. `cek` is returned transiently so
+    /// a multi-device add can reuse it for the next device without
+    /// another tap; it is never persisted in the clear and the caller
+    /// should drop it after use. `material` carries the entropy +
+    /// passphrase so the caller can cache it on the live sandwich (the
+    /// plain biometric item is deleted on first enrollment).
+    struct SecondFactorEnrollSeal {
+        let wrappedCekHex: String
+        let cek: Data
         let material: MasterRecoveryMaterial
     }
 
-    static func promoteToHardware(
-        sandwich: IdentitySandwich,
-        device: RegisteredDevice,
-        hardware: HardwareWallet
-    ) async throws -> PromotionResult {
-        // Read the master material via the live sandwich. After the
-        // first hardware enrollment the biometric Keychain item is
-        // gone (defense-in-depth); the session cache is the only
-        // remaining path, and it's what enables enrolling a SECOND
-        // device (multi-key) without forcing the user to reset.
-        let material = try sandwich.recoveryMaterial(
-            localizedReason: "Add \(device.label) to your Identity Sandwich"
-        )
-        let materialData = try JSONEncoder().encode(MasterMaterialPersisted(
-            entropyHex: bytesToHex(material.entropy),
-            passphrase: material.passphrase
-        ))
-        var saltBytes = [UInt8](repeating: 0, count: 32)
-        let status = SecRandomCopyBytes(kSecRandomDefault, 32, &saltBytes)
-        guard status == errSecSuccess else {
-            throw IdentityWrapError.sealFailed("SecRandomCopyBytes failed: \(status)")
-        }
-        let salt = Data(saltBytes)
-        let challenge = IdentityWrap.challenge(salt: salt, deviceSerial: device.serial)
-        let signature = try await hardware.signMessage(challenge)
-        let key = try IdentityWrap.deriveWrapKey(signature: signature, salt: salt)
-        let sealedBox = try IdentityWrap.seal(
-            plaintext: materialData,
-            key: key,
-            deviceSerial: device.serial
-        )
-        let wrapped = WrappedMaterialPersisted(
-            deviceId: device.id,
-            deviceSerial: device.serial,
-            salt: salt,
-            sealedBox: sealedBox,
-            wrappedAt: Date()
-        )
-
-        let existing = (try loadWrapEnvelope())?.blobs ?? []
-        let wasEmpty = existing.isEmpty
-        // Replace any existing blob for this same device (re-enroll
-        // semantics) or append.
-        var next = existing.filter { $0.deviceId != device.id }
-        next.append(wrapped)
-        try saveWrapEnvelope(WrapEnvelope(blobs: next))
-
-        if wasEmpty {
-            // First device enrolled: drop the plain biometric item
-            // so a jailbreak-with-Face-ID attacker can't read it
-            // without the hardware. The caller-side session cache
-            // (see PromotionResult.material) keeps backup / reveal
-            // working in the current session.
-            try KeyStore.delete(forKey: KeyStoreKeys.masterMaterial)
-        }
-        LogStore.shared.info("identity.wrap",
-            "promoted \(device.serial) (\(device.label)); enrollments=\(next.count)")
-        return PromotionResult(wrapped: wrapped, material: material)
-    }
-
-    /// Promote a device using a caller-supplied secret AND salt.
-    /// Used by the YubiKey FIDO2 NFC path: the wrap signature is
-    /// computed over a salt-derived client data hash, so the same
-    /// salt must drive the HKDF. The caller generates the salt
-    /// once and passes it both to the device (to compute the
-    /// signature) and here (to seal the blob).
-    static func promoteWithSecret(
+    /// Enroll a device into the second factor (ADR-0032 CEK scheme).
+    /// First device (`existingCek == nil`): mint a fresh CEK, seal the
+    /// 32-byte entropy ONCE under it into `sealedEntropyUnderCEK`, write
+    /// the passphrase to its own slot, and DELETE the plain biometric
+    /// `masterMaterial`. Subsequent device: reuse the passed-in CEK
+    /// (recovered from an already-enrolled device) so the single sealed
+    /// entropy is unchanged. Always wraps the CEK under this device's
+    /// secret + salt and returns the wrappedCEK hex. The CALLER writes
+    /// `deviceSaltHex` + `wrappedCekHex` + `wrapProtocolVersion = 2`
+    /// onto the device's IdentityPromotion.
+    static func sealForSecondFactorEnroll(
         sandwich: IdentitySandwich,
         device: RegisteredDevice,
         secret: Data,
-        salt: Data
-    ) async throws -> PromotionResult {
-        // Same cache-aware lookup as promoteToHardware so a SECOND
-        // YubiKey can be enrolled after the biometric Keychain item
-        // is gone from the first enrollment. Without this, multi-key
-        // OR-of-N enrollment is structurally impossible on a freshly
-        // wrapped sandwich.
+        deviceSalt: Data,
+        existingCek: Data?
+    ) throws -> SecondFactorEnrollSeal {
+        // Read the master material via the live sandwich. After the
+        // first enrollment the plain biometric item is gone
+        // (defense-in-depth); the session cache is the only remaining
+        // path, and it's what enables enrolling a SECOND device.
         let material = try sandwich.recoveryMaterial(
-            localizedReason: "Add \(device.label) to your Identity Sandwich"
+            localizedReason: "Add \(device.label) as a second factor"
         )
-        let materialData = try JSONEncoder().encode(MasterMaterialPersisted(
-            entropyHex: bytesToHex(material.entropy),
-            passphrase: material.passphrase
-        ))
-        let key = try IdentityWrap.deriveWrapKey(signature: secret, salt: salt)
-        let sealedBox = try IdentityWrap.seal(
-            plaintext: materialData,
-            key: key,
-            deviceSerial: device.serial
-        )
-        let wrapped = WrappedMaterialPersisted(
-            deviceId: device.id,
-            deviceSerial: device.serial,
-            salt: salt,
-            sealedBox: sealedBox,
-            wrappedAt: Date()
-        )
-        let existing = (try loadWrapEnvelope())?.blobs ?? []
-        let wasEmpty = existing.isEmpty
-        var next = existing.filter { $0.deviceId != device.id }
-        next.append(wrapped)
-        try saveWrapEnvelope(WrapEnvelope(blobs: next))
-        if wasEmpty {
-            try KeyStore.delete(forKey: KeyStoreKeys.masterMaterial)
-        }
+        let cek = existingCek ?? SecondFactorWrap.newCek()
+        // Seal the entropy under the CEK (once) and flip 2FA on. When
+        // adding a second device with the same CEK this rewrites the
+        // identical sealedEntropy, which is harmless.
+        let sealedEntropyHex = try SecondFactorWrap.sealEntropy(material.entropy, cek: cek)
+        try KeyStore.saveString(sealedEntropyHex, forKey: KeyStoreKeys.sealedEntropyUnderCEK)
+        try KeyStore.saveString(material.passphrase, forKey: KeyStoreKeys.passphraseUnder2FA)
+        // First enrollment: drop the plain biometric item so a
+        // jailbreak-with-Face-ID attacker can't read the entropy
+        // without the hardware. The caller caches `material` on the
+        // live sandwich so in-session reveal / backup keep working.
+        try KeyStore.delete(forKey: KeyStoreKeys.masterMaterial)
+
+        let wrappedCekHex = try SecondFactorWrap.wrapCek(cek, secret: secret, deviceSalt: deviceSalt)
+        // Cache the CEK so adding a FURTHER device this session taps only
+        // the new device (no need to re-tap an already-enrolled key).
+        sandwich.cacheSecondFactorCek(cek)
         LogStore.shared.info("identity.wrap",
-            "promoted (secret) \(device.serial); enrollments=\(next.count)")
-        return PromotionResult(wrapped: wrapped, material: material)
+            "sealed second-factor enroll for \(device.serial) (\(device.label)); reusedCek=\(existingCek != nil)")
+        return SecondFactorEnrollSeal(wrappedCekHex: wrappedCekHex, cek: cek, material: material)
     }
 
-    /// Inverse of `promoteWithSecret`: open a wrapped blob given
-    /// the same secret the device just recomputed. Caller hands the
-    /// opened material to `adopt(_:)`.
-    static func openWithSecret(
-        wrapped: WrappedMaterialPersisted,
-        secret: Data
-    ) throws -> Data {
-        let key = try IdentityWrap.deriveWrapKey(signature: secret, salt: wrapped.salt)
-        return try IdentityWrap.open(
-            sealedBox: wrapped.sealedBox,
-            key: key,
-            deviceSerial: wrapped.deviceSerial
-        )
+    /// Recover the shared CEK from an already-enrolled device's wrap.
+    /// Used both by the unlock path (then open the entropy) and by the
+    /// multi-device add path (reuse the CEK for the next device). The
+    /// open() failing IS the fail-closed OR signal: a wrong / foreign
+    /// device's derived wrap key fails the GCM tag.
+    static func recoverCek(device: RegisteredDevice, secret: Data) throws -> Data {
+        guard let promo = device.promotions.identity, promo.hasSecondFactorWrap,
+              let saltHex = promo.deviceSaltHex, let wrappedHex = promo.wrappedCekHex
+        else {
+            throw SandwichError.masterUnavailable
+        }
+        let deviceSalt = hexToBytes(saltHex)
+        return try SecondFactorWrap.unwrapCek(wrappedHex, secret: secret, deviceSalt: deviceSalt)
     }
 
-    /// Equivalent of `loadWrapped` for devices that produce a
-    /// pre-computed wrap secret (YubiKey FIDO2 over NFC). Caller
-    /// is responsible for handing in the secret derived from the
-    /// device-side operation against `wrapped.salt`.
-    static func loadWrappedWithSecret(
-        enrollments: [WrappedMaterialPersisted],
+    /// Second-factor unlock (ADR-0032). Given a device that carries a
+    /// CEK wrap and the just-recomputed per-device secret, recover the
+    /// CEK, open the sealed entropy, read the passphrase slot, rebuild
+    /// the master material, and reconstruct the sandwich from the
+    /// persisted public items. A wrong / foreign device throws at the
+    /// GCM tag so the caller can try the next enrolled device.
+    static func loadWithSecondFactor(
         device: RegisteredDevice,
         secret: Data
-    ) async throws -> IdentitySandwich {
-        guard let wrapped = enrollments.first(where: { $0.deviceId == device.id }) else {
-            throw IdentityWrapError.deviceSerialMismatch(
-                expected: enrollments.map { $0.deviceSerial }.joined(separator: " or "),
-                actual: device.serial
-            )
+    ) throws -> IdentitySandwich {
+        let cek = try recoverCek(device: device, secret: secret)
+        guard let sealedEntropyHex = try KeyStore.loadString(forKey: KeyStoreKeys.sealedEntropyUnderCEK) else {
+            throw SandwichError.masterUnavailable
         }
-        guard device.serial == wrapped.deviceSerial else {
-            throw IdentityWrapError.deviceSerialMismatch(
-                expected: wrapped.deviceSerial,
-                actual: device.serial
-            )
-        }
-        let plaintext = try openWithSecret(wrapped: wrapped, secret: secret)
-        try KeyStore.save(plaintext, forKey: KeyStoreKeys.masterMaterial, requireBiometric: true)
+        let entropy = try SecondFactorWrap.openEntropy(sealedEntropyHex, cek: cek)
+        let passphrase = (try KeyStore.loadString(forKey: KeyStoreKeys.passphraseUnder2FA)) ?? ""
 
         guard
             let masterPk = try KeyStore.load(forKey: KeyStoreKeys.masterPublicKey),
@@ -467,135 +343,70 @@ final class IdentitySandwich {
             ephemeralKeyHandle: handle,
             delegation: cert
         )
-        // Cache the unwrapped material from the just-decrypted blob
-        // so in-session ops (backup, reveal phrase) don't need to
-        // re-read the biometric Keychain item.
-        if let persisted = try? JSONDecoder().decode(MasterMaterialPersisted.self, from: plaintext) {
-            let entropy = hexToBytes(persisted.entropyHex)
-            sandwich.cacheRecoveryMaterial(
-                MasterRecoveryMaterial(entropy: entropy, passphrase: persisted.passphrase)
-            )
-        }
+        // Cache the recovered material so in-session ops (backup,
+        // reveal phrase, delegation renewal, enrolling another device)
+        // work without another hardware tap.
+        sandwich.cacheRecoveryMaterial(
+            MasterRecoveryMaterial(entropy: entropy, passphrase: passphrase)
+        )
+        // Cache the CEK too so adding another second factor this session
+        // taps only the new device.
+        sandwich.cacheSecondFactorCek(cek)
         return sandwich
     }
 
-    /// Outcome of a wrap-envelope demotion.
+    /// Outcome of a second-factor removal.
     struct DemotionResult {
-        /// True when the demoted device was the last enrolled one.
-        /// The caller's UX may want to surface "Identity Sandwich is
-        /// now plain biometric again" or auto-route somewhere.
+        /// True when the removed device was the last enrolled one and
+        /// the second factor was turned off (plain biometric restored).
         let wasLastDevice: Bool
     }
 
-    /// Remove a device's wrap from the envelope, gated on step-up
-    /// authentication from ANY currently-enrolled device. Without
-    /// this gate, a drive-by attacker on an unlocked phone could
-    /// silently strip enrolled devices one by one (the previous
-    /// implementation only required auth on the LAST device, so
-    /// every prior demote was a free envelope edit).
+    /// Remove a device from the second factor (ADR-0032), gated on
+    /// proof-of-possession from an authorizing enrolled device. The
+    /// authorizer recomputes its secret and unwraps its own CEK; that
+    /// unwrap succeeding IS the proof. The removed device's wrap fields
+    /// are cleared by the CALLER (setIdentityPromotion). If the removed
+    /// device was the LAST enrolled one, the recovered CEK opens the
+    /// sealed entropy, re-seals the plain biometric `masterMaterial`,
+    /// and deletes sealedEntropyUnderCEK + the passphrase slot (second
+    /// factor off).
     ///
-    /// `authorizingDevice` can be the same device being removed
-    /// (the common case: user has the device they want to remove)
-    /// or a different enrolled device (the lost-device recovery
-    /// case: user holds a backup device to authorize removal of a
-    /// missing one). The authorizing device must be enrolled, and
-    /// must successfully open its own wrap blob; that proves
-    /// possession in real time without trusting any cached state.
-    ///
-    /// Use this overload for Ledger / Trezor authorizing devices
-    /// (signature-based wrap). For YubiKey FIDO2 hmac-secret
-    /// authorizers, see `demoteWithSecret`.
-    static func demoteFromHardware(
-        deviceToRemove: RegisteredDevice,
+    /// `remainingWrappedDevicesAfterRemoval` is the count of devices
+    /// that still carry a CEK wrap once `deviceToRemove` is dropped;
+    /// the caller computes it from the registry. Zero means this was
+    /// the last device.
+    static func removeSecondFactor(
         authorizingDevice: RegisteredDevice,
-        authorizingHardware: HardwareWallet
-    ) async throws -> DemotionResult {
-        let env = (try loadWrapEnvelope()) ?? WrapEnvelope(blobs: [])
-        guard let authBlob = env.blobs.first(where: { $0.deviceId == authorizingDevice.id }) else {
-            throw IdentityWrapError.deviceSerialMismatch(
-                expected: "an enrolled Identity Sandwich device",
-                actual: "\(authorizingDevice.kind.displayName) \(authorizingDevice.serial)"
-            )
-        }
-        let challenge = IdentityWrap.challenge(salt: authBlob.salt, deviceSerial: authBlob.deviceSerial)
-        let signature = try await authorizingHardware.signMessage(challenge)
-        let key = try IdentityWrap.deriveWrapKey(signature: signature, salt: authBlob.salt)
-        // The open() success IS the proof-of-possession: only the
-        // authorizing device can produce a signature that opens its
-        // own wrap blob.
-        let plaintext = try IdentityWrap.open(
-            sealedBox: authBlob.sealedBox,
-            key: key,
-            deviceSerial: authBlob.deviceSerial
-        )
-        return try applyDemotion(
-            env: env,
-            deviceToRemove: deviceToRemove,
-            authorizingPlaintext: plaintext
-        )
-    }
-
-    /// YubiKey-FIDO2-hmac-secret equivalent of `demoteFromHardware`.
-    /// The caller has already driven `recomputeHMACSecretOverNFC`
-    /// on the authorizing YubiKey and passes the resulting 32-byte
-    /// secret in. The secret must open the authorizing device's own
-    /// wrap blob, which proves possession.
-    static func demoteWithSecret(
-        deviceToRemove: RegisteredDevice,
-        authorizingDevice: RegisteredDevice,
-        authorizingSecret: Data
-    ) async throws -> DemotionResult {
-        let env = (try loadWrapEnvelope()) ?? WrapEnvelope(blobs: [])
-        guard let authBlob = env.blobs.first(where: { $0.deviceId == authorizingDevice.id }) else {
-            throw IdentityWrapError.deviceSerialMismatch(
-                expected: "an enrolled Identity Sandwich device",
-                actual: "\(authorizingDevice.kind.displayName) \(authorizingDevice.serial)"
-            )
-        }
-        let key = try IdentityWrap.deriveWrapKey(signature: authorizingSecret, salt: authBlob.salt)
-        let plaintext = try IdentityWrap.open(
-            sealedBox: authBlob.sealedBox,
-            key: key,
-            deviceSerial: authBlob.deviceSerial
-        )
-        return try applyDemotion(
-            env: env,
-            deviceToRemove: deviceToRemove,
-            authorizingPlaintext: plaintext
-        )
-    }
-
-    /// Shared envelope-edit step. The two demote entry points
-    /// produce a `plaintext` by opening the authorizing device's
-    /// own wrap blob; that proves possession. From here on it's a
-    /// straight envelope edit, plus a biometric-item restore when
-    /// removing the last enrolled device.
-    private static func applyDemotion(
-        env: WrapEnvelope,
-        deviceToRemove: RegisteredDevice,
-        authorizingPlaintext: Data
+        authorizingSecret: Data,
+        remainingWrappedDevicesAfterRemoval: Int
     ) throws -> DemotionResult {
-        guard env.blobs.contains(where: { $0.deviceId == deviceToRemove.id }) else {
-            // Already removed; idempotent.
-            return DemotionResult(wasLastDevice: false)
-        }
-        let next = env.blobs.filter { $0.deviceId != deviceToRemove.id }
-        if next.isEmpty {
-            // Removing the last enrolled device. The authorizing
-            // device IS the one being removed (the only one left).
-            // Restore the plain biometric item from the plaintext
-            // we just opened, drop the wrap envelope.
-            try KeyStore.save(authorizingPlaintext, forKey: KeyStoreKeys.masterMaterial, requireBiometric: true)
-            try KeyStore.delete(forKey: KeyStoreKeys.wrappedMasterMaterial)
+        // Proof-of-possession: only the authorizing device can produce
+        // a secret that unwraps its own CEK.
+        let cek = try recoverCek(device: authorizingDevice, secret: authorizingSecret)
+        if remainingWrappedDevicesAfterRemoval <= 0 {
+            // Last device: turn the second factor off. Recover the
+            // entropy via the CEK, re-seal the plain biometric item,
+            // drop the CEK envelope + passphrase slot.
+            guard let sealedEntropyHex = try KeyStore.loadString(forKey: KeyStoreKeys.sealedEntropyUnderCEK) else {
+                throw SandwichError.masterUnavailable
+            }
+            let entropy = try SecondFactorWrap.openEntropy(sealedEntropyHex, cek: cek)
+            let passphrase = (try KeyStore.loadString(forKey: KeyStoreKeys.passphraseUnder2FA)) ?? ""
+            let materialData = try JSONEncoder().encode(MasterMaterialPersisted(
+                entropyHex: bytesToHex(entropy),
+                passphrase: passphrase
+            ))
+            try KeyStore.save(materialData, forKey: KeyStoreKeys.masterMaterial, requireBiometric: true)
+            try KeyStore.delete(forKey: KeyStoreKeys.sealedEntropyUnderCEK)
+            try KeyStore.delete(forKey: KeyStoreKeys.passphraseUnder2FA)
             LogStore.shared.info("identity.wrap",
-                "demoted last device \(deviceToRemove.serial); restored biometric item")
+                "removed last second-factor device; restored plain biometric material")
             return DemotionResult(wasLastDevice: true)
-        } else {
-            try saveWrapEnvelope(WrapEnvelope(blobs: next))
-            LogStore.shared.info("identity.wrap",
-                "demoted \(deviceToRemove.serial); remaining enrollments=\(next.count)")
-            return DemotionResult(wasLastDevice: false)
         }
+        LogStore.shared.info("identity.wrap",
+            "removed a second-factor device; remaining wrapped=\(remainingWrappedDevicesAfterRemoval)")
+        return DemotionResult(wasLastDevice: false)
     }
 
     // MARK: -- recovery + reveal material
@@ -609,9 +420,8 @@ final class IdentitySandwich {
     func recoveryMaterial(localizedReason: String) throws -> MasterRecoveryMaterial {
         // In-session cache (populated at unlock / enrollment time)
         // wins over the biometric Keychain item. This is the only
-        // recovery path that works after `promoteToHardware` /
-        // `promoteWithSecret` have deleted the biometric item on
-        // first hardware enrollment.
+        // recovery path that works after `sealForSecondFactorEnroll`
+        // has deleted the biometric item on first enrollment.
         if let cached = sessionMaterial { return cached }
         guard let data = try KeyStore.load(
             forKey: KeyStoreKeys.masterMaterial,
@@ -632,11 +442,10 @@ final class IdentitySandwich {
     /// Populate the in-session recovery-material cache. Called by:
     ///   - `buildAndPersist` after a fresh onboarding or mnemonic
     ///     restore (we already have the material in hand).
-    ///   - `loadWrappedWithSecret` after a successful hardware
-    ///     unlock (we just opened the wrap blob and have plaintext).
-    ///   - `promoteWithSecret` / `promoteToHardware` after the first
-    ///     enrollment deletes the biometric item but before returning
-    ///     to the caller.
+    ///   - `loadWithSecondFactor` after a successful hardware unlock
+    ///     (we just opened the sealed entropy and have it in hand).
+    ///   - `sealForSecondFactorEnroll` (via the caller) after the first
+    ///     enrollment deletes the biometric item but before returning.
     func cacheRecoveryMaterial(_ m: MasterRecoveryMaterial) {
         self.sessionMaterial = m
     }
@@ -704,7 +513,7 @@ final class IdentitySandwich {
 
         try KeyStore.wipeAll()
 
-        // Persist master pubkey (non-biometric — it's public) and the
+        // Persist master pubkey (non-biometric, it's public) and the
         // combined material (biometric).
         try KeyStore.save(masterPk, forKey: KeyStoreKeys.masterPublicKey, requireBiometric: false)
         let persisted = MasterMaterialPersisted(

@@ -243,7 +243,7 @@ extension HardwareWallet {
 ///
 /// LocalizedError conformance is important: without it, the default
 /// Swift Error → NSError bridge produces "The operation couldn't be
-/// completed. (Maknoon.HardwareWalletError error 1.)" — generic and
+/// completed. (Maknoon.HardwareWalletError error 1.)", generic and
 /// useless. With it, `localizedDescription` returns the real
 /// `description` text, so callers that wrap by `error.localizedDescription`
 /// (the UniFFI Rust foreign-error path does this) surface the actual

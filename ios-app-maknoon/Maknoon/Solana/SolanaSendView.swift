@@ -277,7 +277,8 @@ struct SolanaSendView: View {
                     }
                 )) {
                     Text("SOL (native)").tag("sol")
-                    ForEach(availableTokens) { token in
+                    // Native first, then tokens alphabetically by symbol (ADR-0033 Phase 2b round-2).
+                    ForEach(availableTokens.sorted { $0.symbol.lowercased() < $1.symbol.lowercased() }) { token in
                         Text("\(token.symbol) - \(token.name)").tag(token.id)
                     }
                 }
@@ -442,7 +443,7 @@ struct SolanaSendView: View {
                 value: activeNetwork.displayName,
                 highlightTint: .purple
             )
-            ReviewRow(label: "Pay to", value: shortAddress(recipient.isEmpty ? "—" : recipient))
+            ReviewRow(label: "Pay to", value: shortAddress(recipient.isEmpty ? "-" : recipient))
             ReviewRow(
                 label: "Amount",
                 value: reviewAmountLine,
@@ -702,7 +703,7 @@ struct SolanaSendView: View {
             return
         }
         if !isHardware, store.sandwich == nil {
-            lastError = "Identity Sandwich is locked. Unlock from the Sandwich tab and retry."
+            lastError = "Maknoon is locked. Unlock from the Identity tab and retry."
             return
         }
         lastError = nil
@@ -830,7 +831,7 @@ struct SolanaSendView: View {
 
     @MainActor
     private func broadcastNow() async {
-        guard case .signed(let signedBase64, _) = state else { return }
+        guard case .signed(let signedBase64, let expiresAt) = state else { return }
         guard let descriptor else { return }
         let net = activeNetwork
         let rpcURL = store.solanaSettings.rpcURL(for: net)
@@ -869,11 +870,15 @@ struct SolanaSendView: View {
                 )
             }
         } catch {
+            // Broadcast-only failure: return to .signed with the SAME signed tx
+            // and its ORIGINAL expiry so the user can re-push without re-signing
+            // (no second device prompt). The expiry hint stays honest rather than
+            // resetting to now (mirrors Tron's broadcastNow).
             let msg = (error as? LocalizedError)?.errorDescription ?? "\(error)"
             lastError = msg
             state = .signed(
                 signedBase64: signedBase64,
-                expiresAt: Date()
+                expiresAt: expiresAt
             )
         }
     }
