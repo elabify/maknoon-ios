@@ -68,9 +68,6 @@ struct AboutView: View {
             row("Commit", buildCommit)
         } header: {
             Text("App")
-        } footer: {
-            Text("Match `Commit` against `/healthz` on the verifier server to confirm both sides are running the same revision.")
-                .font(.caption)
         }
     }
 
@@ -90,9 +87,6 @@ struct AboutView: View {
             }
         } header: {
             Text("Elabify")
-        } footer: {
-            Text("Maknoon and ElabifyCore are dual-licensed under Apache 2.0 or MIT, at your choice. No analytics and no telemetry: your recovery phrase, password, and private keys never leave the Secure Enclave / Keychain, and every network endpoint below is overridable or self-hostable. File feature requests and bug reports on GitHub.")
-                .font(.caption)
         }
     }
 
@@ -101,8 +95,7 @@ struct AboutView: View {
             credit("mempool.space", "Bitcoin fee estimates, block explorer, and the Electrum endpoint Maknoon uses by default", "https://mempool.space")
             credit("Blockstream", "Public Electrum servers and esplora APIs that Bitcoin wallets fall back on", "https://blockstream.info")
             credit("CoinGecko", "Fiat price feeds for Bitcoin display", "https://www.coingecko.com")
-            credit("Cloudflare", "Ethereum mainnet JSON-RPC endpoint", "https://cloudflare-eth.com")
-            credit("PublicNode", "Sepolia testnet JSON-RPC endpoint", "https://www.publicnode.com")
+            credit("PublicNode", "Default JSON-RPC for Ethereum mainnet + Sepolia, Polygon, and BNB Chain", "https://www.publicnode.com")
             credit("Arbitrum Foundation", "Arbitrum One + Sepolia RPC", "https://arbitrum.foundation")
             credit("Optimism", "OP Mainnet + Sepolia RPC", "https://www.optimism.io")
             credit("Base", "Base Mainnet + Sepolia RPC", "https://base.org")

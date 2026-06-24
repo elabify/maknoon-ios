@@ -16,12 +16,18 @@ struct PassportCardDetailView: View {
     @Environment(HolderStore.self) private var store
     @Environment(\.dismiss) private var dismiss
 
+    /// Advanced opt-in (Settings, Identity) to also show testnet anchor badges.
+    /// Off by default: the credential always shows, but testnet anchor chips
+    /// (Sepolia, Base Sepolia) are hidden unless the holder turns this on.
+    @AppStorage("maknoon.showTestnetAnchors") private var showTestnetAnchors = false
+
     /// Credential chosen for presentation (issued match when present, else a
     /// freshly minted self-signed one). Drives the Show-QR sheet.
     @State private var presentCredential: Credential?
     @State private var presentError: String?
     @State private var shareImage: ShareableImage?
     @State private var sharing = false
+    @State private var passiveAuthRunning = false
 
     private var doc: IDDocument? { store.idDocuments.documents.first { $0.id == documentId } }
 
@@ -33,6 +39,14 @@ struct PassportCardDetailView: View {
     }
 
     private var anchors: [AnchorEntry] { matchedCredential?.anchor?.anchors ?? [] }
+
+    /// Anchors shown on the card: production always, testnets only when the
+    /// holder opted in via Settings, Identity, Advanced.
+    private var shownAnchors: [AnchorEntry] {
+        anchors.filter {
+            ChainMark.isProduction($0.chain) || (showTestnetAnchors && ChainMark.isTestnet($0.chain))
+        }
+    }
 
     var body: some View {
         Group {
@@ -55,6 +69,15 @@ struct PassportCardDetailView: View {
                 }
                 .sheet(item: $shareImage) { wrap in
                     ActivityView(items: [wrap.image] + (wrap.link.map { [$0 as Any] } ?? []))
+                }
+                // Resolve the chip-authenticity badge on first appear (a safety
+                // net in case the post-import run hasn't finished or the app was
+                // relaunched); ensurePassiveAuth is a no-op once a result exists.
+                .task(id: documentId) {
+                    guard doc.passiveAuthResult == nil else { return }
+                    passiveAuthRunning = true
+                    await store.ensurePassiveAuth(for: doc)
+                    passiveAuthRunning = false
                 }
             } else {
                 Color.clear.onAppear { dismiss() }
@@ -140,9 +163,9 @@ struct PassportCardDetailView: View {
             // pinned-network strip — on-screen only. The shared picture omits
             // the registry / address / chain marks (ledger detail isn't part of
             // a shareable ID card) and uses a cleaner rectangular shape.
-            // Only when a PRODUCTION anchor exists; a testnet-only pin (e.g. the
-            // Sepolia staging anchor) shows the plain "NFC verified" state (ADR-0040).
-            if !forSharing && anchors.contains(where: { ChainMark.isProduction($0.chain) }) {
+            // Shown when there is an anchor to display: production always, plus
+            // testnets when the holder opted in (ADR-0040 / ADR-0043).
+            if !forSharing && !shownAnchors.isEmpty {
                 pinnedStrip(fg: fg)
                     .padding(.top, 9)
             }
@@ -182,23 +205,31 @@ struct PassportCardDetailView: View {
 
     @ViewBuilder
     private func genuineSeal(_ doc: IDDocument, fg: Color) -> some View {
-        let g = genuineState(doc)
-        HStack(spacing: 7) {
-            Image(systemName: g.icon)
-                .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(.white)
-                .frame(width: 21, height: 21)
-                .background(g.color, in: Circle())
-            Text(LocalizedStringKey(g.label)).font(.callout.weight(.semibold)).foregroundStyle(fg)
+        if passiveAuthRunning && doc.passiveAuthResult == nil {
+            // Authenticity check in flight (first import / first open): show a
+            // neutral "Checking…" state instead of a premature "Not verified".
+            HStack(spacing: 7) {
+                ProgressView().controlSize(.small)
+                Text("Checking authenticity…").font(.callout.weight(.semibold)).foregroundStyle(fg)
+            }
+        } else {
+            let g = genuineState(doc)
+            HStack(spacing: 7) {
+                Image(systemName: g.icon)
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 21, height: 21)
+                    .background(g.color, in: Circle())
+                Text(LocalizedStringKey(g.label)).font(.callout.weight(.semibold)).foregroundStyle(fg)
+            }
         }
     }
 
     @ViewBuilder
     private func pinnedStrip(fg: Color) -> some View {
-        // Show production chains only; testnet anchors (Sepolia, Base Sepolia)
-        // are hidden from end users and live admin-only in the issuer console
-        // (ADR-0040).
-        let shown = anchors.filter { ChainMark.isProduction($0.chain) }
+        // Production anchors always; testnet anchors only when the holder opted
+        // in (Settings, Identity, Advanced, "Show testnet anchors").
+        let shown = shownAnchors
         let primary = shown.first
         HStack(spacing: 10) {
             if let primary, let url = ChainMark.explorerAddressURL(chain: primary.chain, address: primary.registry) {
@@ -486,10 +517,14 @@ struct PassportCardDetailView: View {
         let b = [UInt8](dg12)
         var i = 0
         while i + 2 < b.count {
-            // BER-TLV tag 0x5F26, short-form length (date is 8 bytes).
+            // BER-TLV tag 0x5F26 (date is 8 bytes). Accept short-form length
+            // (0x08) and long-form one-byte length (0x81 0x08); some issuers
+            // encode it long-form, which a short-form-only scan would miss.
             if b[i] == 0x5F, b[i + 1] == 0x26 {
-                let len = Int(b[i + 2])
-                let start = i + 3
+                var p = i + 2
+                var len = Int(b[p])
+                if len == 0x81, p + 1 < b.count { p += 1; len = Int(b[p]) }
+                let start = p + 1
                 if len == 8, start + len <= b.count {
                     let s = String(decoding: b[start..<start + len], as: UTF8.self)
                     if s.count == 8, s.allSatisfy(\.isNumber) {

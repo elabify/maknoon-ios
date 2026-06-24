@@ -101,21 +101,23 @@ struct HardwareUnlockView: View {
         } message: {
             Text("Wipes your locked keys, every registered device, every credential, and every chain wallet. After reset you can restore from your encrypted backup or your 24-word paper seed and re-register your security keys. Only do this if every enrolled security key is lost.")
         }
-        .alert("YubiKey PIN", isPresented: $showYubiKeyPINPrompt) {
-            SecureField("PIN", text: $yubiKeyPin)
-            Button("Continue") {
-                guard let pendingId = pendingYubiKeyRow,
-                      let row = rows.first(where: { $0.device.id == pendingId })
-                else { return }
-                pendingYubiKeyRow = nil
-                Task { await unlock(with: row) }
-            }
-            Button("Cancel", role: .cancel) {
-                pendingYubiKeyRow = nil
-                yubiKeyPin = ""
-            }
-        } message: {
-            Text("Enter your YubiKey's FIDO2 PIN to unlock.")
+        .sheet(isPresented: $showYubiKeyPINPrompt) {
+            PINEntrySheet(
+                title: "YubiKey PIN",
+                message: "Enter your YubiKey's FIDO2 PIN to unlock.",
+                pin: $yubiKeyPin,
+                onSubmit: {
+                    guard let pendingId = pendingYubiKeyRow,
+                          let row = rows.first(where: { $0.device.id == pendingId })
+                    else { return }
+                    pendingYubiKeyRow = nil
+                    Task { await unlock(with: row) }
+                },
+                onCancel: {
+                    pendingYubiKeyRow = nil
+                    yubiKeyPin = ""
+                }
+            )
         }
         .sheet(item: $pendingReadyOp) { op in
             DeviceReadyConfirmationSheet(

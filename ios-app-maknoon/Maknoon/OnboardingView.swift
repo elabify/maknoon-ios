@@ -3,22 +3,21 @@
 // Flow (per the Maknoon onboarding spec):
 //
 //   welcome
-//      ├─ create new identity ─►  reveal ─►  verify ─►  passphraseEntry ─►  encryptedBackup ─►  done
-//      │                            └─ skip-for-now ───────────►  passphraseEntry (no verify)
+//      ├─ create new identity ─►  passphraseEntry ─►  provisioning ─►
+//      │                          encryptedBackup ─►  passportScan ─►  recommendWallet ─►  done
+//      │                              └─ skip (not recommended) ─►  passportScan ─►  …
 //      └─ restore ─►  RecoveryView (separate)
 //
 // Notes:
-//   - Reveal happens BEFORE passphrase. The entropy is generated up
-//     front (no Keychain write yet); the sandwich is only persisted
-//     once the user has set a passphrase.
-//   - Verify has no Skip: the choice to skip lives on the reveal
-//     screen. Verify only has Back (which returns to reveal).
+//   - The 24-word seed phrase is NOT shown or verified during onboarding;
+//     it stays viewable later in Settings, Local Key. The encrypted backup
+//     is the primary recovery path. (The reveal/verify views below are kept
+//     only for the restore flow's re-reveal affordance.)
 //   - Passphrase is MANDATORY. There is no "skip passphrase" branch.
-//     The combined entry + confirmation screen also doubles as a
-//     last-call reminder to save it to a password manager.
-//   - Encrypted backup screen is vendor-neutral; on free Apple ID
-//     teams the upload step fails at runtime with a clear message
-//     because CloudKit needs the paid Developer Program.
+//   - The encrypted backup can be skipped (not recommended); it can be
+//     created later from Settings. On free Apple ID teams the upload step
+//     fails at runtime with a clear message because CloudKit needs the paid
+//     Developer Program.
 
 import SwiftUI
 
@@ -50,7 +49,6 @@ struct OnboardingView: View {
     @State private var confirmedOffline = false
     @State private var passphrase = ""
     @State private var passphraseConfirm = ""
-    @State private var confirmedSavedToPasswordManager = false
     @State private var pendingEntropy: Data?
     @State private var pendingWords: [String] = []
     @State private var pendingSandwich: IdentitySandwich?
@@ -131,7 +129,7 @@ struct OnboardingView: View {
                         .multilineTextAlignment(.center)
                     }
                     VStack(alignment: .leading, spacing: 12) {
-                        bullet("Scan a passport into your phone with post-quantum encryption")
+                        bullet("Verify and share your passport as a digital identity")
                         bullet("Manage digital assets with a secure hardware wallet")
                         bullet("Privately use your identity and assets with those you verify and trust")
                     }
@@ -283,18 +281,12 @@ struct OnboardingView: View {
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Password").font(.caption).foregroundStyle(.secondary)
-                    SecureField("", text: $passphrase)
-                        .textFieldStyle(.roundedBorder)
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
+                    RevealableSecureField(text: $passphrase)
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Confirm password").font(.caption).foregroundStyle(.secondary)
-                    SecureField("", text: $passphraseConfirm)
-                        .textFieldStyle(.roundedBorder)
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
+                    RevealableSecureField(text: $passphraseConfirm)
                 }
 
                 if !passphrase.isEmpty,
@@ -316,12 +308,6 @@ struct OnboardingView: View {
                 .background(Color.orange.opacity(0.12))
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
 
-                Toggle(isOn: $confirmedSavedToPasswordManager) {
-                    Text("I have saved this password").font(.callout)
-                }
-                .toggleStyle(.switch)
-                .tint(.purple)
-
                 Button(action: { Task { await buildSandwich() } }) {
                     Text("Continue").frame(maxWidth: .infinity)
                 }
@@ -329,7 +315,6 @@ struct OnboardingView: View {
                 .disabled(
                     passphrase.isEmpty
                     || passphrase != passphraseConfirm
-                    || !confirmedSavedToPasswordManager
                 )
 
                 if let errorMessage {
@@ -363,6 +348,16 @@ struct OnboardingView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(backupWorking)
+
+                Button(action: { beginPostIdentitySteps() }) {
+                    Text("Skip, not recommended").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .disabled(backupWorking)
+
+                Text("Without a backup, losing this phone means losing your identity and any software wallet keys. You can still create one later in Settings.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
         .fileExporter(
@@ -522,7 +517,7 @@ struct OnboardingView: View {
             TapIDDocumentSheet(onFinish: { _ in
                 showOnboardingPassport = false
                 phase = .recommendWallet
-            }).environment(store)
+            }, skipKindPicker: true).environment(store)
         }
     }
 
@@ -533,7 +528,7 @@ struct OnboardingView: View {
             VStack(alignment: .leading, spacing: 16) {
                 Label("Create your first wallet", systemImage: "creditcard")
                     .font(.title3.weight(.semibold))
-                Text("Maknoon supports many networks, and even anchors temporary verified credentials on some of them. For holding value, though, we only recommend Bitcoin: it is the only cryptocurrency proven as a long-term store of value. The safest option is a hardware wallet; a software Bitcoin wallet is convenient for small amounts.")
+                Text("Maknoon supports many digital asset networks. For holding value, we only recommend Bitcoin: it is the only cryptocurrency proven as a long-term store of value. The safest option is a hardware wallet, but a software Bitcoin wallet is convenient for small amounts.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
 
@@ -555,18 +550,6 @@ struct OnboardingView: View {
                 Button(action: { completeOnboarding() }) {
                     Text("Skip for now").frame(maxWidth: .infinity)
                 }
-
-                VStack(alignment: .leading, spacing: 6) {
-                    Label("For meaningful amounts, use a hardware wallet", systemImage: "snowflake")
-                        .font(.callout.weight(.medium))
-                        .foregroundStyle(.blue)
-                    Text("A software wallet is convenient for small amounts. A separate hardware wallet keeps your keys offline for larger holdings.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(12)
-                .background(Color.blue.opacity(0.10))
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
         }
         .sheet(isPresented: $showHardwarePicker) {
@@ -616,6 +599,5 @@ struct OnboardingView: View {
         passphrase = ""
         passphraseConfirm = ""
         confirmedOffline = false
-        confirmedSavedToPasswordManager = false
     }
 }

@@ -418,29 +418,7 @@ struct IDDocumentDetailView: View {
         if !force, doc.passiveAuthResult != nil { return }
         passiveAuthRunning = true
         defer { passiveAuthRunning = false }
-
-        let cscaSource = store.knownIssuers.hosts
-            .compactMap { store.knownIssuers.outboundBaseURL(forEntry: $0) }
-            .first
-        if let cscaSource {
-            await CSCATrustStore.shared.refresh(from: cscaSource, force: force)
-        }
-        let cafileURL = await CSCATrustStore.shared.cafileURL
-        let version = await CSCATrustStore.shared.version
-
-        let sod = store.idDocuments.sodBytes(for: doc)
-        var dgs: [String: Data] = [:]
-        for g in ["dg1", "dg2", "dg11", "dg12", "dg15"] {
-            if let b = store.idDocuments.rawDataGroup(g, for: doc) { dgs[g] = b }
-        }
-        let result = PassportPassiveAuthVerifier.verify(
-            sod: sod,
-            dataGroups: dgs,
-            issuingAlpha3: doc.issuingAuthority,
-            cafileURL: cafileURL,
-            bundleVersion: version
-        )
-        store.idDocuments.setPassiveAuthResult(result, for: doc.id)
+        await store.ensurePassiveAuth(for: doc, force: force)
     }
 
     /// Host string shown in the "Submitting to …" line during the

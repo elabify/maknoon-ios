@@ -128,3 +128,36 @@ enum PassportPassiveAuthVerifier {
         #endif
     }
 }
+
+extension HolderStore {
+    /// Run passive authentication (the CSCA chain check) for a document and
+    /// persist the result. No-op when a result already exists unless `force`.
+    /// Centralised so it runs both right after import AND on a detail view's
+    /// appear, so the genuineness badge is correct the first time a passport is
+    /// shown (not only after opening Advanced).
+    func ensurePassiveAuth(for doc: IDDocument, force: Bool = false) async {
+        if !force, doc.passiveAuthResult != nil { return }
+        let cscaSource = knownIssuers.hosts
+            .compactMap { knownIssuers.outboundBaseURL(forEntry: $0) }
+            .first
+        if let cscaSource {
+            await CSCATrustStore.shared.refresh(from: cscaSource, force: force)
+        }
+        let cafileURL = await CSCATrustStore.shared.cafileURL
+        let version = await CSCATrustStore.shared.version
+
+        let sod = idDocuments.sodBytes(for: doc)
+        var dgs: [String: Data] = [:]
+        for g in ["dg1", "dg2", "dg11", "dg12", "dg15"] {
+            if let b = idDocuments.rawDataGroup(g, for: doc) { dgs[g] = b }
+        }
+        let result = PassportPassiveAuthVerifier.verify(
+            sod: sod,
+            dataGroups: dgs,
+            issuingAlpha3: doc.issuingAuthority,
+            cafileURL: cafileURL,
+            bundleVersion: version
+        )
+        idDocuments.setPassiveAuthResult(result, for: doc.id)
+    }
+}

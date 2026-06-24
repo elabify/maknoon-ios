@@ -59,18 +59,18 @@ struct DeviceDetailView: View {
         .onAppear {
             if let dev = device { renameDraft = dev.label }
         }
-        .alert("YubiKey PIN", isPresented: $showYubiKeyPINPrompt) {
-            SecureField("PIN", text: $yubiKeyPin)
-            Button("Continue") {
-                if let dev = device {
-                    Task { await promoteToIdentity(dev) }
-                }
-            }
-            Button("Cancel", role: .cancel) {
-                yubiKeyPin = ""
-            }
-        } message: {
-            Text("If your YubiKey has a FIDO2 PIN, enter it now. Leave blank if the key has no PIN (it will register as a tap-only key).")
+        .sheet(isPresented: $showYubiKeyPINPrompt) {
+            PINEntrySheet(
+                title: "YubiKey PIN",
+                message: "If your YubiKey has a FIDO2 PIN, enter it now. Leave blank if the key has no PIN (it will register as a tap-only key).",
+                pin: $yubiKeyPin,
+                onSubmit: {
+                    if let dev = device {
+                        Task { await promoteToIdentity(dev) }
+                    }
+                },
+                onCancel: { yubiKeyPin = "" }
+            )
         }
         .alert("Registered without a PIN", isPresented: $noPinWarning) {
             Button("OK", role: .cancel) {}

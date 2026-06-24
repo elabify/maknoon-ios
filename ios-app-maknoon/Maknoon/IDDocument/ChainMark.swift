@@ -14,6 +14,8 @@ struct ChainMark {
     let glyph: String
     let color: Color
     let isTestnet: Bool
+    /// Short red caption shown under a testnet chip (e.g. "Sepolia", "Devnet").
+    var testnetLabel: String = "TEST"
 
     /// Chains shown to end users. Testnets (Sepolia eip155:11155111, Base Sepolia
     /// eip155:84532, anvil, devnets) are anchored for testing but never rendered
@@ -22,10 +24,16 @@ struct ChainMark {
     /// has no "sepolia" substring to match on).
     static let productionChains: Set<String> = ["eip155:1", "eip155:8453"]
 
-    /// True for chains the clients display. Drives the anchor filter so testnet
-    /// pins (incl. the current Sepolia anchor) never appear on the passport card.
+    /// True for chains the clients display by default. Drives the anchor filter
+    /// so testnet pins are hidden unless the holder opts in (Settings, Identity,
+    /// Advanced, "Show testnet anchors").
     static func isProduction(_ caip2: String) -> Bool {
         productionChains.contains(caip2.lowercased())
+    }
+
+    /// True for testnet / dev chains (Sepolia, Base Sepolia, Solana devnet, anvil).
+    static func isTestnet(_ caip2: String) -> Bool {
+        forCAIP2(caip2).isTestnet
     }
 
     static func forCAIP2(_ caip2: String) -> ChainMark {
@@ -34,9 +42,11 @@ struct ChainMark {
         case id == "eip155:1":
             return ChainMark(name: "Ethereum", assetName: "ChainEthereum", glyph: "Ξ", color: Color(hex: 0x627eea), isTestnet: false)
         case id == "eip155:11155111":
-            return ChainMark(name: "Sepolia", assetName: "ChainEthereum", glyph: "Ξ", color: Color(hex: 0x627eea), isTestnet: true)
+            return ChainMark(name: "Ethereum Sepolia", assetName: "ChainEthereum", glyph: "Ξ", color: Color(hex: 0x627eea), isTestnet: true, testnetLabel: "Sepolia")
         case id == "eip155:8453":
-            return ChainMark(name: "Base", assetName: nil, glyph: "B", color: Color(hex: 0x0052ff), isTestnet: false)
+            return ChainMark(name: "Base", assetName: "ChainBase", glyph: "B", color: Color(hex: 0x0052ff), isTestnet: false)
+        case id == "eip155:84532":
+            return ChainMark(name: "Base Sepolia", assetName: "ChainBase", glyph: "B", color: Color(hex: 0x0052ff), isTestnet: true, testnetLabel: "Sepolia")
         case id == "eip155:42161":
             return ChainMark(name: "Arbitrum", assetName: nil, glyph: "A", color: Color(hex: 0x28a0f0), isTestnet: false)
         case id == "eip155:137":
@@ -45,7 +55,7 @@ struct ChainMark {
             return ChainMark(name: "EVM", assetName: "ChainEthereum", glyph: "Ξ", color: Color(hex: 0x627eea), isTestnet: false)
         case id.hasPrefix("solana:"):
             let test = id.contains("devnet") || id.contains("testnet")
-            return ChainMark(name: "Solana", assetName: "ChainSolana", glyph: "◎", color: Color(hex: 0x9945ff), isTestnet: test)
+            return ChainMark(name: "Solana", assetName: "ChainSolana", glyph: "◎", color: Color(hex: 0x9945ff), isTestnet: test, testnetLabel: "Devnet")
         case id.hasPrefix("bip122:"), id.contains("bitcoin"):
             return ChainMark(name: "Bitcoin", assetName: "ChainBitcoin", glyph: "₿", color: Color(hex: 0xf7931a), isTestnet: false)
         case id.hasPrefix("tron:"), id.contains("tron"):
@@ -64,6 +74,7 @@ struct ChainMark {
         case id == "eip155:1":         base = "https://etherscan.io/address/"
         case id == "eip155:11155111":  base = "https://sepolia.etherscan.io/address/"
         case id == "eip155:8453":      base = "https://basescan.org/address/"
+        case id == "eip155:84532":     base = "https://sepolia.basescan.org/address/"
         case id == "eip155:42161":     base = "https://arbiscan.io/address/"
         case id == "eip155:137":       base = "https://polygonscan.com/address/"
         case id.hasPrefix("solana:"):  base = "https://explorer.solana.com/address/"
@@ -110,9 +121,9 @@ struct ChainMarkChip: View {
                 )
             )
             if mark.isTestnet {
-                // A clearly-visible red "TEST" pill (white on red), so a testnet
-                // anchor like Sepolia never reads as production trust.
-                Text("TEST")
+                // A clearly-visible red pill naming the testnet (e.g. "Sepolia"),
+                // so a testnet anchor never reads as production trust.
+                Text(mark.testnetLabel)
                     .font(.system(size: 7, weight: .heavy))
                     .foregroundStyle(.white)
                     .padding(.horizontal, 3).padding(.vertical, 1)
@@ -120,7 +131,7 @@ struct ChainMarkChip: View {
                     .fixedSize()
             }
         }
-        .frame(width: size + 8)
+        .frame(width: max(size + 8, mark.isTestnet ? 44 : size + 8))
         .accessibilityLabel(mark.isTestnet ? "\(mark.name) testnet" : mark.name)
     }
 }

@@ -20,13 +20,23 @@ struct IdentitySettingsView: View {
     @State private var cscaRefreshedAt: Date?
     @State private var cscaUpdating = false
 
+    /// Advanced disclosure state (0.6.1 friendliness pass): the technical
+    /// controls a normal user rarely touches are collapsed by default.
+    @State private var showAdvanced = false
+    /// Opt-in to show testnet anchor badges on credential cards (off by default).
+    @AppStorage("maknoon.showTestnetAnchors") private var showTestnetAnchors = false
+
     var body: some View {
         Form {
             biometricSection
-            registeredSection
-            knownIssuersSection
-            cscaSection
-            relaySection
+            advancedToggleSection
+            if showAdvanced {
+                showTestnetAnchorsSection
+                registeredSection
+                knownIssuersSection
+                cscaSection
+                relaySection
+            }
         }
         .navigationTitle("Identity")
         .navigationBarTitleDisplayMode(.inline)
@@ -194,21 +204,44 @@ struct IdentitySettingsView: View {
 
     // MARK: -- always-on biometric / passcode
 
+    // Tap-to-expand "Advanced" row: reveals the technical sections below.
+    private var advancedToggleSection: some View {
+        Section {
+            Button {
+                withAnimation { showAdvanced.toggle() }
+            } label: {
+                HStack {
+                    Text("Advanced").foregroundStyle(.primary)
+                    Spacer()
+                    Image(systemName: showAdvanced ? "chevron.down" : "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    private var showTestnetAnchorsSection: some View {
+        Section {
+            Toggle("Show testnet anchors", isOn: $showTestnetAnchors)
+        } footer: {
+            Text("Show ledger-anchor badges for testnets (Sepolia, Base Sepolia) on credential cards. Off by default; the credential itself always shows.")
+                .font(.caption)
+        }
+    }
+
     private var biometricSection: some View {
         Section {
             HStack {
                 Image(systemName: "cpu.fill").foregroundStyle(.blue)
                 VStack(alignment: .leading) {
-                    Text("Secure Enclave Signing").font(.callout.weight(.semibold))
-                    Text("Required for every sensitive operation. Authorized by your preferred configured biometric, passcode, or second factor.")
+                    Text("Mobile Phone Signing").font(.callout.weight(.semibold))
+                    Text("Authorized by your preferred configured biometric, phone passcode, or optional hardware second factor.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
         } header: {
             Text("On-device authorization")
-        } footer: {
-            Text("Always on. Cannot be disabled.")
-                .font(.caption)
         }
     }
 
@@ -235,7 +268,7 @@ struct IdentitySettingsView: View {
         } header: {
             Text("Hardware second factor")
         } footer: {
-            Text("Enabling a hardware device adds extra protection for your identity and asset transactions. The device is then required to unlock; if you lose it, restore from your 24-word recovery phrase.")
+            Text("Enabling a hardware device adds extra protection for your identity and asset transactions. The device is then required to unlock.")
                 .font(.caption)
         }
     }
@@ -289,7 +322,7 @@ struct IdentitySettingsView: View {
         } header: {
             Text("Presentation relay")
         } footer: {
-            Text("When on, you can share a verified credential over the internet using a private one-time link. Turn it off to share only by QR code.")
+            Text("When on, you can share a verified credential over the internet using a private one-time link. Turn it off to share only by offline QR code.")
                 .font(.caption)
         }
     }

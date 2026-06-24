@@ -103,10 +103,10 @@ struct AddHardwareDeviceFlow: View {
 
     private func kindHint(_ kind: DeviceKind) -> String {
         switch kind {
-        case .ledger:     return "Bluetooth hardware wallet for Bitcoin, Ethereum, Solana, and Tron."
-        case .trezor:     return "Bluetooth hardware wallet for Bitcoin, Ethereum, Solana, and Tron."
+        case .ledger:     return "Bluetooth hardware wallets"
+        case .trezor:     return "Bluetooth hardware wallets"
         case .seedsigner: return "Air-gapped Bitcoin signer paired by scanning QR codes."
-        case .yubikey:    return "Security key that protects your wallet."
+        case .yubikey:    return "Security key for hardware second factor."
         }
     }
 

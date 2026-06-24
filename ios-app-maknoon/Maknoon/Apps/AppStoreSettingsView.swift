@@ -8,6 +8,7 @@ struct AppStoreSettingsView: View {
     @Environment(HolderStore.self) private var store
 
     @State private var showAddSheet = false
+    @State private var showAdvanced = false
 
     var body: some View {
         Form {
@@ -25,6 +26,20 @@ struct AppStoreSettingsView: View {
                     .font(.caption)
             }
 
+            Section {
+                Button {
+                    withAnimation { showAdvanced.toggle() }
+                } label: {
+                    HStack {
+                        Text("Advanced").foregroundStyle(.primary)
+                        Spacer()
+                        Image(systemName: showAdvanced ? "chevron.down" : "chevron.right")
+                            .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            if showAdvanced {
             Section {
                 if store.appStores.userStores.isEmpty {
                     Text("No additional Apps catalogs configured.")
@@ -57,6 +72,7 @@ struct AppStoreSettingsView: View {
                 ))
             } header: {
                 Text("Beta apps")
+            }
             }
         }
         .navigationTitle("Apps")

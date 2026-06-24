@@ -86,21 +86,23 @@ struct RemoveFromSandwichSheet: View {
                     .disabled(inFlight)
                 }
             }
-            .alert("YubiKey PIN", isPresented: $showPINPrompt) {
-                SecureField("PIN", text: $pin)
-                Button("Continue") {
-                    if let id = pendingAuthorizerId,
-                       let row = enrolledRows.first(where: { $0.device.id == id }) {
+            .sheet(isPresented: $showPINPrompt) {
+                PINEntrySheet(
+                    title: "YubiKey PIN",
+                    message: "Enter your YubiKey FIDO2 PIN to authorize.",
+                    pin: $pin,
+                    onSubmit: {
+                        if let id = pendingAuthorizerId,
+                           let row = enrolledRows.first(where: { $0.device.id == id }) {
+                            pendingAuthorizerId = nil
+                            Task { await authorizeAndDemote(via: row) }
+                        }
+                    },
+                    onCancel: {
                         pendingAuthorizerId = nil
-                        Task { await authorizeAndDemote(via: row) }
+                        pin = ""
                     }
-                }
-                Button("Cancel", role: .cancel) {
-                    pendingAuthorizerId = nil
-                    pin = ""
-                }
-            } message: {
-                Text("Enter your YubiKey FIDO2 PIN to authorize.")
+                )
             }
             .sheet(item: $pendingReadyOp) { op in
                 DeviceReadyConfirmationSheet(

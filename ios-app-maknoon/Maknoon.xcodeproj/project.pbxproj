@@ -36,6 +36,7 @@
 		1B44F8758505FDEB27970BD1 /* AppAttestVerifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7731704DB7EF3249B51DAC3 /* AppAttestVerifier.swift */; };
 		1BC662600CC4C011B909BE60 /* IDDocumentCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD727F20C7D3E99123272BA8 /* IDDocumentCard.swift */; };
 		1D62C327CF2D60AE5DAC8598 /* LocalPassportCredentialTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05C1D115C59094CAEA05FDA1 /* LocalPassportCredentialTests.swift */; };
+		1E6CEC29919045B8B53564BC /* RevealableSecureField.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD1E646B5953CB0436ABA28A /* RevealableSecureField.swift */; };
 		1F431B4D55497500D86F57DE /* TronReceiveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 238725740C17047D9618C4F5 /* TronReceiveView.swift */; };
 		21368065EDB2B3CDC778833C /* IdentityBridgeHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DBAC208B2138A44D9547884 /* IdentityBridgeHandler.swift */; };
 		217B4C71E73A31DDAA18E0DE /* TrezorPairing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 421B1C054BCEF0CF8B8992D0 /* TrezorPairing.swift */; };
@@ -590,6 +591,7 @@
 		CB19E3D01620F179DD1818F1 /* Bech32.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bech32.swift; sourceTree = "<group>"; };
 		CC64F2BA18F4E17047518E7C /* LockScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LockScreen.swift; sourceTree = "<group>"; };
 		CC6AA1A9224439F983C1BF1F /* EthereumNetworkPickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EthereumNetworkPickerSheet.swift; sourceTree = "<group>"; };
+		CD1E646B5953CB0436ABA28A /* RevealableSecureField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevealableSecureField.swift; sourceTree = "<group>"; };
 		CD5642A874242550314C46DA /* EthereumToken.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EthereumToken.swift; sourceTree = "<group>"; };
 		CD7D11A8B1FF116189BAD1D1 /* TronWallet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TronWallet.swift; sourceTree = "<group>"; };
 		CD83F549B7F16E9F885D87D8 /* SolanaSPLTransferBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SolanaSPLTransferBuilder.swift; sourceTree = "<group>"; };
@@ -1113,6 +1115,7 @@
 				2439E298CE25EF2B8BAEA253 /* ReceiveView.swift */,
 				D2F7AC09291DA964D61A1A1A /* RecoveryView.swift */,
 				A22D1233790B8BD232F680C8 /* RelaySettings.swift */,
+				CD1E646B5953CB0436ABA28A /* RevealableSecureField.swift */,
 				491F12D271EC69DD66FDDDD2 /* ScanVerifierSheet.swift */,
 				F104DB45B0857837DC368132 /* SecondFactorWrap.swift */,
 				D1AFB881941FCB8D89DA2DFE /* SemVer.swift */,
@@ -1597,6 +1600,7 @@
 				11F8124DFA80D02EDFEE6083 /* RegisteredDevice.swift in Sources */,
 				5216348C55524CCFDD808522 /* RelaySettings.swift in Sources */,
 				7DD027E9A58B18D358308652 /* RemoveFromSandwichSheet.swift in Sources */,
+				1E6CEC29919045B8B53564BC /* RevealableSecureField.swift in Sources */,
 				AC4931D3EB2BBE1ECD575B71 /* SanctionsScreeningClient.swift in Sources */,
 				EF5EBD0D5925FD2855F6FC97 /* SandwichLockedBanner.swift in Sources */,
 				9D6EABF8A70F0A48BEA93F95 /* ScanVerifierSheet.swift in Sources */,
@@ -1737,7 +1741,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = PQ34VD5384;
 				ELABIFY_BUILD_COMMIT = dev;
@@ -1752,7 +1756,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.6.0;
+				MARKETING_VERSION = 0.6.1;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1818,7 +1822,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = PQ34VD5384;
 				ELABIFY_BUILD_COMMIT = dev;
@@ -1839,7 +1843,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.6.0;
+				MARKETING_VERSION = 0.6.1;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

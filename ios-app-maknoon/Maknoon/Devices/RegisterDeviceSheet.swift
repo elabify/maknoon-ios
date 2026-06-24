@@ -128,7 +128,7 @@ struct RegisterDeviceSheet: View {
                 // hmac-secret enroll). Enrollment needs FIDO2, which iPhone only
                 // exposes over NFC, so there is no USB-C path here.
                 TextField("Label (e.g. \"Backup key\")", text: $label)
-                SecureField("FIDO2 PIN (leave blank if the key has none)", text: $yubiKeyPin)
+                RevealableSecureField(placeholder: "FIDO2 PIN (leave blank if the key has none)", text: $yubiKeyPin, keyboardType: .numberPad)
                 Button {
                     transport = .nfc
                     Task { await registerAndEnrollYubiKey() }

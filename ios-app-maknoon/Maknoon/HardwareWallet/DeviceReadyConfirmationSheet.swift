@@ -124,10 +124,7 @@ struct DeviceReadyConfirmationSheet: View {
                 }
                 if requiresPassphrase {
                     Section {
-                        SecureField("Hidden-wallet passphrase", text: $passphrase)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                            .submitLabel(.done)
+                        RevealableSecureField(placeholder: "Hidden-wallet passphrase", text: $passphrase)
                     } header: {
                         Text("Hidden wallet")
                     } footer: {

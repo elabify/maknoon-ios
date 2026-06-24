@@ -269,7 +269,7 @@ struct SettingsView: View {
             }
             recoverySection
             if !BackupState.lockdownEnabled {
-                lockdownSectionInline
+                advancedLocalKeySection
             }
         }
         .navigationTitle("Local Key")
@@ -281,20 +281,10 @@ struct SettingsView: View {
     @ViewBuilder
     private var recoverySection: some View {
         Section {
-            if !BackupState.lockdownEnabled {
-                Button {
-                    Task { await revealPhrase() }
-                } label: {
-                    Label("Show seed phrase", systemImage: "doc.text.viewfinder")
-                }
-                Button {
-                    route = .verifyPhrase
-                } label: {
-                    Label("Verify seed phrase", systemImage: "checkmark.shield")
-                }
-            }
             // Verifying an encrypted backup only needs the file + the
-            // passphrase, so it stays available even under Lockdown.
+            // passphrase, so it stays available even under Lockdown. It is the
+            // only recovery action shown to normal users; the seed-phrase tools
+            // and Lockdown live under Advanced (0.6.1 friendliness pass).
             Button {
                 route = .verifyBackup
             } label: {
@@ -307,24 +297,36 @@ struct SettingsView: View {
             }
         } header: {
             Text("Recovery")
-        } footer: {
-            Text("Show or verify your 24-word seed phrase for advanced or offline use. Verify encrypted backup tests that a saved backup file opens with your password, without changing anything on this device.")
         }
     }
 
+    // Advanced: seed-phrase tools + Lockdown, collapsed by default (only shown
+    // when not already locked down).
     @ViewBuilder
-    private var lockdownSectionInline: some View {
+    private var advancedLocalKeySection: some View {
         Section {
-            Button(role: .destructive) {
-                lockdownStep = .explain
-                route = .lockdown
-            } label: {
-                Label("Lockdown wallet…", systemImage: "lock.shield")
+            DisclosureGroup("Advanced") {
+                Button {
+                    Task { await revealPhrase() }
+                } label: {
+                    Label("Show seed phrase", systemImage: "doc.text.viewfinder")
+                }
+                Button {
+                    route = .verifyPhrase
+                } label: {
+                    Label("Verify seed phrase", systemImage: "checkmark.shield")
+                }
+                Button(role: .destructive) {
+                    lockdownStep = .explain
+                    route = .lockdown
+                } label: {
+                    Label("Lockdown wallet…", systemImage: "lock.shield")
+                }
+                // Inside the disclosure so it only shows when Advanced is expanded.
+                Text("Lockdown irreversibly removes the option to view your recovery phrase on this device. Useful after you have written it down and stored it safely; the only way to recover after Lockdown is from your offline paper or an encrypted backup.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
-        } header: {
-            Text("Lockdown")
-        } footer: {
-            Text("Irreversibly removes the option to view your recovery phrase on this device. Useful after you have written it down and stored it safely. The only way to recover after Lockdown is from your offline paper or an encrypted backup.")
         }
     }
 

@@ -6036,36 +6036,36 @@
         }
       }
     },
-    "Date of birth (YY/MM/DD)": {
+    "Date of birth (YYYY-MM-DD)": {
       "extractionState": "manual",
       "localizations": {
         "ar": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "تاريخ الميلاد (سس/شش/يي)"
+            "state": "translated",
+            "value": "تاريخ الميلاد (سسسس-شش-يي)"
           }
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "出生日期（YY/MM/DD）"
+            "state": "translated",
+            "value": "出生日期（YYYY-MM-DD）"
           }
         }
       }
     },
-    "Date of expiry (YY/MM/DD)": {
+    "Date of expiry (YYYY-MM-DD)": {
       "extractionState": "manual",
       "localizations": {
         "ar": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "تاريخ الانتهاء (سس/شش/يي)"
+            "state": "translated",
+            "value": "تاريخ الانتهاء (سسسس-شش-يي)"
           }
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "到期日期（YY/MM/DD）"
+            "state": "translated",
+            "value": "到期日期（YYYY-MM-DD）"
           }
         }
       }

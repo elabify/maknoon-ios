@@ -47,36 +47,37 @@ struct CurrencySettingsView: View {
                 }
 
                 Section {
-                    TextField("CoinGecko base URL", text: $prefs.coinGeckoBaseURL)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .keyboardType(.URL)
-                        .onChange(of: prefs.coinGeckoBaseURL) { _, _ in
-                            store.assetPrices.refreshAll(fiat: prefs.code)
-                        }
-                    TextField("USD FX rates URL", text: $prefs.fxBaseURL)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .keyboardType(.URL)
-                        .onChange(of: prefs.fxBaseURL) { _, _ in
-                            store.assetPrices.refreshAll(fiat: prefs.code)
-                        }
-                    Button("Reset to defaults") {
-                        prefs.coinGeckoBaseURL = FiatPreferences.defaultCoinGecko
-                        prefs.fxBaseURL = FiatPreferences.defaultFX
-                        store.assetPrices.refreshAll(fiat: prefs.code)
-                    }
-                } header: {
-                    Text("Price data sources")
-                } footer: {
-                    Text("Advanced: use your own price and exchange-rate sources instead of the defaults.")
-                        .font(.caption)
-                }
-
-                Section {
                     samplePreview
                 } header: {
                     Text("Preview")
+                }
+
+                // Advanced (price data sources): pinned to the very bottom.
+                Section {
+                    DisclosureGroup("Advanced") {
+                        TextField("CoinGecko base URL", text: $prefs.coinGeckoBaseURL)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .keyboardType(.URL)
+                            .onChange(of: prefs.coinGeckoBaseURL) { _, _ in
+                                store.assetPrices.refreshAll(fiat: prefs.code)
+                            }
+                        TextField("USD FX rates URL", text: $prefs.fxBaseURL)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .keyboardType(.URL)
+                            .onChange(of: prefs.fxBaseURL) { _, _ in
+                                store.assetPrices.refreshAll(fiat: prefs.code)
+                            }
+                        Button("Reset to defaults") {
+                            prefs.coinGeckoBaseURL = FiatPreferences.defaultCoinGecko
+                            prefs.fxBaseURL = FiatPreferences.defaultFX
+                            store.assetPrices.refreshAll(fiat: prefs.code)
+                        }
+                    }
+                } footer: {
+                    Text("Price data sources: use your own price and exchange-rate sources instead of the defaults.")
+                        .font(.caption)
                 }
             }
         }

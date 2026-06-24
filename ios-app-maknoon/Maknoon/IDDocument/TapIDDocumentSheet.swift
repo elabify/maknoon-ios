@@ -19,6 +19,10 @@ struct TapIDDocumentSheet: View {
     /// in the minted step, so the caller just needs to dismiss the sheet.
     var onFinish: (_ savedDocId: UUID?) -> Void = { _ in }
 
+    /// When true, skip the document-kind picker and go straight to the passport
+    /// form (onboarding's "Scan your passport" is passport-specific).
+    var skipKindPicker: Bool = false
+
     enum Step: Hashable { case kindPicker, form, scanning, review, minted, error }
 
     /// Inline issuance state for the minted step's "Get a verified
@@ -46,6 +50,11 @@ struct TapIDDocumentSheet: View {
         kind: .passport,
         documentNumber: "", dateOfBirthYYMMDD: "", dateOfExpiryYYMMDD: ""
     )
+    /// Full 4-digit-year date entry (YYYYMMDD digits) the user types. The
+    /// chip's BAC key only needs the 2-digit-year YYMMDD, derived from these by
+    /// dropping the century, so `parameters` stays MRZ-shaped.
+    @State private var dobDigits = ""
+    @State private var expDigits = ""
     @State private var lastError: String?
     @State private var readResult: IDDocumentReadResult?
 
@@ -53,7 +62,16 @@ struct TapIDDocumentSheet: View {
         NavigationStack {
             Group {
                 switch step {
-                case .kindPicker: kindPickerStep
+                case .kindPicker:
+                    if skipKindPicker {
+                        // Passport-only entry (onboarding): skip straight to the form.
+                        Color.clear.onAppear {
+                            parameters.kind = .passport
+                            step = .form
+                        }
+                    } else {
+                        kindPickerStep
+                    }
                 case .form:       formStep
                 case .scanning:   scanningStep
                 case .review:     reviewStep
@@ -154,22 +172,20 @@ struct TapIDDocumentSheet: View {
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.characters)
                     .font(.system(.body, design: .monospaced))
-                // YYMMDD text entry with a YY-MM-DD dash mask (ISO 8601 style;
-                // dashes copy safely into input fields). The stored value stays
-                // the raw 6 digits the chip's BAC key derivation expects. The
-                // 2-digit year matches the passport's printed MRZ.
-                TextField("Date of birth (YY-MM-DD)", text: Binding(
-                    get: { Self.dashed(parameters.dateOfBirthYYMMDD) },
-                    set: { parameters.dateOfBirthYYMMDD = String($0.filter(\.isNumber).prefix(6)) }
-                ))
-                .keyboardType(.numberPad)
-                .font(.system(.body, design: .monospaced))
-                TextField("Date of expiry (YY-MM-DD)", text: Binding(
-                    get: { Self.dashed(parameters.dateOfExpiryYYMMDD) },
-                    set: { parameters.dateOfExpiryYYMMDD = String($0.filter(\.isNumber).prefix(6)) }
-                ))
-                .keyboardType(.numberPad)
-                .font(.system(.body, design: .monospaced))
+                // YYYY-MM-DD entry: the user types the full 4-digit year and the
+                // dashes appear LIVE (eager trailing separator) via a UITextField
+                // (a SwiftUI TextField bound to a reformatting Binding does not
+                // re-read its getter mid-edit, so the mask only applied on commit).
+                // The chip-facing value stays the 2-digit-year YYMMDD the MRZ /
+                // BAC key derivation expects (the century is dropped on the way in).
+                MaskedDateField(placeholder: "Date of birth (YYYY-MM-DD)", digits: $dobDigits)
+                    .onChange(of: dobDigits) { _, new in
+                        parameters.dateOfBirthYYMMDD = Self.yymmdd(fromYYYYMMDD: new)
+                    }
+                MaskedDateField(placeholder: "Date of expiry (YYYY-MM-DD)", digits: $expDigits)
+                    .onChange(of: expDigits) { _, new in
+                        parameters.dateOfExpiryYYMMDD = Self.yymmdd(fromYYYYMMDD: new)
+                    }
             } header: {
                 Text("Document details")
             } footer: {
@@ -185,13 +201,15 @@ struct TapIDDocumentSheet: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(!canContinue)
-                Button {
-                    step = .kindPicker
-                } label: {
-                    Text("Change document type")
-                        .frame(maxWidth: .infinity)
+                if !skipKindPicker {
+                    Button {
+                        step = .kindPicker
+                    } label: {
+                        Text("Change document type")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
                 }
-                .buttonStyle(.bordered)
             } footer: {
                 if !IDDocumentReader.isAvailable {
                     Label(
@@ -214,8 +232,8 @@ struct TapIDDocumentSheet: View {
         // the user having actually touched both pickers turns that
         // into an obvious "fill this in" instead.
         !parameters.documentNumber.trimmingCharacters(in: .whitespaces).isEmpty
-            && parameters.dateOfBirthYYMMDD.count == 6
-            && parameters.dateOfExpiryYYMMDD.count == 6
+            && dobDigits.count == 8
+            && expDigits.count == 8
     }
 
     /// Kind-specific opening sentence shown above the number /
@@ -229,17 +247,11 @@ struct TapIDDocumentSheet: View {
         }
     }
 
-    /// Render a stored YYMMDD digit string as "YY-MM-DD" for display; dashes
-    /// appear only once their group's digits exist. Dashes (not slashes) match
-    /// ISO 8601 and copy safely into input fields.
-    private static func dashed(_ digits: String) -> String {
-        let d = Array(digits.filter(\.isNumber).prefix(6))
-        var out = ""
-        for (i, c) in d.enumerated() {
-            if i == 2 || i == 4 { out.append("-") }
-            out.append(c)
-        }
-        return out
+    /// Drop the century from a complete YYYYMMDD to the MRZ-shaped YYMMDD the
+    /// chip's BAC key needs; returns "" until all 8 digits are present.
+    private static func yymmdd(fromYYYYMMDD digits: String) -> String {
+        let d = digits.filter(\.isNumber)
+        return d.count == 8 ? String(d.dropFirst(2)) : ""
     }
 
     // MARK: -- step 2: scanning
@@ -392,6 +404,10 @@ struct TapIDDocumentSheet: View {
             rawChipData: result.rawChipData
         )
         mintedDocId = saved.id
+        // Run the chip-authenticity (passive auth / CSCA chain) check now, on
+        // import, so the genuineness badge is already resolved the first time the
+        // passport card is opened (not only after visiting Advanced).
+        Task { await store.ensurePassiveAuth(for: saved) }
         // The saved passport is itself the single card on the Identity tab; it
         // can be presented as a self-signed credential on demand from its
         // detail screen (no separate credential card is created). Offer the
@@ -424,7 +440,7 @@ struct TapIDDocumentSheet: View {
         switch issuance {
         case .idle:
             Section {
-                Text("Send the document's chip-signed fields to an issuer for verification and sanctions screening. You get back a post-quantum credential, anchored privately on ledger, that any compatible verifier can check.")
+                Text("Send the document to an issuer for verification, sanctions screening, and anchoring on ledger that any compatible verifier can check.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                 IssuerPickerField(
@@ -435,7 +451,7 @@ struct TapIDDocumentSheet: View {
                 Button {
                     Task { await runMintIssuance() }
                 } label: {
-                    Label("Get a verified credential from an issuer", systemImage: "checkmark.seal")
+                    Label("Get verified credential", systemImage: "checkmark.seal")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
@@ -443,9 +459,6 @@ struct TapIDDocumentSheet: View {
                 if let hint = issuanceDisabledHint {
                     Text(hint).font(.caption).foregroundStyle(.orange)
                 }
-            } footer: {
-                Text("Optional, takes a moment. Pick an issuer, or choose Custom URL to add your own (employer, university, self-hosted). Manage the list in Settings → Identity → Known issuers.")
-                    .font(.caption)
             }
             Section {
                 Button("Done, keep the local credential only") {
@@ -460,20 +473,14 @@ struct TapIDDocumentSheet: View {
                     Text("Submitting to \(submittingHost)…").font(.callout)
                 }
             }
-        case .submittedForAnchor(let credentialId):
+        case .submittedForAnchor:
             Section {
                 Label("Submitted; anchoring in background", systemImage: "checkmark.seal")
                     .font(.callout.weight(.semibold))
                     .foregroundStyle(.green)
-                Text("Your verified credential is being anchored. It appears on the Identity tab as soon as the issuer's batch flushes; a pending row at the top of that tab lets you cancel.")
+                Text("Your verified credential is being anchored.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                Text("Credential: \(credentialId)")
-                    .font(.caption.monospaced())
-                    .foregroundStyle(.tertiary)
-                    .textSelection(.enabled)
-                    .lineLimit(2)
-                    .truncationMode(.middle)
                 doneButton
             }
         case .pendingReview(let pendingId, let preVerified, let reason):
@@ -531,7 +538,7 @@ struct TapIDDocumentSheet: View {
     private var localCredentialIcon: String { "checkmark.seal.fill" }
 
     private var localCredentialStatus: String {
-        "Document saved. It appears as a single card on the Identity tab; present it as a self-signed QR offline, or get a verified credential from an issuer below."
+        "Document verified and saved locally"
     }
 
     // MARK: -- minted-step issuance helpers
@@ -639,6 +646,80 @@ struct TapIDDocumentSheet: View {
             .buttonStyle(.bordered)
             .padding(.horizontal, 24)
             .padding(.bottom, 24)
+        }
+    }
+}
+
+/// A `UITextField`-backed field that masks an 8-digit YYYYMMDD entry as
+/// "YYYY-MM-DD" LIVE on every keystroke, with an EAGER trailing separator: the
+/// dash shows the instant a group completes ("2017-" the moment the 4th digit is
+/// typed). The model stays the raw digit string (`digits`). A SwiftUI TextField
+/// bound to a reformatting Binding does not re-read its getter mid-edit, so the
+/// mask only applied on commit — hence the UIKit field (ADR-0043).
+struct MaskedDateField: UIViewRepresentable {
+    let placeholder: String
+    @Binding var digits: String
+
+    /// digits -> "YYYY-MM-DD" with the eager trailing dash.
+    static func format(_ digits: String) -> String {
+        let d = Array(digits.filter(\.isNumber).prefix(8))
+        var out = ""
+        for (i, c) in d.enumerated() {
+            if i == 4 || i == 6 { out.append("-") }
+            out.append(c)
+        }
+        if d.count == 4 || d.count == 6 { out.append("-") }
+        return out
+    }
+
+    func makeUIView(context: Context) -> UITextField {
+        let tf = UITextField()
+        tf.delegate = context.coordinator
+        tf.keyboardType = .numberPad
+        tf.placeholder = placeholder
+        tf.font = .monospacedSystemFont(
+            ofSize: UIFont.preferredFont(forTextStyle: .body).pointSize, weight: .regular
+        )
+        tf.text = Self.format(digits)
+        tf.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        return tf
+    }
+
+    func updateUIView(_ tf: UITextField, context: Context) {
+        let formatted = Self.format(digits)
+        if tf.text != formatted { tf.text = formatted }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator($digits) }
+
+    final class Coordinator: NSObject, UITextFieldDelegate {
+        private let digits: Binding<String>
+        init(_ digits: Binding<String>) { self.digits = digits }
+
+        func textField(
+            _ tf: UITextField,
+            shouldChangeCharactersIn range: NSRange,
+            replacementString string: String
+        ) -> Bool {
+            let current = tf.text ?? ""
+            guard let r = Range(range, in: current) else { return false }
+            let proposed = current.replacingCharacters(in: r, with: string)
+            var newDigits = String(proposed.filter(\.isNumber))
+            if string.isEmpty {
+                // Deletion: if only a separator was removed (digit count
+                // unchanged), drop the last digit so one backspace clears the
+                // eager trailing dash AND the digit it followed.
+                let curDigits = current.filter(\.isNumber)
+                if newDigits.count == curDigits.count, !newDigits.isEmpty {
+                    newDigits = String(newDigits.dropLast())
+                }
+            }
+            newDigits = String(newDigits.prefix(8))
+            digits.wrappedValue = newDigits
+            tf.text = MaskedDateField.format(newDigits)
+            let end = tf.endOfDocument
+            tf.selectedTextRange = tf.textRange(from: end, to: end)
+            return false
         }
     }
 }
