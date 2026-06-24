@@ -1,10 +1,10 @@
-# iOS build check for the Maknoon app. The app links four Ledger SDK
-# xcframeworks that are build artifacts, so CI builds them from the crate
-# submodules with `make ios` first; elabify-core resolves as a local
-# SwiftPM package. Unsigned simulator build: it verifies the app compiles,
-# holds no secrets, and never uploads.
+# iOS build check for the Maknoon app. The app links five Rust core
+# xcframeworks (four Ledger SDKs + Trezor) that are build artifacts, so CI
+# builds them from the crate submodules with `make ios` first; elabify-core
+# resolves as a local SwiftPM package. Unsigned simulator build: it verifies
+# the app compiles, holds no secrets, and never uploads.
 #
-# MANUAL-ONLY (workflow_dispatch): a full run builds four Rust xcframeworks
+# MANUAL-ONLY (workflow_dispatch): a full run builds five Rust xcframeworks
 # plus the app on a macOS runner (~45 min). Trigger before an iOS release.
 name: ci-ios
 
@@ -38,11 +38,12 @@ jobs:
             ledger-eth-rs
             ledger-sol-rs
             ledger-tron-rs
+            trezor-core-rs
 
-      - name: Build Ledger xcframeworks (btc, eth, sol, tron)
+      - name: Build core xcframeworks (btc, eth, sol, tron, trezor)
         run: |
           set -euo pipefail
-          for crate in ledger-btc-rs ledger-eth-rs ledger-sol-rs ledger-tron-rs; do
+          for crate in ledger-btc-rs ledger-eth-rs ledger-sol-rs ledger-tron-rs trezor-core-rs; do
             echo "::group::make ios ($crate)"
             make -C "$crate" ios
             echo "::endgroup::"
