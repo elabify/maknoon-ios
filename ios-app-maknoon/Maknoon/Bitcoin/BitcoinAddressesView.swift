@@ -46,8 +46,14 @@ struct BitcoinAddressesView: View {
     /// Address whose QR is shown full-screen so another person can scan it to
     /// pay (Android parity: the per-row QR button + sheet).
     @State private var qrAddress: QRAddress?
+    /// Address to sign a message with, set from a row's long-press menu.
+    @State private var signTarget: SignTargetItem?
 
     private struct QRAddress: Identifiable { let id: String }
+    private struct SignTargetItem: Identifiable {
+        let id = UUID()
+        let target: BitcoinSignMessageSheet.AddressTarget
+    }
 
     var body: some View {
         NavigationStack {
@@ -90,6 +96,10 @@ struct BitcoinAddressesView: View {
             }
             .sheet(item: $qrAddress) { target in
                 AddressQRSheet(address: target.id)
+            }
+            .sheet(item: $signTarget) { item in
+                BitcoinSignMessageSheet(activeWallet: wallet.descriptor, target: item.target)
+                    .environment(store)
             }
         }
     }
@@ -181,6 +191,24 @@ struct BitcoinAddressesView: View {
             }
         }
         .padding(.vertical, 4)
+        .contextMenu {
+            Button {
+                UIPasteboard.general.string = row.address
+            } label: {
+                Label("Copy address", systemImage: "doc.on.doc")
+            }
+            // Sign a message with THIS address's key. Works for software and
+            // hardware (Trezor) wallets; the sign sheet routes by wallet kind.
+            Button {
+                signTarget = SignTargetItem(target: .init(
+                    chain: kind == .receive ? 0 : 1,
+                    index: row.id,
+                    address: row.address
+                ))
+            } label: {
+                Label("Sign message", systemImage: "signature")
+            }
+        }
     }
 
     private func explorerURL(for address: String) -> URL? {

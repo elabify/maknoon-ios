@@ -171,13 +171,10 @@ struct RecoveryView: View {
             }
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("Passphrase (leave blank if you didn't set one)")
+                Text("Password (leave blank if you didn't set one)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                SecureField("", text: $passphrase)
-                    .textFieldStyle(.roundedBorder)
-                    .autocorrectionDisabled()
-                    .textInputAutocapitalization(.never)
+                RevealableSecureField(text: $passphrase)
             }
 
             Button(action: { Task { await restoreFromWords() } }) {
@@ -209,16 +206,13 @@ struct RecoveryView: View {
             Label("Restore from backup file", systemImage: "doc.badge.arrow.up")
                 .font(.title3.weight(.semibold))
 
-            Text("Enter the passphrase you used when you encrypted this backup, then pick the file. Decryption and verification happen entirely on this phone.")
+            Text("Enter the password you used when you encrypted this backup, then pick the file. Decryption and verification happen entirely on this phone.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("Passphrase").font(.caption).foregroundStyle(.secondary)
-                SecureField("", text: $passphrase)
-                    .textFieldStyle(.roundedBorder)
-                    .autocorrectionDisabled()
-                    .textInputAutocapitalization(.never)
+                Text("Password").font(.caption).foregroundStyle(.secondary)
+                RevealableSecureField(text: $passphrase)
             }
 
             Button(action: { showBackupImporter = true }) {

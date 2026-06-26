@@ -587,6 +587,30 @@ final class LedgerBLE: NSObject, HardwareWallet, @unchecked Sendable {
         }
     }
 
+    /// EIP-191 `personal_sign` for Ethereum account `account`, returning the
+    /// FULL 0x-hex signature (r||s||v, v in {27,28}) a web3 verifier can
+    /// ecrecover. Unlike `signMessage(_:)` above (the identity-sandwich path
+    /// that drops the recovery byte), this keeps v.
+    func signEthereumPersonalMessage(account: UInt32, message: Data) async throws -> String {
+        defer { resetSession() }
+        try await ensureConnected()
+        do {
+            let sig = try await ethereumSDK().signPersonalMessageForAccount(
+                account: account,
+                message: message
+            )
+            var out = Data()
+            out.append(Data(sig.r))
+            out.append(Data(sig.s))
+            // ledger-eth-core normalizes v to 0/1 parity; web3 wants 27/28.
+            let v = UInt8(truncatingIfNeeded: Int(sig.v))
+            out.append(v < 27 ? v &+ 27 : v)
+            return "0x" + out.map { String(format: "%02x", $0) }.joined()
+        } catch {
+            throw mapEthereumSDKError(error, command: "SIGN_PERSONAL_MESSAGE")
+        }
+    }
+
     // MARK: -- Bitcoin app APDUs (M4, skeleton)
     //
     // Real Ledger Bitcoin app v2 protocol details, sourced from
@@ -723,6 +747,35 @@ final class LedgerBLE: NSObject, HardwareWallet, @unchecked Sendable {
         }
     }
 
+    /// Sign a Solana off-chain message (OCMS). Fetches the device pubkey,
+    /// builds the SIMD-0048 envelope (ledger-sol-core), has the device sign it
+    /// raw (SIGN_OFFCHAIN_MESSAGE, INS 0x07), and returns the base58 address +
+    /// base58 64-byte signature, byte-identical to the software + Trezor paths.
+    func signSolanaMessage(
+        account: UInt32,
+        message: String,
+        signerPubkey: Data
+    ) async throws -> (address: String, signature: String) {
+        defer { resetSession() }
+        try await ensureConnected()
+        do {
+            let sdk = solanaSDK()
+            let path = pendingDerivationPath ?? "m/44'/501'/\(account)'/0'"
+            // SINGLE device op (matches the working send path). The signer pubkey
+            // comes from the wallet descriptor, so we do NOT do a get-address
+            // round-trip first: that inter-op BLE idle gap (no heartbeat between
+            // the two exchanges) was tripping the Ledger's ~600-800ms supervision
+            // timeout, dropping the link right as the offchain approval began (the
+            // device signed but the response never arrived).
+            let envelope = try solOffchainEnvelope(message: message, signerPubkey: signerPubkey)
+            let sig = try await sdk.signOffchainMessageAtPath(path: path, message: envelope)
+            let signed = try solHardwareSignedMessage(signerPubkey: signerPubkey, signature: sig.bytes)
+            return (signed.address, signed.signature)
+        } catch {
+            throw mapSolanaSDKError(error, command: "SIGN_OFFCHAIN_MESSAGE")
+        }
+    }
+
     // MARK: -- Ethereum (via ledger-eth-core SDK)
     //
     // The hand-rolled Swift APDU code that used to live in this
@@ -817,6 +870,26 @@ final class LedgerBLE: NSObject, HardwareWallet, @unchecked Sendable {
         }
     }
 
+    /// Sign a TIP-191 "TRON Signed Message" on-device. The device prefixes +
+    /// hashes + signs; the bound T-address is recovered host-side by the Rust
+    /// core. Returns the base58check address + 0x-hex r||s||v signature.
+    func signTronMessage(account: UInt32, message: String) async throws -> (address: String, signature: String) {
+        defer { resetSession() }
+        try await ensureConnected()
+        do {
+            let sdk = tronSDK()
+            let signed: TronSignedMessage
+            if let path = pendingDerivationPath {
+                signed = try await sdk.signMessageAtPath(path: path, message: message)
+            } else {
+                signed = try await sdk.signMessageForAccount(account: account, message: message)
+            }
+            return (signed.address, signed.signature)
+        } catch {
+            throw mapTronSDKError(error, command: "SIGN_PERSONAL_MESSAGE")
+        }
+    }
+
     private func mapTronSDKError(_ error: Error, command: String) -> HardwareWalletError {
         if let le = error as? LedgerTronError {
             switch le {
@@ -897,6 +970,31 @@ final class LedgerBLE: NSObject, HardwareWallet, @unchecked Sendable {
             return try await bitcoinSDK().signPsbt(psbtBase64: unsignedBase64, policy: policy)
         } catch {
             throw mapBitcoinSDKError(error, command: "SIGN_PSBT", coinType: coinType)
+        }
+    }
+
+    /// Sign an arbitrary message with the Bitcoin key at `path` (a full BIP32
+    /// path) in the standard "Bitcoin Signed Message" format. The Ledger app
+    /// shows the message + address and the user confirms. Returns the
+    /// recovered address + base64 signature (the core derives the address).
+    func signBitcoinMessage(
+        path: String,
+        message: Data,
+        network: BitcoinNetwork
+    ) async throws -> (address: String, signature: String) {
+        defer { resetSession() }
+        try await ensureConnected()
+        let net: BtcMsgNetwork
+        switch network {
+        case .mainnet:  net = .mainnet
+        case .testnet3: net = .testnet
+        case .signet:   net = .signet
+        }
+        do {
+            let signed = try await bitcoinSDK().signMessage(path: path, message: message, network: net)
+            return (signed.address, signed.signature)
+        } catch {
+            throw mapBitcoinSDKError(error, command: "SIGN_MESSAGE", coinType: network == .mainnet ? 0 : 1)
         }
     }
 

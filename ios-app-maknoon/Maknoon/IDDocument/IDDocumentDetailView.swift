@@ -55,14 +55,13 @@ struct IDDocumentDetailView: View {
         if let doc {
             Form {
                 photoSection(doc)
-                detailsSection(doc)
                 chipAuthSection(doc)
                 issueVerifiedSection(doc)
                 nicknameSection(doc)
                 folderSection(doc)
                 deleteSection(doc)
             }
-            .navigationTitle("Advanced options")
+            .navigationTitle("Advanced")
             .navigationBarTitleDisplayMode(.inline)
             .onAppear { nicknameDraft = doc.nickname ?? "" }
             // Run on-device Passive Authentication once the view appears (and
@@ -115,59 +114,6 @@ struct IDDocumentDetailView: View {
                 Spacer()
             }
             .padding(.vertical, 4)
-        }
-    }
-
-    private func detailsSection(_ doc: IDDocument) -> some View {
-        Section("Details") {
-            let docLabel = doc.userDeclaredKind?.documentNumberLabel ?? "Document number"
-            row(docLabel, value: doc.documentNumber, monospaced: true)
-            // Personal number is intentionally not displayed (ADR-0039): it has
-            // no standardized ICAO 9303 meaning and most holders use the
-            // document number. The field stays in the model.
-            // Given + Family rendered separately so each is a labelled
-            // attribute the user can copy independently. Prefer the
-            // MRZ-derived Latin form (which is what foreign verifiers
-            // see); fall back to the library-reported form for legacy
-            // saved docs that pre-date the MRZ parser.
-            let given = (doc.latinGivenNames ?? doc.givenNames).trimmingCharacters(in: .whitespaces)
-            let family = (doc.latinSurname ?? doc.surname).trimmingCharacters(in: .whitespaces)
-            if !given.isEmpty {
-                row("Given name", value: given)
-            }
-            if !family.isEmpty {
-                row("Family name", value: family)
-            }
-            // Native-script name as its own row when the chip exposed
-            // one in DG11 and it differs from the Latin form. CHN /
-            // JPN / KOR / Arabic-script issuers show up here.
-            if let native = doc.nativeFullName?.trimmingCharacters(in: .whitespaces),
-               !native.isEmpty,
-               native.caseInsensitiveCompare("\(given) \(family)".trimmingCharacters(in: .whitespaces)) != .orderedSame {
-                row("Native name", value: native)
-            }
-            if let dob = doc.formattedDateOfBirth {
-                row("Date of birth", value: dob)
-            }
-            if let exp = doc.formattedDateOfExpiry {
-                row("Expires", value: exp)
-            }
-            if let sex = doc.sex, !sex.isEmpty {
-                row("Sex", value: sex)
-            }
-            if let nat = IDDocument.countryName(for: doc.nationality) {
-                row("Nationality", value: nat)
-            }
-            if let issuer = IDDocument.countryName(for: doc.issuingAuthority) {
-                row("Issued by", value: issuer)
-            }
-            if let pob = doc.formattedPlaceOfBirth, !pob.isEmpty {
-                row("Place of birth", value: pob)
-            }
-            if !doc.documentType.isEmpty {
-                row("Document type", value: doc.documentType, monospaced: true)
-            }
-            row("Saved", value: dateString(doc.readAt))
         }
     }
 

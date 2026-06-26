@@ -439,6 +439,33 @@ final class TrezorBLE: NSObject, HardwareWallet, @unchecked Sendable {
         return (sig.v, sig.r, sig.s)
     }
 
+    /// EIP-191 `personal_sign` for Ethereum account `account` on the current
+    /// `pendingPassphrase` wallet (standard or hidden). The device shows the
+    /// message and the user confirms. Returns the 0x-hex signature (r||s||v,
+    /// v in {27,28}) web3 verifiers expect.
+    func signEthereumMessage(account: UInt32, message: Data) async throws -> String {
+        defer { resetSession() }
+        let creds = try credentialAndHostKey()
+        let passphrase = pendingPassphrase
+        let path = pendingDerivationPath
+        let sig = try await withBusyRetry {
+            try await ensureConnected()
+            return try await trezorClient().signEthereumMessage(
+                hostStaticPriv: creds.hostKey,
+                credential: creds.credential,
+                passphrase: passphrase,
+                account: account,
+                message: message,
+                path: path
+            )
+        }
+        var out = Data(sig)
+        // Normalize the recovery byte to web3's v = 27/28 if the device
+        // returned a bare parity (0/1).
+        if out.count == 65, out[64] < 27 { out[64] = out[64] &+ 27 }
+        return "0x" + out.map { String(format: "%02x", $0) }.joined()
+    }
+
     /// BIP84 account-level xpub for the current `pendingPassphrase`
     /// wallet, used to build a watch-only BDK descriptor host-side.
     /// Within a pinned discovery the seeded session is reused across
@@ -481,6 +508,33 @@ final class TrezorBLE: NSObject, HardwareWallet, @unchecked Sendable {
         return fp.map { String(format: "%02x", $0) }.joined()
     }
 
+    /// Sign an arbitrary message with the Bitcoin key at `addressN` (a full
+    /// BIP32 path as hardened/unhardened u32 components) on the current
+    /// `pendingPassphrase` wallet (standard or hidden). The device shows the
+    /// message + address and the user confirms on-screen. Returns the address
+    /// the device signed for and the 65-byte Electrum signature.
+    func signBitcoinMessage(
+        addressN: [UInt32],
+        message: Data,
+        coinType: UInt32
+    ) async throws -> (address: String, signature: Data) {
+        defer { resetSession() }
+        let creds = try credentialAndHostKey()
+        let passphrase = pendingPassphrase
+        let result = try await withBusyRetry {
+            try await ensureConnected()
+            return try await trezorClient().signBitcoinMessage(
+                hostStaticPriv: creds.hostKey,
+                credential: creds.credential,
+                passphrase: passphrase,
+                addressN: addressN,
+                message: message,
+                coinType: coinType
+            )
+        }
+        return (result.address, result.signature)
+    }
+
     /// Base58 ed25519 address for SLIP-0010 account `account` on the
     /// current `pendingPassphrase` wallet. Within a pinned discovery
     /// the seeded session is reused across accounts.
@@ -519,6 +573,37 @@ final class TrezorBLE: NSObject, HardwareWallet, @unchecked Sendable {
                 account: account,
                 path: path
             )
+        }
+    }
+
+    /// Sign a Solana off-chain message (OCMS). Fetches the device pubkey,
+    /// builds the SIMD-0048 envelope (ledger-sol-core), has the device parse +
+    /// sign it raw (SolanaSignMessage 906), and returns the base58 address +
+    /// base58 64-byte signature, byte-identical to the software + Ledger paths.
+    func signSolanaMessage(
+        account: UInt32,
+        message: String,
+        signerPubkey: Data
+    ) async throws -> (address: String, signature: String) {
+        defer { resetSession() }
+        let creds = try credentialAndHostKey()
+        let passphrase = pendingPassphrase
+        let path = pendingDerivationPath
+        return try await withBusyRetry {
+            try await ensureConnected()
+            // Single device op: the signer pubkey comes from the wallet descriptor,
+            // so no get-address round-trip first (consistent with the Ledger path).
+            let envelope = try solOffchainEnvelope(message: message, signerPubkey: signerPubkey)
+            let sig = try await trezorClient().signSolanaMessage(
+                hostStaticPriv: creds.hostKey,
+                credential: creds.credential,
+                passphrase: passphrase,
+                envelope: envelope,
+                account: account,
+                path: path
+            )
+            let signed = try solHardwareSignedMessage(signerPubkey: signerPubkey, signature: sig)
+            return (signed.address, signed.signature)
         }
     }
 

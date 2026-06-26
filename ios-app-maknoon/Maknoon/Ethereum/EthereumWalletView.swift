@@ -28,6 +28,8 @@ struct EthereumWalletView: View {
     @State private var showAddToken = false
     @State private var showAddWallet = false
     @State private var showNetworkPicker = false
+    @State private var showSignMessage = false
+    @State private var showVerifyMessage = false
     @State private var detailToken: EthereumToken?
 
     private var activeWallet: EthereumWalletDescriptor? {
@@ -100,6 +102,17 @@ struct EthereumWalletView: View {
                     } label: {
                         Label("Manage wallets…", systemImage: "list.bullet.rectangle")
                     }
+                    Divider()
+                    Button {
+                        showSignMessage = true
+                    } label: {
+                        Label("Sign message", systemImage: "signature")
+                    }
+                    Button {
+                        showVerifyMessage = true
+                    } label: {
+                        Label("Verify message", systemImage: "checkmark.seal")
+                    }
                 } label: {
                     Image(systemName: "plus.circle")
                 }
@@ -126,6 +139,13 @@ struct EthereumWalletView: View {
         .sheet(isPresented: $showAddWallet) {
             AddEthereumWalletSheet()
                 .environment(store)
+        }
+        .sheet(isPresented: $showSignMessage) {
+            EthereumSignMessageSheet(activeWallet: activeWallet)
+                .environment(store)
+        }
+        .sheet(isPresented: $showVerifyMessage) {
+            EthereumVerifyMessageSheet()
         }
         .sheet(isPresented: $showReceive) {
             if let activeWallet, let addr = activeWallet.address {

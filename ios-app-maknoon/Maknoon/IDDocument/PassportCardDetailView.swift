@@ -287,7 +287,7 @@ struct PassportCardDetailView: View {
                 NavigationLink {
                     IDDocumentDetailView(documentId: documentId).environment(store)
                 } label: {
-                    Label("Advanced options", systemImage: "slider.horizontal.3").frame(maxWidth: .infinity)
+                    Label("Advanced", systemImage: "slider.horizontal.3").frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
             }

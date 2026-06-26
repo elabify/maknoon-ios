@@ -124,6 +124,47 @@ enum BitcoinSigningHelpers {
         }
     }
 
+    /// Hardware-BLE message sign: connect to the paired device, sign the
+    /// arbitrary message at the full BIP32 `path`, and return the signed-for
+    /// address + the base64 "Bitcoin Signed Message" signature. Supports
+    /// hidden (passphrase) wallets via `hidden` + `hostEntered`, exactly like
+    /// the PSBT send path. Works for Trezor and Ledger.
+    static func signMessageOverBLE(
+        device: RegisteredDevice,
+        path: String,
+        message: Data,
+        network: BitcoinNetwork,
+        hidden: HardwarePassphraseRef? = nil,
+        hostEntered: String? = nil
+    ) async throws -> (address: String, signature: String) {
+        let coinType: UInt32 = network == .mainnet ? 0 : 1
+        switch device.kind {
+        case .trezor:
+            let trezor = HardwareWalletFactory.make(kind: .trezor)
+            guard let trezor = trezor as? TrezorBLE else {
+                throw BitcoinWallet.WalletError.sendFailed("Expected TrezorBLE instance, got \(type(of: trezor))")
+            }
+            trezor.targetPeripheralUUID = device.peripheralUUID
+            // A hidden wallet re-opens its passphrase session so the device
+            // derives the matching key; standard wallets resolve to `.standard`.
+            trezor.applyPassphraseMode(try HardwarePassphraseRef.resolveChoice(hidden, hostEntered: hostEntered))
+            let addressN = try BIP32Path.parse(path)
+            let r = try await trezor.signBitcoinMessage(addressN: addressN, message: message, coinType: coinType)
+            return (r.address, r.signature.base64EncodedString())
+        case .ledger:
+            let ledger = HardwareWalletFactory.make(kind: .ledger)
+            guard let ledger = ledger as? LedgerBLE else {
+                throw BitcoinWallet.WalletError.sendFailed("Expected LedgerBLE instance, got \(type(of: ledger))")
+            }
+            ledger.targetPeripheralUUID = device.peripheralUUID
+            return try await ledger.signBitcoinMessage(path: path, message: message, network: network)
+        default:
+            throw BitcoinWallet.WalletError.sendFailed(
+                "Device kind \(device.kind.displayName) does not support message signing yet"
+            )
+        }
+    }
+
     /// Surface a compact, human-readable debug code from common
     /// error types we expect at the signing boundary. Returned
     /// string is suitable for display next to the user-facing

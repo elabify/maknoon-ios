@@ -325,6 +325,10 @@ struct LightningSendView: View {
     @MainActor
     private func payBOLT11(_ invoice: String) async {
         guard let client = activeClient() else { return }
+        // Fresh biometric / passcode before sending funds (ADR-0045
+        // Authorization invariant). Lightning is custodial (LNDHub), so there is
+        // no sandwich seed to gate; use the device-owner-auth gate directly.
+        guard await LocalAuth.authorize(reason: "Authorize Lightning payment") else { return }
         phase = .sending
         do {
             let result = try await client.payInvoice(invoice)
@@ -356,6 +360,8 @@ struct LightningSendView: View {
     @MainActor
     private func payLNURL(_ req: LNURL.PayRequest) async {
         guard let client = activeClient(), let sat = lnurlAmountSats, sat > 0 else { return }
+        // Fresh biometric / passcode before sending funds (ADR-0045).
+        guard await LocalAuth.authorize(reason: "Authorize Lightning payment") else { return }
         phase = .sending
         do {
             let invoice = try await LNURL.fetchInvoice(

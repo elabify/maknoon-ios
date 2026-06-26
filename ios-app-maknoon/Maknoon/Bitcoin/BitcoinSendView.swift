@@ -833,6 +833,10 @@ struct BitcoinSendView: View {
                 guard let sandwich = store.sandwich else {
                     throw BitcoinWallet.WalletError.sandwichRequired
                 }
+                // Fresh biometric / passcode before signing (ADR-0045
+                // Authorization invariant); refreshes the cache so signSoftware
+                // below does not prompt again.
+                _ = try await sandwich.recoveryMaterialFresh(localizedReason: "Authorize Bitcoin send")
                 signedB64 = try BitcoinSigningHelpers.signSoftware(
                     unsignedBase64: unsignedB64,
                     sandwich: sandwich,

@@ -26,6 +26,17 @@ enum BitcoinNetwork: String, Codable, CaseIterable, Sendable {
         }
     }
 
+    /// Legacy P2PKH address version byte (base58check prefix). Mainnet is
+    /// 0x00 ("1…"); testnet3 and signet share 0x6F ("m…"/"n…"). Used to bind
+    /// a "Bitcoin Signed Message" (BIP-137) signature to the signing key's
+    /// legacy address on the active network.
+    var p2pkhVersion: UInt8 {
+        switch self {
+        case .mainnet: return 0x00
+        case .testnet3, .signet: return 0x6F
+        }
+    }
+
     /// Bridge to BDK's Network enum.
     var bdk: Network {
         switch self {

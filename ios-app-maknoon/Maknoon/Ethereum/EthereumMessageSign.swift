@@ -1,30 +1,28 @@
-// Sign-message and verify-message sheets, modelled on Sparrow's Tools
-// menu. Implements the legacy "Bitcoin Signed Message" format (BIP-137,
-// the one Bitcoin Core's signmessage / verifymessage and Electrum
-// produce): the magic-prefixed double-SHA256 digest is signed with
-// secp256k1 recoverable ECDSA and base64-encoded (header byte 31..34 for
-// a compressed-key P2PKH). The signature binds to the signing key's
-// legacy P2PKH address on the active network; verification recovers the
-// public key and checks it against that address.
+// Sign-message and verify-message sheets for Ethereum, modelled on the
+// Bitcoin equivalents (BitcoinMessageSign.swift). Implements EIP-191
+// `personal_sign`: keccak256("\u{19}Ethereum Signed Message:\n" + len +
+// message), signed with secp256k1 (recoverable), returned as a 65-byte
+// 0x-hex signature (r||s||v) with v in {27,28} as web3 clients expect.
+// This is the format MetaMask / Etherscan / MyCrypto produce and verify.
 //
-// Hand-rolled over Trust Wallet Core's secp256k1 primitives (sign +
-// PublicKey.recover) rather than TWC's BitcoinMessageSigner, which only
-// accepts mainnet addresses. Doing it directly makes signing work on
-// EVERY network (mainnet, testnet3, signet) and matches what the Ledger
-// and Trezor message-signing flows produce. Signing needs the private
-// key (software wallets); verification is keyless and works for any
-// legacy P2PKH address + message + base64 signature from any source.
+// Signing needs the private key, so it is offered for software wallets
+// only (hardware routing is added with the hardware-signing work);
+// verification is keyless and works for any address + message +
+// signature from any source, by recovering the signer address and
+// comparing it to the supplied address.
+//
+// personal_sign carries no chain id, so it is network-agnostic (unlike
+// the Bitcoin legacy format, which is mainnet-only).
 
 import SwiftUI
 import UIKit
 import WalletCore
 
-enum BitcoinMessageSigningError: LocalizedError {
+enum EthereumMessageSigningError: LocalizedError {
     case identityRequired
     case hardwareUnsupported
     case noWallet
-    case keyDerivationFailed
-    case signingFailed
+    case signingFailed(String)
 
     var errorDescription: String? {
         switch self {
@@ -33,126 +31,118 @@ enum BitcoinMessageSigningError: LocalizedError {
         case .hardwareUnsupported:
             return "Message signing is available for software wallets only. This wallet is hardware-backed; its key never leaves the device."
         case .noWallet:
-            return "No active Bitcoin wallet. Pick one in the Bitcoin tab first."
-        case .keyDerivationFailed:
-            return "Couldn't derive the signing key for this wallet."
-        case .signingFailed:
-            return "The signer did not produce a signature."
+            return "No active Ethereum wallet. Pick one in the Ethereum tab first."
+        case .signingFailed(let m):
+            return m
         }
     }
 }
 
-/// Legacy "Bitcoin Signed Message" signing + verification via Trust
-/// Wallet Core. Stateless; both entry points are pure functions of
-/// their inputs (plus, for signing, a biometric-gated seed read).
-enum BitcoinMessageSigning {
-    /// Sign `message` with the key at `derivationPath` (a full BIP32 path,
-    /// e.g. "m/84'/0'/0'/0/0"), in the Electrum "Bitcoin Signed Message"
-    /// format for `scriptType` on `network`. The signature binds to that
-    /// key's address of the given type (native segwit by default), which is
-    /// what `verify` checks against.
-    ///
-    /// The crypto runs in the shared Rust core (rust-bitcoin), so iOS,
-    /// Android, and the Ledger/Trezor flows stay byte-identical and
-    /// interoperate with Electrum / Bitcoin Core.
+/// EIP-191 `personal_sign` signing + verification. Signing derives the
+/// account key under a biometric prompt; verification is a pure,
+/// keyless function (recover the signer address and compare).
+enum EthereumMessageSigning {
+    /// Sign `message` (UTF-8) with the active software wallet's account.
+    /// Returns the 0x-hex signature; the signer address is the wallet's
+    /// own EOA address, which is what `verify` checks against.
     static func sign(
         message: String,
-        derivationPath: String,
-        scriptType: BIP32Path.BitcoinScriptType,
-        network: BitcoinNetwork,
+        account: UInt32,
         sandwich: IdentitySandwich,
         biometricReason: String
-    ) throws -> (address: String, signature: String) {
-        let material = try sandwich.recoveryMaterial(localizedReason: biometricReason)
-        return try sign(
-            message: message,
-            derivationPath: derivationPath,
-            scriptType: scriptType,
-            network: network,
-            mnemonic: material.words.joined(separator: " "),
-            passphrase: material.hasPassphrase ? material.passphrase : ""
+    ) throws -> String {
+        try EthereumDescriptors.signPersonalMessageFromSandwich(
+            sandwich: sandwich,
+            account: account,
+            message: Data(message.utf8),
+            biometricReason: biometricReason
         )
     }
 
-    /// Pure form: derive the key from a mnemonic + passphrase and sign via
-    /// the shared core. No biometric read; exercised by the round-trip tests.
-    static func sign(
-        message: String,
-        derivationPath: String,
-        scriptType: BIP32Path.BitcoinScriptType,
-        network: BitcoinNetwork,
-        mnemonic: String,
-        passphrase: String
-    ) throws -> (address: String, signature: String) {
-        guard let hd = HDWallet(mnemonic: mnemonic, passphrase: passphrase) else {
-            throw BitcoinMessageSigningError.keyDerivationFailed
-        }
-        let key = hd.getKey(coin: .bitcoin, derivationPath: derivationPath)
-        let signed = try btcSignMessage(
-            secretKey: key.data,
-            message: message,
-            scriptType: scriptType.coreScriptType,
-            networkKind: network.coreNetwork
-        )
-        return (signed.address, signed.signature)
-    }
-
-    /// Verify an Electrum "Bitcoin Signed Message" signature (legacy or
-    /// segwit). Keyless: works for any address + message + base64 signature.
+    /// Verify an EIP-191 `personal_sign` signature: recover the signer
+    /// address and compare (case-insensitively) to `address`. Keyless.
     static func verify(address: String, message: String, signature: String) -> Bool {
-        btcVerifyMessage(address: address, message: message, signature: signature)
+        guard let recovered = recoverAddress(message: message, signature: signature) else {
+            return false
+        }
+        let want = address.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return recovered.lowercased() == want
     }
-}
 
-private extension BIP32Path.BitcoinScriptType {
-    var coreScriptType: BtcMsgScriptType {
-        switch self {
-        case .legacy:       return .legacy
-        case .nestedSegwit: return .nestedSegwit
-        case .nativeSegwit: return .nativeSegwit
+    /// Recover the EIP-55 address that produced an EIP-191 `personal_sign`
+    /// signature, or nil if the signature is malformed.
+    static func recoverAddress(message: String, signature: String) -> String? {
+        let trimmed = signature.trimmingCharacters(in: .whitespacesAndNewlines)
+        let hex = trimmed.hasPrefix("0x") ? String(trimmed.dropFirst(2)) : trimmed
+        guard let raw = Data(hexString: hex), raw.count == 65 else { return nil }
+        // web3 encodes v as 27/28; Trust Wallet Core's recover wants the
+        // recovery id (0/1) in the trailing byte.
+        var sig = raw
+        if sig[64] >= 27 { sig[64] -= 27 }
+        let messageData = Data(message.utf8)
+        var prefixed = Data("\u{19}Ethereum Signed Message:\n\(messageData.count)".utf8)
+        prefixed.append(messageData)
+        let digest = Hash.keccak256(data: prefixed)
+        guard let pub = PublicKey.recover(signature: sig, message: digest) else { return nil }
+        return AnyAddress(publicKey: pub, coin: .ethereum).description
+    }
+
+    /// Hardware-BLE `personal_sign`: connect to the paired device, sign with
+    /// Ethereum account `account`, and return the 0x-hex signature (r||s||v).
+    /// Trezor hidden (passphrase) wallets are supported via `hidden` +
+    /// `hostEntered`; Ledger hidden wallets are selected at device unlock.
+    static func signOverBLE(
+        device: RegisteredDevice,
+        account: UInt32,
+        message: Data,
+        hidden: HardwarePassphraseRef? = nil,
+        hostEntered: String? = nil
+    ) async throws -> String {
+        switch device.kind {
+        case .ledger:
+            let ledger = HardwareWalletFactory.make(kind: .ledger)
+            guard let ledger = ledger as? LedgerBLE else {
+                throw EthereumMessageSigningError.signingFailed("Expected LedgerBLE instance, got \(type(of: ledger))")
+            }
+            ledger.targetPeripheralUUID = device.peripheralUUID
+            return try await ledger.signEthereumPersonalMessage(account: account, message: message)
+        case .trezor:
+            let trezor = HardwareWalletFactory.make(kind: .trezor)
+            guard let trezor = trezor as? TrezorBLE else {
+                throw EthereumMessageSigningError.signingFailed("Expected TrezorBLE instance, got \(type(of: trezor))")
+            }
+            trezor.targetPeripheralUUID = device.peripheralUUID
+            trezor.applyPassphraseMode(try HardwarePassphraseRef.resolveChoice(hidden, hostEntered: hostEntered))
+            return try await trezor.signEthereumMessage(account: account, message: message)
+        default:
+            throw EthereumMessageSigningError.signingFailed(
+                "\(device.kind.displayName) does not support message signing yet"
+            )
         }
     }
 }
 
-private extension BitcoinNetwork {
-    var coreNetwork: BtcMsgNetwork {
-        switch self {
-        case .mainnet:  return .mainnet
-        case .testnet3: return .testnet
-        case .signet:   return .signet
-        }
-    }
-}
-
-struct BitcoinSignMessageSheet: View {
-    let activeWallet: BitcoinWalletDescriptor?
-    /// A specific address to sign with (from a long-press in the Addresses
-    /// screen). When nil, signs with the wallet's first receive address.
-    var target: AddressTarget? = nil
+struct EthereumSignMessageSheet: View {
+    let activeWallet: EthereumWalletDescriptor?
     @Environment(HolderStore.self) private var store
     @Environment(\.dismiss) private var dismiss
 
-    /// Identifies a specific derived address (keychain + index) to sign with.
-    struct AddressTarget: Equatable {
-        let chain: UInt32   // 0 = receive (external), 1 = change (internal)
-        let index: UInt32
-        let address: String
-    }
-
     @State private var message: String = ""
-    @State private var signedAddress: String?
     @State private var signature: String?
     @State private var errorText: String?
     @State private var signing = false
     @State private var copiedField: String?
-    /// Host-typed passphrase for a hidden hardware wallet (never stored).
+    /// Host-typed passphrase for a hidden Trezor wallet (never stored).
     @State private var hostPassphrase: String = ""
 
-    /// Account index for the derivation path: the software account, or 0 for
-    /// a hardware wallet (whose kind doesn't carry an account index).
-    private var accountIndex: UInt32 {
-        if case .software(let a) = activeWallet?.kind { return a }
-        return 0
+    /// Account index for the active wallet (software or hardware); nil if
+    /// there is no active wallet.
+    private var account: UInt32? {
+        switch activeWallet?.kind {
+        case .software(let a):       return a
+        case .hardware(_, let a, _): return a
+        case .none:                  return nil
+        }
     }
 
     private var isHardware: Bool {
@@ -160,29 +150,10 @@ struct BitcoinSignMessageSheet: View {
         return true
     }
 
-    /// A host-typed hidden (passphrase) wallet needs the passphrase entered
-    /// up front so the device opens the matching session to sign.
+    /// A host-typed hidden (passphrase) Trezor wallet needs the passphrase
+    /// entered up front so the device opens the matching session to sign.
     private var needsPassphrase: Bool {
         activeWallet?.hidden?.needsHostPassphrase == true
-    }
-
-    /// Account-level path: the wallet's custom path if set, else the standard
-    /// BIP84 account path. Its purpose selects the script type.
-    private var accountPath: String? {
-        guard let w = activeWallet else { return nil }
-        return w.derivationPath ?? BIP32Path.standardBitcoin(account: accountIndex, coinType: w.network.coinType)
-    }
-
-    private var scriptType: BIP32Path.BitcoinScriptType {
-        guard let p = accountPath else { return .nativeSegwit }
-        return BIP32Path.bitcoinScriptType(forPath: p) ?? .nativeSegwit
-    }
-
-    /// Full derivation path of the address being signed: the target row's
-    /// (keychain, index) if long-pressed, else the first receive key (0/0).
-    private var fullPath: String? {
-        guard let p = accountPath else { return nil }
-        return "\(p)/\(target?.chain ?? 0)/\(target?.index ?? 0)"
     }
 
     var body: some View {
@@ -193,9 +164,7 @@ struct BitcoinSignMessageSheet: View {
                 } header: {
                     Text("Wallet")
                 } footer: {
-                    Text(target == nil
-                         ? "Signs with the wallet's first receive address using the standard \"Bitcoin Signed Message\" format (Electrum-compatible). The signature is bound to that address, which is what a verifier checks against."
-                         : "Signs with the selected address using the standard \"Bitcoin Signed Message\" format (Electrum-compatible). The signature is bound to this address.")
+                    Text("Signs the message with this account's key using the EIP-191 \"personal_sign\" format (the one MetaMask and Etherscan produce). The signature is bound to this wallet's address, which is what a verifier checks against.")
                         .font(.caption)
                 }
 
@@ -225,7 +194,7 @@ struct BitcoinSignMessageSheet: View {
                                          : (isHardware ? "Sign on device" : "Sign message"))
                         }
                     }
-                    .disabled(signing || activeWallet == nil || message.isEmpty || (needsPassphrase && hostPassphrase.isEmpty))
+                    .disabled(signing || account == nil || message.isEmpty || (needsPassphrase && hostPassphrase.isEmpty))
                     if isHardware {
                         Text("You'll confirm the message on the device screen.")
                             .font(.caption)
@@ -234,9 +203,9 @@ struct BitcoinSignMessageSheet: View {
                     if let errorText {
                         Text(errorText).foregroundStyle(.red).font(.callout)
                     }
-                    if let signature, let signedAddress {
+                    if let signature, let address = activeWallet?.address {
                         VStack(alignment: .leading, spacing: 8) {
-                            labeledCopyable("Address", signedAddress)
+                            labeledCopyable("Address", address)
                             labeledCopyable("Signature", signature)
                         }
                     }
@@ -255,22 +224,17 @@ struct BitcoinSignMessageSheet: View {
     @ViewBuilder
     private var walletSummary: some View {
         if let w = activeWallet {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text(w.label).font(.callout.weight(.semibold))
-                    Spacer()
-                    Text(w.network.displayName).font(.caption).foregroundStyle(.secondary)
-                }
-                if let target {
-                    Text(target.address)
-                        .font(.system(.caption2, design: .monospaced))
+            HStack {
+                Text(w.label).font(.callout.weight(.semibold))
+                Spacer()
+                if let addr = w.address {
+                    Text(addr.prefix(6) + "…" + addr.suffix(4))
+                        .font(.system(.caption, design: .monospaced))
                         .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
                 }
             }
         } else {
-            Text("No active wallet. Pick one in the Bitcoin tab first.").foregroundStyle(.red)
+            Text("No active wallet. Pick one in the Ethereum tab first.").foregroundStyle(.red)
         }
     }
 
@@ -311,47 +275,39 @@ struct BitcoinSignMessageSheet: View {
         signing = true
         errorText = nil
         signature = nil
-        signedAddress = nil
         defer { signing = false }
         do {
-            guard let w = activeWallet, let path = fullPath else {
-                throw BitcoinMessageSigningError.noWallet
+            guard let w = activeWallet, let account = account else {
+                throw EthereumMessageSigningError.noWallet
             }
             switch w.kind {
             case .software:
                 guard let sandwich = store.sandwich else {
-                    throw BitcoinMessageSigningError.identityRequired
+                    throw EthereumMessageSigningError.identityRequired
                 }
                 // Require a fresh biometric / passcode before signing (ADR-0045
                 // Authorization invariant); refreshes the cache so the sign call
                 // below does not prompt again.
                 _ = try await sandwich.recoveryMaterialFresh(
-                    localizedReason: "Sign a message with your Bitcoin wallet"
+                    localizedReason: "Sign a message with your Ethereum wallet"
                 )
-                let result = try BitcoinMessageSigning.sign(
+                signature = try EthereumMessageSigning.sign(
                     message: message,
-                    derivationPath: path,
-                    scriptType: scriptType,
-                    network: w.network,
+                    account: account,
                     sandwich: sandwich,
-                    biometricReason: "Sign a message with your Bitcoin wallet"
+                    biometricReason: "Sign a message with your Ethereum wallet"
                 )
-                signedAddress = result.address
-                signature = result.signature
             case .hardware(let deviceId, _, _):
                 guard let device = store.devices.find(id: deviceId) else {
-                    throw BitcoinMessageSigningError.noWallet
+                    throw EthereumMessageSigningError.noWallet
                 }
-                let result = try await BitcoinSigningHelpers.signMessageOverBLE(
+                signature = try await EthereumMessageSigning.signOverBLE(
                     device: device,
-                    path: path,
+                    account: account,
                     message: Data(message.utf8),
-                    network: w.network,
                     hidden: w.hidden,
                     hostEntered: hostPassphrase
                 )
-                signedAddress = result.address
-                signature = result.signature
             }
         } catch {
             errorText = (error as? LocalizedError)?.errorDescription ?? "\(error)"
@@ -359,7 +315,7 @@ struct BitcoinSignMessageSheet: View {
     }
 }
 
-struct BitcoinVerifyMessageSheet: View {
+struct EthereumVerifyMessageSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var address: String = ""
@@ -377,14 +333,14 @@ struct BitcoinVerifyMessageSheet: View {
         NavigationStack {
             Form {
                 Section {
-                    TextField("Address", text: $address, axis: .vertical)
+                    TextField("Address (0x…)", text: $address, axis: .vertical)
                         .font(.system(.callout, design: .monospaced))
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
                         .lineLimit(2...4)
                     TextField("Message", text: $message, axis: .vertical)
                         .lineLimit(3...10)
-                    TextField("Signature", text: $signature, axis: .vertical)
+                    TextField("Signature (0x…)", text: $signature, axis: .vertical)
                         .font(.system(.callout, design: .monospaced))
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
@@ -392,7 +348,7 @@ struct BitcoinVerifyMessageSheet: View {
                 } header: {
                     Text("Verify")
                 } footer: {
-                    Text("Checks that a signature was produced by the owner of an address. Paste the address, message, and signature.")
+                    Text("Verifies an EIP-191 \"personal_sign\" signature (MetaMask / Etherscan). Paste the address, message, and 0x-hex signature from any source.")
                         .font(.caption)
                 }
 
@@ -433,7 +389,7 @@ struct BitcoinVerifyMessageSheet: View {
         verifying = true
         result = nil
         defer { verifying = false }
-        let ok = BitcoinMessageSigning.verify(
+        let ok = EthereumMessageSigning.verify(
             address: address.trimmingCharacters(in: .whitespacesAndNewlines),
             message: message,
             signature: signature.trimmingCharacters(in: .whitespacesAndNewlines)

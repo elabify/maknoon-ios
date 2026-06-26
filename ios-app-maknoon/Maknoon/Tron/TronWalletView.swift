@@ -26,6 +26,8 @@ struct TronWalletView: View {
     @State private var unknownContractToAdd: String?
     @State private var showAllTxs: Bool = false
     @State private var detailToken: TronTRC20Token?
+    @State private var showSignMessage = false
+    @State private var showVerifyMessage = false
 
     private var activeWallet: TronWalletDescriptor? {
         store.tronWalletStore.activeWallet
@@ -84,6 +86,12 @@ struct TronWalletView: View {
                 .environment(store)
             }
         }
+        .sheet(isPresented: $showSignMessage) {
+            TronSignMessageSheet(activeWallet: activeWallet).environment(store)
+        }
+        .sheet(isPresented: $showVerifyMessage) {
+            TronVerifyMessageSheet()
+        }
         .navigationBarBackButtonHidden(true)
         .navigationTitle("Tron")
         .navigationBarTitleDisplayMode(.inline)
@@ -109,6 +117,17 @@ struct TronWalletView: View {
                         showWallets = true
                     } label: {
                         Label("Manage wallets…", systemImage: "list.bullet.rectangle")
+                    }
+                    Divider()
+                    Button {
+                        showSignMessage = true
+                    } label: {
+                        Label("Sign message", systemImage: "signature")
+                    }
+                    Button {
+                        showVerifyMessage = true
+                    } label: {
+                        Label("Verify message", systemImage: "checkmark.seal")
                     }
                 } label: {
                     Image(systemName: "plus.circle")

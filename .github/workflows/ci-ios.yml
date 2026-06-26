@@ -1,19 +1,27 @@
-# iOS build check for the Maknoon app. The app links five Rust core
-# xcframeworks (four Ledger SDKs + Trezor) that are build artifacts, so CI
-# builds them from the crate submodules with `make ios` first; elabify-core
-# resolves as a local SwiftPM package. Unsigned simulator build: it verifies
-# the app compiles, holds no secrets, and never uploads.
+# Maknoon iOS CI. The app links five Rust core xcframeworks (four Ledger SDKs +
+# Trezor) that are build artifacts, so CI builds them from the crate submodules
+# with `make ios` first; elabify-core resolves as a local SwiftPM package. Two
+# jobs:
+#   build    - workflow_dispatch: unsigned simulator build (~45 min). Verifies
+#              the app compiles, holds no secrets, never uploads.
+#   release  - on a vX.Y.Z tag only, behind the `testflight` Environment
+#              (required-reviewer gate): signed device archive -> App Store IPA
+#              -> upload to TestFlight via the App Store Connect API key. You
+#              then distribute to testers / promote to the App Store manually.
 #
-# MANUAL-ONLY (workflow_dispatch): a full run builds five Rust xcframeworks
-# plus the app on a macOS runner (~45 min). Trigger before an iOS release.
+# The signing + ASC-key secrets and Environment setup live in the maintainer
+# release runbook.
 name: ci-ios
 
 on:
   workflow_dispatch:
+  push:
+    tags: ['v*']
 
 jobs:
   build:
     name: unsigned simulator build
+    if: github.event_name == 'workflow_dispatch'
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v5
@@ -64,3 +72,119 @@ jobs:
             -destination 'generic/platform=iOS Simulator' \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO
+
+  release:
+    name: archive + upload to TestFlight
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: macos-latest
+    # Required-reviewer gate: the upload pauses until you approve the
+    # `testflight` Environment in the run's UI.
+    environment: testflight
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - name: Select newest available Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Install Rust toolchain + iOS targets
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios
+
+      - name: Cache cargo registry + build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            ledger-btc-rs
+            ledger-eth-rs
+            ledger-sol-rs
+            ledger-tron-rs
+            trezor-core-rs
+
+      - name: Build core xcframeworks (btc, eth, sol, tron, trezor)
+        run: |
+          set -euo pipefail
+          for crate in ledger-btc-rs ledger-eth-rs ledger-sol-rs ledger-tron-rs trezor-core-rs; do
+            echo "::group::make ios ($crate)"
+            make -C "$crate" ios
+            echo "::endgroup::"
+          done
+
+      - name: Install xcodegen
+        run: brew install xcodegen
+
+      - name: Import signing certificate + provisioning profile
+        env:
+          CERT_P12_BASE64: ${{ secrets.IOS_DIST_CERT_P12_BASE64 }}
+          CERT_P12_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+          PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+          KEYCHAIN_PASSWORD: ${{ secrets.IOS_KEYCHAIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          CERT="$RUNNER_TEMP/dist.p12"
+          PROFILE="$RUNNER_TEMP/profile.mobileprovision"
+          KEYCHAIN="$RUNNER_TEMP/app-signing.keychain-db"
+          echo "$CERT_P12_BASE64" | base64 --decode > "$CERT"
+          echo "$PROFILE_BASE64"  | base64 --decode > "$PROFILE"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$CERT" -P "$CERT_P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security list-keychain -d user -s "$KEYCHAIN"
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          cp "$PROFILE" "$HOME/Library/MobileDevice/Provisioning Profiles/"
+
+      - name: Install App Store Connect API key
+        env:
+          ASC_KEY_BASE64: ${{ secrets.ASC_API_KEY_P8_BASE64 }}
+          ASC_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/private_keys"
+          echo "$ASC_KEY_BASE64" | base64 --decode > "$HOME/private_keys/AuthKey_${ASC_KEY_ID}.p8"
+
+      - name: Archive, export App Store IPA, upload to TestFlight
+        working-directory: ios-app-maknoon
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+          PROFILE_NAME: ${{ secrets.IOS_PROVISIONING_PROFILE_NAME }}
+        run: |
+          set -euo pipefail
+          xcodegen generate
+          xcodebuild archive \
+            -project Maknoon.xcodeproj \
+            -scheme Maknoon \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/Maknoon.xcarchive" \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
+            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
+            CODE_SIGN_IDENTITY="Apple Distribution"
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>teamID</key><string>$TEAM_ID</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>provisioningProfiles</key><dict>
+              <key>com.elabify.app.maknoon</key><string>$PROFILE_NAME</string>
+            </dict>
+            <key>destination</key><string>export</string>
+          </dict></plist>
+          EOF
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/Maknoon.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/export"
+          xcrun altool --upload-app -t ios \
+            -f "$RUNNER_TEMP/export/Maknoon.ipa" \
+            --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"

@@ -33,6 +33,7 @@
 import Foundation
 import CryptoKit
 import ElabifyCore
+import LocalAuthentication
 
 // MARK: -- Wire format
 
@@ -411,18 +412,29 @@ final class IdentitySandwich {
 
     // MARK: -- recovery + reveal material
 
-    /// Decrypt the master material out of Keychain (Face ID prompt)
-    /// and return the entropy plus passphrase. Used by:
-    ///   - Settings "Show recovery phrase"
-    ///   - Settings "Show passphrase"
-    ///   - Delegation renewal (the master sign path)
-    ///   - iCloud backup uploader
+    /// READ-ONLY / derivation use only (addresses, balances, backup upload).
+    /// This is cache-first: once `sessionMaterial` is populated it returns with
+    /// NO biometric prompt. Any action that PRODUCES A SIGNATURE or BROADCASTS a
+    /// transaction MUST instead use `recoveryMaterialFresh`, which forces a fresh
+    /// biometric / 2FA prompt every time (see ADR-0045, Authorization invariant).
+    ///
+    /// In-session cache (populated at unlock / enrollment time) wins over the
+    /// biometric Keychain item. This is the only recovery path that works after
+    /// `sealForSecondFactorEnroll` has deleted the biometric item.
     func recoveryMaterial(localizedReason: String) throws -> MasterRecoveryMaterial {
-        // In-session cache (populated at unlock / enrollment time)
-        // wins over the biometric Keychain item. This is the only
-        // recovery path that works after `sealForSecondFactorEnroll`
-        // has deleted the biometric item on first enrollment.
         if let cached = sessionMaterial { return cached }
+        let material = try readMasterMaterialFromKeychain(localizedReason: localizedReason)
+        // Cache for the rest of the session so subsequent reads are free of
+        // biometric prompts and survive a later hardware enrollment.
+        self.sessionMaterial = material
+        return material
+    }
+
+    /// Read the `.userPresence`-protected master material straight from the
+    /// Keychain (bypassing the cache). Reading the item forces iOS to present a
+    /// fresh Face ID / passcode prompt. Shared by `recoveryMaterial` (cache miss)
+    /// and `recoveryMaterialFresh` (always).
+    private func readMasterMaterialFromKeychain(localizedReason: String) throws -> MasterRecoveryMaterial {
         guard let data = try KeyStore.load(
             forKey: KeyStoreKeys.masterMaterial,
             localizedReason: localizedReason
@@ -430,13 +442,42 @@ final class IdentitySandwich {
             throw SandwichError.masterUnavailable
         }
         let persisted = try JSONDecoder().decode(MasterMaterialPersisted.self, from: data)
-        let entropy = hexToBytes(persisted.entropyHex)
-        let material = MasterRecoveryMaterial(entropy: entropy, passphrase: persisted.passphrase)
-        // Cache for the rest of the session so subsequent reads are
-        // free of biometric prompts and survive a later hardware
-        // enrollment that deletes the biometric item.
-        self.sessionMaterial = material
-        return material
+        return MasterRecoveryMaterial(
+            entropy: hexToBytes(persisted.entropyHex),
+            passphrase: persisted.passphrase
+        )
+    }
+
+    /// Authorize a SENSITIVE action (signing a message, signing/broadcasting a
+    /// transaction) by forcing a fresh biometric / device-passcode prompt right
+    /// now, then return the master material. Unlike `recoveryMaterial`, this is
+    /// NEVER satisfied silently from the in-session cache.
+    ///
+    /// Two modes (branch on `isSecondFactorOn()`, no prompt to check):
+    ///   - Biometric mode: bypass the cache and read the `.userPresence` Keychain
+    ///     item, which prompts. Refreshing the cache means a later
+    ///     `recoveryMaterial()` in the same action does not prompt again.
+    ///   - Hardware second-factor mode: the Keychain item is sealed/absent and the
+    ///     cache is the only source, so gate with an explicit device-owner-auth
+    ///     evaluation, then return the cached material.
+    /// Exactly one prompt per call in both modes.
+    func recoveryMaterialFresh(localizedReason: String) async throws -> MasterRecoveryMaterial {
+        if try Self.isSecondFactorOn() == false {
+            let material = try readMasterMaterialFromKeychain(localizedReason: localizedReason)
+            self.sessionMaterial = material
+            return material
+        }
+        let ctx = LAContext()
+        var err: NSError?
+        if ctx.canEvaluatePolicy(.deviceOwnerAuthentication, error: &err) {
+            let ok = (try? await ctx.evaluatePolicy(
+                .deviceOwnerAuthentication,
+                localizedReason: localizedReason
+            )) ?? false
+            guard ok else { throw SandwichError.userCancelled }
+        }
+        guard let cached = sessionMaterial else { throw SandwichError.masterUnavailable }
+        return cached
     }
 
     /// Populate the in-session recovery-material cache. Called by:
@@ -604,10 +645,13 @@ final class IdentitySandwich {
 
 enum SandwichError: Error, CustomStringConvertible {
     case masterUnavailable
+    case userCancelled
     var description: String {
         switch self {
         case .masterUnavailable:
             return "Master seed is not in Keychain (biometric or passcode prompt was denied, or wallet not provisioned)."
+        case .userCancelled:
+            return "Authentication was cancelled."
         }
     }
 }

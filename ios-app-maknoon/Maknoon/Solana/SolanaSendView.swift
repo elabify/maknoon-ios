@@ -751,6 +751,14 @@ struct SolanaSendView: View {
                         expiresAt: Date().addingTimeInterval(55)
                     )
                 } else {
+                    guard let sandwich = store.sandwich else {
+                        throw SolanaDescriptorError.signingFailed(
+                            "Unlock Maknoon first; signing needs your wallet's private key."
+                        )
+                    }
+                    // Fresh biometric before broadcast (ADR-0045); refreshes the
+                    // cache so sendSPLToken below does not prompt again.
+                    _ = try await sandwich.recoveryMaterialFresh(localizedReason: "Authorize \(token.symbol) send")
                     state = .broadcasting
                     let sig = try await wallet.sendSPLToken(
                         mint: token.mint,
@@ -805,6 +813,15 @@ struct SolanaSendView: View {
                     expiresAt: Date().addingTimeInterval(55)
                 )
             } else {
+                guard let sandwich = store.sandwich else {
+                    throw SolanaDescriptorError.signingFailed(
+                        "Unlock Maknoon first; signing needs your wallet's private key."
+                    )
+                }
+                // Fresh biometric / passcode before broadcast (ADR-0045
+                // Authorization invariant); refreshes the cache so sendSoftware
+                // below does not prompt again.
+                _ = try await sandwich.recoveryMaterialFresh(localizedReason: "Authorize Solana send")
                 state = .broadcasting
                 let sig = try await wallet.sendSoftware(
                     recipient: recipient,

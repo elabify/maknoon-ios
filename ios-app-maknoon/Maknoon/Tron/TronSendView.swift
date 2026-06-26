@@ -746,6 +746,14 @@ struct TronSendView: View {
                     return
                 }
                 // Software path stays one-shot.
+                guard let sandwich = store.sandwich else {
+                    throw TronDescriptorError.signingFailed(
+                        "Unlock Maknoon first; signing needs your wallet's private key."
+                    )
+                }
+                // Fresh biometric before broadcast (ADR-0045); refreshes the cache
+                // so sendTRC20 below does not prompt again.
+                _ = try await sandwich.recoveryMaterialFresh(localizedReason: "Authorize \(token.symbol) send")
                 state = .broadcasting
                 let txid = try await wallet.sendTRC20(
                     contractAddress: token.contract,
@@ -809,6 +817,14 @@ struct TronSendView: View {
                     expiresAt: Date().addingTimeInterval(55)
                 )
             } else {
+                guard let sandwich = store.sandwich else {
+                    throw TronDescriptorError.signingFailed(
+                        "Unlock Maknoon first; signing needs your wallet's private key."
+                    )
+                }
+                // Fresh biometric before broadcast (ADR-0045); refreshes the cache
+                // so prepareSoftwareNative below does not prompt again.
+                _ = try await sandwich.recoveryMaterialFresh(localizedReason: "Authorize Tron send")
                 let signedJSON = try await wallet.prepareSoftwareNative(
                     recipient: recipient,
                     sunAmount: sunAmount,

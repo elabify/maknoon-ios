@@ -29,6 +29,8 @@ struct SolanaWalletView: View {
     @State private var showWallets = false
     @State private var showAllTxs = false
     @State private var showAddWallet = false
+    @State private var showSignMessage = false
+    @State private var showVerifyMessage = false
     /// Drives the Add-SPL-token sheet. Using `.sheet(item:)` (not
     /// `isPresented`) guarantees the prefilled mint is carried atomically:
     /// `.sheet(isPresented:)` rendered the sheet body before the separate
@@ -114,6 +116,17 @@ struct SolanaWalletView: View {
                     } label: {
                         Label("Manage wallets…", systemImage: "list.bullet.rectangle")
                     }
+                    Divider()
+                    Button {
+                        showSignMessage = true
+                    } label: {
+                        Label("Sign message", systemImage: "signature")
+                    }
+                    Button {
+                        showVerifyMessage = true
+                    } label: {
+                        Label("Verify message", systemImage: "checkmark.seal")
+                    }
                 } label: {
                     Image(systemName: "plus.circle")
                 }
@@ -174,6 +187,13 @@ struct SolanaWalletView: View {
                 showAddWallet = false
             }
             .environment(store)
+        }
+        .sheet(isPresented: $showSignMessage) {
+            SolanaSignMessageSheet(activeWallet: activeWallet)
+                .environment(store)
+        }
+        .sheet(isPresented: $showVerifyMessage) {
+            SolanaVerifyMessageSheet()
         }
         .sheet(item: $addTokenRequest) { req in
             SolanaAddTokenSheet(

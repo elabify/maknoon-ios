@@ -1009,6 +1009,12 @@ struct EthereumSendView: View {
                     throw EthereumWallet.WalletError.sandwichRequired
                 }
                 let promptVerb = token == nil ? "send" : "transfer \(token!.symbol)"
+                // Fresh biometric / passcode before signing (ADR-0045
+                // Authorization invariant); refreshes the cache so the sign call
+                // below does not prompt again.
+                _ = try await sandwich.recoveryMaterialFresh(
+                    localizedReason: "Authorize \(network.displayName) \(promptVerb)"
+                )
                 let rawTx = try EthereumDescriptors.signTransactionFromSandwich(
                     sandwich: sandwich,
                     account: account,

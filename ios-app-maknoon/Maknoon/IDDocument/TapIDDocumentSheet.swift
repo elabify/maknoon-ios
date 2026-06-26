@@ -241,7 +241,7 @@ struct TapIDDocumentSheet: View {
     private var formIntro: String {
         switch parameters.kind {
         case .passport:
-            return "Type your details from inside of your passport, then place your phone over the passport."
+            return "Passports with this logo on the front can be added. In order to connect to your passport securely, you must type your details from inside of your passport accurately."
         case .other:
             return "Type the details from the data page of your ID, then tap your phone to it when the system NFC sheet appears."
         }
@@ -264,10 +264,10 @@ struct TapIDDocumentSheet: View {
                 .font(.system(size: 96, weight: .ultraLight))
                 .foregroundStyle(.tint)
                 .symbolEffect(.pulse, options: .repeating)
-            Text("Hold your phone over top of the NFC enabled passport")
+            Text("Tap Passport")
                 .font(.headline)
                 .multilineTextAlignment(.center)
-            Text("Move slowly until the phone finds the chip. The bottom of an iPhone reads best.")
+            Text("Passports vary. Try to place the phone on the center of the inside back cover of the passport, or on the photo page, or the front cover.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

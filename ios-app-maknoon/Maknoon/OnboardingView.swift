@@ -68,6 +68,16 @@ struct OnboardingView: View {
                 .padding(.bottom, 24)
         }
         .preferredColorScheme(.dark)
+        // Lock the welcome / onboarding flow to portrait; release it when the
+        // flow ends (RootView swaps to ContentView, dismissing this view).
+        .onAppear {
+            AppOrientation.lockPortrait = true
+            AppOrientation.apply()
+        }
+        .onDisappear {
+            AppOrientation.lockPortrait = false
+            AppOrientation.apply()
+        }
     }
 
     private var navigationTitle: String {
@@ -275,7 +285,7 @@ struct OnboardingView: View {
                 Text("Set a password")
                     .font(.title3.weight(.semibold))
 
-                Text("A password is used to backup your identity and any local assets using post-quantum encryption.")
+                Text("A username is not required because all your data is owned on your phone. A password is used to encrypt the backup of your identity and any local assets.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
 
@@ -332,7 +342,7 @@ struct OnboardingView: View {
                 Label("Encrypted backup", systemImage: "lock.doc")
                     .font(.title3.weight(.semibold))
 
-                Text("Maknoon will store an encrypted backup in any location you prefer using your password. Without the password, the post-quantum encrypted backup is useless and nobody can unlock it.")
+                Text("Maknoon will store an encrypted backup in any location you prefer using your password. Without the password, the encrypted backup is useless and nobody can unlock it.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
 
@@ -490,14 +500,14 @@ struct OnboardingView: View {
     private var passportScanView: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                Label("Scan your passport", systemImage: "person.text.rectangle")
+                Label("Tap your Passport", systemImage: "person.text.rectangle")
                     .font(.title3.weight(.semibold))
-                Text("Tap your passport and Maknoon reads its chip on-device and mints an identity credential signed by your post-quantum key, that you can present from your phone. Nothing is uploaded unless you then choose an Elabify-verified credential.")
+                Text("Tap your passport and Maknoon reads its chip on-device and mints an identity credential that you can present from your phone.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
 
                 Button(action: { showOnboardingPassport = true }) {
-                    Label("Scan passport", systemImage: "wave.3.right")
+                    Label("Add Passport", systemImage: "wave.3.right")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)

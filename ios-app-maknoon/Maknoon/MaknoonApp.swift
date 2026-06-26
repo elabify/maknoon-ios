@@ -5,9 +5,44 @@
 // See ADR-0019 §"The supersession map".
 
 import SwiftUI
+import UIKit
+
+/// App-wide interface-orientation gate. The onboarding flow locks the device
+/// to portrait (the welcome screens are designed portrait-first); the rest of
+/// the app keeps the default rotation behaviour. Read by [AppDelegate].
+enum AppOrientation {
+    /// When true, the app reports `.portrait` as its only supported
+    /// orientation. Toggled by OnboardingView on appear / disappear.
+    static var lockPortrait = false
+
+    /// Ask UIKit to re-evaluate the supported orientations now (iOS 16+),
+    /// so a device already held in landscape snaps back to portrait when the
+    /// lock turns on (and is freed when it turns off).
+    @MainActor
+    static func apply() {
+        guard let scene = UIApplication.shared.connectedScenes
+            .first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene
+            ?? UIApplication.shared.connectedScenes.first as? UIWindowScene else { return }
+        let mask: UIInterfaceOrientationMask = lockPortrait ? .portrait : .allButUpsideDown
+        scene.requestGeometryUpdate(.iOS(interfaceOrientations: mask))
+        scene.keyWindow?.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
+    }
+}
+
+/// Minimal app delegate whose only job is to report the supported interface
+/// orientations from [AppOrientation] (SwiftUI's App has no orientation hook).
+final class AppDelegate: NSObject, UIApplicationDelegate {
+    func application(
+        _ application: UIApplication,
+        supportedInterfaceOrientationsFor window: UIWindow?
+    ) -> UIInterfaceOrientationMask {
+        AppOrientation.lockPortrait ? .portrait : .allButUpsideDown
+    }
+}
 
 @main
 struct MaknoonApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var store = HolderStore()
     @State private var displayPrefs = DisplayPreferences()
     @State private var autoLock = AutoLockManager()

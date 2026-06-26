@@ -240,11 +240,25 @@ enum EthereumDescriptors {
         biometricReason: String
     ) throws -> String {
         let material = try sandwich.recoveryMaterial(localizedReason: biometricReason)
-        let words = material.words.joined(separator: " ")
-        guard let wallet = HDWallet(
-            mnemonic: words,
-            passphrase: material.hasPassphrase ? material.passphrase : ""
-        ) else {
+        return try signPersonalMessage(
+            mnemonic: material.words.joined(separator: " "),
+            passphrase: material.hasPassphrase ? material.passphrase : "",
+            account: account,
+            message: message
+        )
+    }
+
+    /// Pure EIP-191 `personal_sign` from a mnemonic + passphrase (no biometric
+    /// read). Mirrors the Android `EthereumDescriptors.signPersonalMessage`;
+    /// exercised directly by the cross-platform KAT. Derives the account key at
+    /// m/44'/60'/<account>'/0/0 and returns the 0x-hex r||s||v (v in {27,28}).
+    static func signPersonalMessage(
+        mnemonic: String,
+        passphrase: String,
+        account: UInt32,
+        message: Data
+    ) throws -> String {
+        guard let wallet = HDWallet(mnemonic: mnemonic, passphrase: passphrase) else {
             throw EthereumDescriptorError.hdWalletFailed("HDWallet constructor returned nil")
         }
         let key = wallet.getDerivedKey(coin: .ethereum, account: account, change: 0, address: 0)
