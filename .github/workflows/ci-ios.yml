@@ -155,6 +155,13 @@ jobs:
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
           PROFILE_NAME: ${{ secrets.IOS_PROVISIONING_PROFILE_NAME }}
+          # Auto-increment the CFBundleVersion: project.yml pins a static
+          # CURRENT_PROJECT_VERSION, so without this every upload reuses the same build
+          # number and App Store Connect rejects the duplicate (altool -19232). The GH
+          # run number is monotonic and survives the shallow checkout (git rev-list
+          # --count returns 1 on a depth=1 clone, so it can't be used here). The build
+          # number is NOT the provenance signal; that stays ELABIFY_BUILD_COMMIT (git SHA).
+          BUILD_NUMBER: ${{ github.run_number }}
         run: |
           set -euo pipefail
           xcodegen generate
@@ -164,6 +171,7 @@ jobs:
             -configuration Release \
             -destination 'generic/platform=iOS' \
             -archivePath "$RUNNER_TEMP/Maknoon.xcarchive" \
+            CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
             CODE_SIGN_STYLE=Manual \
             DEVELOPMENT_TEAM="$TEAM_ID" \
             PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
@@ -185,6 +193,13 @@ jobs:
             -archivePath "$RUNNER_TEMP/Maknoon.xcarchive" \
             -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
             -exportPath "$RUNNER_TEMP/export"
+          # altool exits 0 even when App Store Connect REJECTS the upload (e.g. a
+          # duplicate build number, -19232), which would green-wash a failed delivery.
+          # Capture its output and require the success marker, else fail the step.
           xcrun altool --upload-app -t ios \
             -f "$RUNNER_TEMP/export/Maknoon.ipa" \
-            --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"
+            --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID" 2>&1 | tee "$RUNNER_TEMP/altool.log"
+          if ! grep -qi "No errors uploading" "$RUNNER_TEMP/altool.log"; then
+            echo "::error::TestFlight upload was rejected (see altool output above)"
+            exit 1
+          fi
