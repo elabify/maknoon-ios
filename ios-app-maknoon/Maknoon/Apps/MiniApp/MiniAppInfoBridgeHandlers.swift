@@ -8,15 +8,17 @@
 //     coin's spot rate, so a app can show fiat-equivalents and offer
 //     fiat-first amount entry.
 //
-// addressBook requires the "payment" permission (it exposes the user's
-// address list); fiat is public market data and needs no grant.
+// addressBook requires the "wallet" permission (it reads the user's receiving
+// addresses); fiat is public market data and needs no grant. ("payment" stays a
+// defined capability reserved for a future outbound-send handler; receive-only
+// flows are "wallet" - see the mini-app permission ADR.)
 
 import Foundation
 
 @MainActor
 final class AddressBookBridgeHandler: MiniAppNamespaceHandler {
     let namespace = "addressBook"
-    let requiredPermission: String? = "payment"
+    let requiredPermission: String? = "wallet"
 
     private let store: HolderStore
     init(store: HolderStore) { self.store = store }

@@ -9,7 +9,7 @@ import Foundation
 @MainActor
 final class CommerceBridgeHandler: MiniAppNamespaceHandler {
     let namespace = "commerce"
-    let requiredPermission: String? = "payment"
+    let requiredPermission: String? = "wallet"
 
     private let store: HolderStore
     private let appTitle: String
