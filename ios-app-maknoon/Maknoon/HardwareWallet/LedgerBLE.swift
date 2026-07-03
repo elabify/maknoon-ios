@@ -255,7 +255,7 @@ final class LedgerBLE: NSObject, HardwareWallet, @unchecked Sendable {
     /// waiting continuation with a clear timeout message so the
     /// awaited op() in withTimeout throws.
     private func tripTimeout(label: String, seconds: Double) {
-        let msg = "\(label) timed out after \(Int(seconds))s. Make sure your Ledger is awake (press a button), Bluetooth is on, and the Bitcoin app is open."
+        let msg = "\(label) timed out after \(Int(seconds))s. Make sure your hardware wallet is awake (press a button), Bluetooth is on, and the correct app for this network is open."
         if let pa = pendingAPDU?.continuation {
             pa.resume(throwing: HardwareWalletError.transport(msg))
             pendingAPDU = nil
@@ -608,6 +608,32 @@ final class LedgerBLE: NSObject, HardwareWallet, @unchecked Sendable {
             return "0x" + out.map { String(format: "%02x", $0) }.joined()
         } catch {
             throw mapEthereumSDKError(error, command: "SIGN_PERSONAL_MESSAGE")
+        }
+    }
+
+    /// EIP-712 `eth_signTypedData_v4` on the device (Ledger Ethereum app, INS
+    /// 0x0E). The SDK hashes the typed-data JSON with the shared hasher and sends
+    /// `domainSeparator (32) || hashStruct (32)`; the device signs. Returns the
+    /// FULL 0x-hex r||s||v (v in {27,28}) a web3 verifier can ecrecover.
+    func signEthereumTypedData(account: UInt32, typedDataJSON: String) async throws -> String {
+        defer { resetSession() }
+        try await ensureConnected()
+        do {
+            let sdk = ethereumSDK()
+            let sig: EthereumSignature
+            if let path = pendingDerivationPath {
+                sig = try await sdk.signEip712TypedDataAtPath(path: path, typedDataJson: typedDataJSON)
+            } else {
+                sig = try await sdk.signEip712TypedDataForAccount(account: account, typedDataJson: typedDataJSON)
+            }
+            var out = Data()
+            out.append(Data(sig.r))
+            out.append(Data(sig.s))
+            let v = UInt8(truncatingIfNeeded: Int(sig.v))
+            out.append(v < 27 ? v &+ 27 : v)
+            return "0x" + out.map { String(format: "%02x", $0) }.joined()
+        } catch {
+            throw mapEthereumSDKError(error, command: "SIGN_EIP712")
         }
     }
 

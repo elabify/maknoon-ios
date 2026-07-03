@@ -125,6 +125,17 @@ packages:
   YubiKit:
     url: https://github.com/Yubico/yubikit-ios.git
     from: 4.6.0
+  # Reown (WalletConnect) Swift SDK. ReownWalletKit is the wallet-side
+  # product: pairing over the relay, session proposals, and request
+  # handling for EVM (eip155) only (ADR-0049). Foreground-only; we do not
+  # wire push. WARNING (validate on first resolve): WalletKit pulls Yttrium
+  # (a binary Rust core) + CoinbaseWalletSDK transitively, and may pull
+  # swift-crypto, which has failed to build in this Xcode/SPM setup before
+  # (see the note below). If resolution/build breaks, fall back to the
+  # lower-level WalletConnect/Sign products or pin transitive versions.
+  ReownWalletKit:
+    url: https://github.com/reown-com/reown-swift.git
+    exactVersion: 2.3.0
   # NOTE: the App Attest peer verifier (parked in ../appattest-wip) needs
   # swift-certificates + swift-asn1 for cert-chain validation and nonce-
   # extension parsing. Adding them pulls in swift-crypto, whose dynamic
@@ -204,6 +215,11 @@ targets:
         # verifier server's /healthz buildCommit. Stays "dev" for local
         # builds; CI overrides via xcconfig or environment.
         ELABIFY_BUILD_COMMIT: $(ELABIFY_BUILD_COMMIT)
+        # WalletConnect / Reown Cloud project ID (ADR-0049). Not a secret: it is
+        # a public client identifier allowlisted by bundle ID in Reown Cloud, and
+        # is embedded in every shipped build. A user/enterprise can override the
+        # project ID and relay URL in Settings (self-hosted relay).
+        ELABIFY_WC_PROJECT_ID: 8c99b5a141a9efbffd6b40169eb471f5
         LSRequiresIPhoneOS: true
         NSFaceIDUsageDescription: Maknoon uses Face ID to unlock the app and authorize signing with your wallet and credential keys.
         NSCameraUsageDescription: Maknoon needs camera access to scan QR codes from issuers when you receive a credential.
@@ -241,6 +257,12 @@ targets:
           - A000000527200101
           - A000000527210101
           - A000000308
+        # WalletConnect deep links (ADR-0049): external apps hand off a
+        # `wc:` pairing URI to Maknoon. EVM-only; foreground handling.
+        CFBundleURLTypes:
+          - CFBundleURLName: com.elabify.app.maknoon.walletconnect
+            CFBundleURLSchemes:
+              - wc
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
         UILaunchScreen: {}
@@ -326,6 +348,14 @@ targets:
         product: URKit
       - package: YubiKit
         product: YubiKit
+      # Reown WalletKit (WalletConnect, EVM-only). ADR-0049. ReownWalletKit
+      # re-exports Sign/Relay/Signer/Utils (WalletKit, AutoNamespaces, Session,
+      # Request, CryptoProvider, EthereumSignature, WebSocketConnecting);
+      # WalletConnectNetworking is needed for Networking.configure.
+      - package: ReownWalletKit
+        product: ReownWalletKit
+      - package: ReownWalletKit
+        product: WalletConnectNetworking
   # Unit tests. Hosted by the Maknoon app (XcodeGen wires TEST_HOST +
   # the app's test scheme from the target dependency) so the test
   # bundle resolves the app's embedded WalletCore / SwiftProtobuf

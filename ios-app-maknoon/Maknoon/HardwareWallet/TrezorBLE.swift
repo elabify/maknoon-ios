@@ -466,6 +466,31 @@ final class TrezorBLE: NSObject, HardwareWallet, @unchecked Sendable {
         return "0x" + out.map { String(format: "%02x", $0) }.joined()
     }
 
+    /// EIP-712 `eth_signTypedData_v4` on the current `pendingPassphrase` wallet.
+    /// The Rust client drives the device's interactive StructRequest/ValueRequest
+    /// streaming over the typed-data JSON; the user confirms on-device. Returns
+    /// the full 0x-hex signature (r||s||v, v in {27,28}).
+    func signEthereumTypedData(account: UInt32, typedDataJSON: String) async throws -> String {
+        defer { resetSession() }
+        let creds = try credentialAndHostKey()
+        let passphrase = pendingPassphrase
+        let path = pendingDerivationPath
+        let sig = try await withBusyRetry {
+            try await ensureConnected()
+            return try await trezorClient().signEthereumTypedData(
+                hostStaticPriv: creds.hostKey,
+                credential: creds.credential,
+                passphrase: passphrase,
+                account: account,
+                typedDataJson: typedDataJSON,
+                path: path
+            )
+        }
+        var out = Data(sig)
+        if out.count == 65, out[64] < 27 { out[64] = out[64] &+ 27 }
+        return "0x" + out.map { String(format: "%02x", $0) }.joined()
+    }
+
     /// BIP84 account-level xpub for the current `pendingPassphrase`
     /// wallet, used to build a watch-only BDK descriptor host-side.
     /// Within a pinned discovery the seeded session is reused across

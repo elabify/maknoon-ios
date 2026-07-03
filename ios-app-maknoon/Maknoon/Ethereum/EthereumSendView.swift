@@ -849,46 +849,14 @@ struct EthereumSendView: View {
         guard let dev = store.devices.find(id: deviceId) else {
             throw EthereumWallet.WalletError.rpcFailure("Hardware device record \(deviceId) is missing. Re-register the device in Settings → Devices.")
         }
-        let hwKind: HardwareWalletKind = dev.kind == .ledger ? .ledger : .trezor
-        let hardware = HardwareWalletFactory.make(kind: hwKind)
-        // A Trezor hidden wallet must re-open the same passphrase
-        // session it was discovered in, or the device derives a
-        // different (wrong) key and the signature won't match the
-        // wallet's address. Ledger / mock clients ignore this.
-        if let trezor = hardware as? TrezorBLE {
-            trezor.applyPassphraseMode(try HardwarePassphraseRef.resolveChoice(hidden, hostEntered: hostEntered))
-        }
-        hardware.setDerivationPathOverride(derivationPath)
-        // Pin one BLE/THP session across identify + sign. Without it,
-        // identify tears the link down and the sign reconnects
-        // immediately (no network round-trip in between, unlike Solana),
-        // racing the half-closed BLE link so the fresh THP handshake
-        // reads a stale frame ("handshake init response has the wrong
-        // size"). Pinning keeps the link up across both ops.
-        hardware.beginSession()
-        defer { hardware.endSession() }
-        let connected = try await hardware.identifyDevice()
-        guard connected == dev.serial else {
-            throw IdentityWrapError.deviceSerialMismatch(expected: dev.serial, actual: connected)
-        }
-        let unsigned = EthereumTxEncoder.unsignedEnvelope(plan: plan)
-        // For an ERC-20 transfer, hand the device the Ledger-signed
-        // token descriptor (when bundled) so it clear-signs the
-        // transfer instead of demanding blind signing. plan.toAddress
-        // is the token contract for the .erc20 payload.
-        let erc20Descriptor: Data?
-        if case .erc20 = plan.payload {
-            erc20Descriptor = LedgerERC20Descriptors.descriptor(chainId: plan.chainId, contract: plan.toAddress)
-        } else {
-            erc20Descriptor = nil
-        }
-        let (v, r, s) = try await hardware.signEthereumTransaction(
-            envelope: unsigned,
+        return try await EthereumHardwareTx.sign(
+            plan: plan,
+            device: dev,
             account: account,
-            erc20Descriptor: erc20Descriptor
+            hidden: hidden,
+            derivationPath: derivationPath,
+            hostEntered: hostEntered
         )
-        let signed = EthereumTxEncoder.signedEnvelope(plan: plan, v: v, r: r, s: s)
-        return "0x" + signed.map { String(format: "%02x", $0) }.joined()
     }
 
     // MARK: -- data flow

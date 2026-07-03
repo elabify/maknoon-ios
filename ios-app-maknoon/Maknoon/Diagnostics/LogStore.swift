@@ -15,6 +15,7 @@
 // invoking the iOS share sheet.
 
 import Foundation
+import os
 
 final class LogStore: @unchecked Sendable {
     static let shared = LogStore()
@@ -52,6 +53,14 @@ final class LogStore: @unchecked Sendable {
         if _entries.count > maxEntries {
             _entries.removeFirst(_entries.count - maxEntries)
         }
+        #if DEBUG
+        // Debug builds also mirror to the unified system log so a developer can
+        // `log stream` live while testing on device. Same content as the in-app
+        // log (addresses / device ids / errors only, per the rule above); never
+        // in release builds, preserving the no-telemetry posture.
+        Logger(subsystem: "com.elabify.app.maknoon", category: category)
+            .log("\(message, privacy: .public)")
+        #endif
     }
 
     // MARK: -- read
@@ -66,6 +75,14 @@ final class LogStore: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         return _entries.count
+    }
+
+    /// Most recent entries for a single category, oldest-first, capped at `limit`.
+    /// Used to surface a focused diagnostic feed (e.g. WalletConnect) in-app.
+    func recent(category: String, limit: Int = 40) -> [Entry] {
+        lock.lock()
+        defer { lock.unlock() }
+        return Array(_entries.filter { $0.category == category }.suffix(limit))
     }
 
     func clear() {

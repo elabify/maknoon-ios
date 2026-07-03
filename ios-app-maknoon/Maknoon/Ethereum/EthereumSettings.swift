@@ -36,6 +36,13 @@ final class EthereumSettings: @unchecked Sendable {
     /// Wallet's assets repo.
     var logoTemplate: String = EthereumSettings.defaultLogoTemplate
 
+    /// Self-hosted WalletConnect relay host (e.g. relay.example.com). Empty means
+    /// the built-in default relay. This is a GLOBAL WalletConnect setting, not
+    /// per-network (WalletConnect is EVM-only today but the relay is one config
+    /// for all). Takes effect on next app launch (the relay is configured once at
+    /// startup). Host only; any wss:// scheme or trailing slash is stripped on save.
+    var walletConnectRelayHost: String = ""
+
     static let defaultLogoTemplate = "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/{chain}/assets/{address}/logo.png"
 
     /// Per-token logo URL for a given network + contract. Returns
@@ -160,6 +167,7 @@ final class EthereumSettings: @unchecked Sendable {
         fiatCode = "usd"
         ensRPCURL = ""
         tokenCatalogURL = EthereumTokenRegistry.defaultCatalogURL
+        walletConnectRelayHost = ""
         persist()
     }
 
@@ -184,6 +192,7 @@ final class EthereumSettings: @unchecked Sendable {
         var ensRPCURL: String?
         var tokenCatalogURL: String?
         var logoTemplate: String?
+        var walletConnectRelayHost: String?
     }
 
     /// Reset to defaults then re-read UserDefaults (post-restore refresh).
@@ -196,6 +205,7 @@ final class EthereumSettings: @unchecked Sendable {
         ensRPCURL = ""
         tokenCatalogURL = EthereumTokenRegistry.defaultCatalogURL
         logoTemplate = EthereumSettings.defaultLogoTemplate
+        walletConnectRelayHost = ""
         load()
     }
 
@@ -215,6 +225,7 @@ final class EthereumSettings: @unchecked Sendable {
         if let saved = snap.logoTemplate, !saved.isEmpty {
             logoTemplate = saved
         }
+        walletConnectRelayHost = snap.walletConnectRelayHost ?? ""
         // Etherscan retired most of the per-chain v1 hostnames in
         // 2024 (api-sepolia.etherscan.io, api.arbiscan.io, ...) and
         // returns either NSURLError -1003 or a deprecation banner.
@@ -256,7 +267,8 @@ final class EthereumSettings: @unchecked Sendable {
             fiatCode: fiatCode,
             ensRPCURL: ensRPCURL,
             tokenCatalogURL: tokenCatalogURL,
-            logoTemplate: logoTemplate
+            logoTemplate: logoTemplate,
+            walletConnectRelayHost: walletConnectRelayHost
         )
         if let data = try? JSONEncoder().encode(snap) {
             UserDefaults.standard.set(data, forKey: Self.storeKey)

@@ -41,6 +41,12 @@ struct EthereumTxPlan {
         /// the token contract. `toAddress` on the parent struct is
         /// the contract address; `recipient` here is the receiver.
         case erc20(recipient: String)
+        /// Arbitrary contract call (e.g. a WalletConnect dApp's
+        /// `eth_sendTransaction`): raw `data` sent to `toAddress`,
+        /// carrying `value` wei (often zero, non-zero for payable
+        /// calls such as an ETH swap). The device clear- or
+        /// blind-signs the call; there is no recognized descriptor.
+        case contractCall(data: Data)
     }
 
     let chainId: UInt64
@@ -89,8 +95,9 @@ enum EthereumTxEncoder {
     /// value contradicts the recognized transfer calldata.
     private static func ethValueWei(for plan: EthereumTxPlan) -> EthereumWeiValue {
         switch plan.payload {
-        case .native: return plan.value
-        case .erc20:  return .zero
+        case .native:       return plan.value
+        case .erc20:        return .zero
+        case .contractCall: return plan.value
         }
     }
 
@@ -126,6 +133,8 @@ enum EthereumTxEncoder {
             return Data()
         case .erc20(let recipient):
             return EthereumABI.transferData(to: recipient, amount: plan.value) ?? Data()
+        case .contractCall(let data):
+            return data
         }
     }
 
@@ -135,6 +144,56 @@ enum EthereumTxEncoder {
         // Allow the canonical-RLP all-zero case to collapse to empty.
         if bytes.count == 1 && bytes[0] == 0 { return Data() }
         return Data(bytes)
+    }
+}
+
+/// Shared hardware (Ledger / Trezor) EIP-1559 transaction signer. Both the send
+/// flow and WalletConnect call this so they pin ONE BLE/THP session across
+/// identify+sign and apply identical hidden-wallet passphrase + derivation-path
+/// handling. Returns the 0x-prefixed signed raw transaction.
+enum EthereumHardwareTx {
+    static func sign(
+        plan: EthereumTxPlan,
+        device: RegisteredDevice,
+        account: UInt32,
+        hidden: HardwarePassphraseRef? = nil,
+        derivationPath: String? = nil,
+        hostEntered: String? = nil
+    ) async throws -> String {
+        let hwKind: HardwareWalletKind = device.kind == .ledger ? .ledger : .trezor
+        let hardware = HardwareWalletFactory.make(kind: hwKind)
+        // A Trezor hidden wallet must re-open the same passphrase session it was
+        // discovered in, or the device derives a different (wrong) key and the
+        // signature won't match the wallet's address. Ledger / mock ignore this.
+        if let trezor = hardware as? TrezorBLE {
+            trezor.applyPassphraseMode(try HardwarePassphraseRef.resolveChoice(hidden, hostEntered: hostEntered))
+        }
+        hardware.setDerivationPathOverride(derivationPath)
+        // Pin the session across identify + sign (see send-flow note): without
+        // it, identify tears the link down and the sign reconnects immediately,
+        // racing the half-closed BLE link into a stale-frame handshake error.
+        hardware.beginSession()
+        defer { hardware.endSession() }
+        let connected = try await hardware.identifyDevice()
+        guard connected == device.serial else {
+            throw IdentityWrapError.deviceSerialMismatch(expected: device.serial, actual: connected)
+        }
+        let unsigned = EthereumTxEncoder.unsignedEnvelope(plan: plan)
+        // ERC-20 transfers get the Ledger-signed token descriptor for
+        // clear-signing; native + arbitrary contract calls have none.
+        let erc20Descriptor: Data?
+        if case .erc20 = plan.payload {
+            erc20Descriptor = LedgerERC20Descriptors.descriptor(chainId: plan.chainId, contract: plan.toAddress)
+        } else {
+            erc20Descriptor = nil
+        }
+        let (v, r, s) = try await hardware.signEthereumTransaction(
+            envelope: unsigned,
+            account: account,
+            erc20Descriptor: erc20Descriptor
+        )
+        let signed = EthereumTxEncoder.signedEnvelope(plan: plan, v: v, r: r, s: s)
+        return "0x" + signed.map { String(format: "%02x", $0) }.joined()
     }
 }
 
@@ -211,6 +270,13 @@ enum EthereumDescriptors {
             erc20.to = recipient
             erc20.amount = plan.value.bigEndianBytes
             tx.transactionOneof = .erc20Transfer(erc20)
+        case .contractCall(let data):
+            // Arbitrary call: WalletCore's generic contract carries the
+            // ETH value (payable calls) and the raw calldata verbatim.
+            var generic = EthereumTransaction.ContractGeneric()
+            generic.amount = plan.value.bigEndianBytes
+            generic.data = data
+            tx.transactionOneof = .contractGeneric(generic)
         }
         input.transaction = tx
 
@@ -270,6 +336,36 @@ enum EthereumDescriptors {
             throw EthereumDescriptorError.signingFailed("secp256k1 personal_sign failed")
         }
         // TWC returns recid (0/1) in the trailing byte; web3 wants v=27/28.
+        sig[64] = sig[64] + 27
+        return "0x" + sig.map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// EIP-712 `eth_signTypedData_v4` (software). Hashes the standard
+    /// `{types,primaryType,domain,message}` JSON with the SAME pure-Rust hasher
+    /// the Ledger path uses (so software and hardware signatures agree), then
+    /// signs the 32-byte digest with secp256k1 under a biometric prompt. Returns
+    /// the 0x-hex r||s||v signature (v in {27,28}) web3 clients expect.
+    static func signTypedDataFromSandwich(
+        sandwich: IdentitySandwich,
+        account: UInt32,
+        typedDataJSON: String,
+        biometricReason: String
+    ) throws -> String {
+        let hashes = try hashEip712TypedData(json: typedDataJSON)
+        guard hashes.digest.count == 32 else {
+            throw EthereumDescriptorError.signingFailed("eip712 digest size \(hashes.digest.count)")
+        }
+        let material = try sandwich.recoveryMaterial(localizedReason: biometricReason)
+        guard let wallet = HDWallet(
+            mnemonic: material.words.joined(separator: " "),
+            passphrase: material.hasPassphrase ? material.passphrase : ""
+        ) else {
+            throw EthereumDescriptorError.hdWalletFailed("HDWallet constructor returned nil")
+        }
+        let key = wallet.getDerivedKey(coin: .ethereum, account: account, change: 0, address: 0)
+        guard var sig = key.sign(digest: hashes.digest, curve: .secp256k1), sig.count == 65 else {
+            throw EthereumDescriptorError.signingFailed("secp256k1 eip712 sign failed")
+        }
         sig[64] = sig[64] + 27
         return "0x" + sig.map { String(format: "%02x", $0) }.joined()
     }

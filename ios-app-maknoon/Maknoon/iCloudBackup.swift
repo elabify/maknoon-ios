@@ -411,11 +411,50 @@ enum EncryptedBackup {
     /// Test that an encrypted backup blob opens with the given
     /// passphrase WITHOUT applying any of it to the device. Decrypts
     /// (and, for v3 blobs, verifies the ML-DSA-65 signature) and
-    /// discards the result. Throws the same `BackupError` as
-    /// `decryptFull` on a wrong passphrase or a malformed / tampered
-    /// file. Used by Settings, "Verify encrypted backup".
-    static func verify(_ blobData: Data, passphrase: String) throws {
-        _ = try decryptFull(blobData, passphrase: passphrase)
+    /// RETURNS the decrypted payload so the caller can show its
+    /// contents manifest (nothing on the device is changed). Throws the
+    /// same `BackupError` as `decryptFull` on a wrong passphrase or a
+    /// malformed / tampered file. Used by Settings, "Verify encrypted
+    /// backup".
+    @discardableResult
+    static func verify(_ blobData: Data, passphrase: String) throws -> DecryptedBackup {
+        try decryptFull(blobData, passphrase: passphrase)
+    }
+
+    /// The human-readable contents list shown BOTH after a backup is
+    /// saved and after "Verify encrypted backup" opens one, so the two
+    /// can be compared at a glance (the create-time footer says exactly
+    /// this). The labels MUST stay byte-identical between the two call
+    /// sites, which is why this is the single source of truth for them.
+    static func backupManifest(
+        settings: SettingsBackup?,
+        lightningCount: Int,
+        credentialsCount: Int,
+        idDocumentsCount: Int,
+        walletState: [String: String]?
+    ) -> [String] {
+        func walletCount(_ key: String) -> Int {
+            guard let b64 = walletState?[key], let data = Data(base64Encoded: b64),
+                  let arr = (try? JSONSerialization.jsonObject(with: data)) as? [Any] else { return 0 }
+            return arr.count
+        }
+        var manifest: [String] = ["Identity & recovery phrase"]
+        for (label, key) in [
+            ("Bitcoin", "networks.bitcoin.wallets.v1"),
+            ("Ethereum", "networks.ethereum.wallets.v2"),
+            ("Solana", "networks.solana.wallets.v2"),
+            ("Tron", "networks.tron.wallets.v2"),
+        ] {
+            let n = walletCount(key); if n > 0 { manifest.append("\(label) wallets (\(n))") }
+        }
+        if walletState != nil { manifest.append("Networks, RPC/explorer overrides, tokens, currency & display") }
+        if let issuers = settings?.knownIssuers, !issuers.isEmpty { manifest.append("Trusted issuers (\(issuers.count))") }
+        if let devs = settings?.devices, !devs.isEmpty { manifest.append("Hardware devices (\(devs.count))") }
+        if let ab = settings?.addressBook, !ab.isEmpty { manifest.append("Address book (\(ab.count))") }
+        if lightningCount > 0 { manifest.append("Lightning accounts (\(lightningCount))") }
+        if credentialsCount > 0 { manifest.append("Credentials (\(credentialsCount))") }
+        if idDocumentsCount > 0 { manifest.append("ID documents / passports (\(idDocumentsCount))") }
+        return manifest
     }
 
     static func decryptFull(_ blobData: Data, passphrase: String) throws -> DecryptedBackup {

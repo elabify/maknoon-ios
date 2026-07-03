@@ -11,7 +11,6 @@ struct BitcoinSettingsView: View {
     @State private var pinnedCertSHA: String = ""
     @State private var mempoolURL: String = ""
     @State private var explorerURL: String = ""
-    @State private var fiatCode: String = "usd"
 
     var body: some View {
         Form {
@@ -78,28 +77,6 @@ struct BitcoinSettingsView: View {
             }
 
             Section {
-                Picker("Fiat currency", selection: $fiatCode) {
-                    ForEach(commonFiats, id: \.self) {
-                        Text($0.uppercased()).tag($0)
-                    }
-                }
-                Button("Reset to default") {
-                    fiatCode = "usd"
-                    save()
-                }
-                .foregroundStyle(.blue)
-            } header: {
-                Text("Fiat currency")
-            } footer: {
-                // The spot-price + FX endpoints moved to a single global override
-                // under Settings > Currency > Price data sources (#63); the
-                // legacy per-Bitcoin CoinGecko field + BitcoinPriceCache are
-                // retired. All chains now price through the shared AssetPriceCache.
-                Text("The display currency and price sources are set globally under Settings, Currency.")
-                    .font(.caption)
-            }
-
-            Section {
                 Button("Save changes") { save() }
                 Button(role: .destructive) {
                     store.bitcoinSettings.resetToDefaults()
@@ -113,10 +90,6 @@ struct BitcoinSettingsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { loadFromStore() }
     }
-
-    private let commonFiats: [String] = [
-        "usd", "eur", "gbp", "jpy", "aed", "sar", "cny", "inr", "cad", "aud", "chf"
-    ]
 
     // MARK: -- hardware wallets section
     //
@@ -134,7 +107,6 @@ struct BitcoinSettingsView: View {
         pinnedCertSHA = cfg.pinnedCertSHA256
         mempoolURL = store.bitcoinSettings.mempoolURLByNetwork[selectedNetwork] ?? ""
         explorerURL = store.bitcoinSettings.explorerURLByNetwork[selectedNetwork] ?? ""
-        fiatCode = store.bitcoinSettings.fiatCode
     }
 
     private func save() {
@@ -147,7 +119,6 @@ struct BitcoinSettingsView: View {
         )
         store.bitcoinSettings.setMempool(mempoolURL, for: selectedNetwork)
         store.bitcoinSettings.setExplorerURL(explorerURL, for: selectedNetwork)
-        store.bitcoinSettings.fiatCode = fiatCode
         store.bitcoinSettings.persist()
     }
 }

@@ -452,23 +452,16 @@ struct SettingsView: View {
             )
             // Manifest of what this backup contains, shown after save so it can
             // be eyeballed against the restore confirmation (and so a new config
-            // that silently isn't being backed up is easy to spot).
-            func walletCount(_ key: String) -> Int {
-                guard let b64 = walletStateSnapshot?[key], let data = Data(base64Encoded: b64),
-                      let arr = (try? JSONSerialization.jsonObject(with: data)) as? [Any] else { return 0 }
-                return arr.count
-            }
-            var manifest: [String] = ["Identity & recovery phrase"]
-            for (label, key) in [("Bitcoin", "networks.bitcoin.wallets.v1"), ("Ethereum", "networks.ethereum.wallets.v2"), ("Solana", "networks.solana.wallets.v2"), ("Tron", "networks.tron.wallets.v2")] {
-                let n = walletCount(key); if n > 0 { manifest.append("\(label) wallets (\(n))") }
-            }
-            if walletStateSnapshot != nil { manifest.append("Networks, RPC/explorer overrides, tokens, currency & display") }
-            if !snapshot.knownIssuers.isEmpty { manifest.append("Trusted issuers (\(snapshot.knownIssuers.count))") }
-            if let devs = snapshot.devices, !devs.isEmpty { manifest.append("Hardware devices (\(devs.count))") }
-            if let ab = snapshot.addressBook, !ab.isEmpty { manifest.append("Address book (\(ab.count))") }
-            if !lightning.isEmpty { manifest.append("Lightning accounts (\(lightning.count))") }
-            if !credentialsSnapshot.credentials.isEmpty { manifest.append("Credentials (\(credentialsSnapshot.credentials.count))") }
-            if !idDocumentsSnapshot.documents.isEmpty { manifest.append("ID documents / passports (\(idDocumentsSnapshot.documents.count))") }
+            // that silently isn't being backed up is easy to spot). Built by the
+            // shared EncryptedBackup.backupManifest so the verify screen shows an
+            // identical list.
+            let manifest = EncryptedBackup.backupManifest(
+                settings: snapshot,
+                lightningCount: lightning.count,
+                credentialsCount: credentialsSnapshot.credentials.count,
+                idDocumentsCount: idDocumentsSnapshot.documents.count,
+                walletState: walletStateSnapshot
+            )
             EncryptedBackup.presentBackupPicker(blob: blob) { url, error in
                 backupWorking = false
                 if let error {

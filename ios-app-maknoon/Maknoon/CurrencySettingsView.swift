@@ -55,6 +55,9 @@ struct CurrencySettingsView: View {
                 // Advanced (price data sources): pinned to the very bottom.
                 Section {
                     DisclosureGroup("Advanced") {
+                        Text("Price data sources: use your own price and exchange-rate sources instead of the defaults.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                         TextField("CoinGecko base URL", text: $prefs.coinGeckoBaseURL)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
@@ -75,9 +78,6 @@ struct CurrencySettingsView: View {
                             store.assetPrices.refreshAll(fiat: prefs.code)
                         }
                     }
-                } footer: {
-                    Text("Price data sources: use your own price and exchange-rate sources instead of the defaults.")
-                        .font(.caption)
                 }
             }
         }

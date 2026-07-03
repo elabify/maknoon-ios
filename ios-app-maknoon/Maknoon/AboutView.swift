@@ -20,6 +20,7 @@ struct AboutView: View {
         Form {
             appSection
             elabifySection
+            standardsSection
             servicesSection
             componentsSection
             diagnosticsSection
@@ -82,11 +83,23 @@ struct AboutView: View {
             Link(destination: URL(string: "https://github.com/elabify/maknoon-ios/blob/main/ios-app-maknoon/LICENSE.md")!) {
                 Label("License (Apache 2.0 / MIT)", systemImage: "scroll")
             }
-            Link(destination: URL(string: "https://musnad.elabify.com/privacy")!) {
+            Link(destination: URL(string: "https://elabify.com/support/compliance/privacy-policy/")!) {
                 Label("Privacy policy", systemImage: "hand.raised")
             }
         } header: {
             Text("Elabify")
+        }
+    }
+
+    private var standardsSection: some View {
+        Section {
+            Link(destination: URL(string: "https://github.com/trustoverip/high-assurance-verifiable-identifiers")!) {
+                Label("ToIP HAVID", systemImage: "checkmark.seal.fill")
+            }
+        } header: {
+            Text("Standards")
+        } footer: {
+            Text("Maknoon verifiers can cross-check an issuer's DID against its X.509 organisational certificate (HAVID), and a passport's CSCA against an on-chain registry, so trust does not rest on the issuer's word alone.")
         }
     }
 
@@ -132,6 +145,8 @@ struct AboutView: View {
                       url: "https://github.com/elabify/elabify-core")
             component("Ledger device SDKs (BTC/ETH/SOL/TRON)", version: "In-tree", license: "Apache 2.0",
                       url: "https://github.com/elabify/maknoon-ios")
+            component("WalletConnect (Reown)", version: "2.3.0", license: "Apache 2.0",
+                      url: "https://github.com/reown-com/reown-swift")
             component("YubiKit", version: "4.7.0", license: "Apache 2.0",
                       url: "https://github.com/Yubico/yubikit-ios")
             component("NFCPassportReader", version: "2.3.0", license: "MIT",
@@ -152,9 +167,6 @@ struct AboutView: View {
                       url: "https://github.com/krzyzanowskim/OpenSSL-Package")
         } header: {
             Text("Open-source components")
-        } footer: {
-            Text("Complete third-party bill of materials, every component is permissively licensed (Apache 2.0, MIT, or BSD-2-Clause-Patent), with no copyleft (GPL/LGPL/AGPL/MPL). Versions are pinned. The Ledger device SDKs are in-tree Apache-2.0 wrappers around LedgerHQ's official clients.")
-                .font(.caption)
         }
     }
 

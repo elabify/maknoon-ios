@@ -120,6 +120,40 @@ enum EthereumMessageSigning {
             )
         }
     }
+
+    /// Hardware-BLE EIP-712 `eth_signTypedData_v4`. Ledger signs the two hashes
+    /// on-device (INS 0x0E). Trezor's typed-data streaming is not implemented yet
+    /// (the Rust core returns NotImplemented), so it surfaces a clear message
+    /// rather than a cryptic device error.
+    static func signTypedDataOverBLE(
+        device: RegisteredDevice,
+        account: UInt32,
+        typedDataJSON: String,
+        hidden: HardwarePassphraseRef? = nil,
+        hostEntered: String? = nil
+    ) async throws -> String {
+        switch device.kind {
+        case .ledger:
+            let ledger = HardwareWalletFactory.make(kind: .ledger)
+            guard let ledger = ledger as? LedgerBLE else {
+                throw EthereumMessageSigningError.signingFailed("Expected LedgerBLE instance, got \(type(of: ledger))")
+            }
+            ledger.targetPeripheralUUID = device.peripheralUUID
+            return try await ledger.signEthereumTypedData(account: account, typedDataJSON: typedDataJSON)
+        case .trezor:
+            let trezor = HardwareWalletFactory.make(kind: .trezor)
+            guard let trezor = trezor as? TrezorBLE else {
+                throw EthereumMessageSigningError.signingFailed("Expected TrezorBLE instance, got \(type(of: trezor))")
+            }
+            trezor.targetPeripheralUUID = device.peripheralUUID
+            trezor.applyPassphraseMode(try HardwarePassphraseRef.resolveChoice(hidden, hostEntered: hostEntered))
+            return try await trezor.signEthereumTypedData(account: account, typedDataJSON: typedDataJSON)
+        default:
+            throw EthereumMessageSigningError.signingFailed(
+                "\(device.kind.displayName) does not support typed-data signing yet"
+            )
+        }
+    }
 }
 
 struct EthereumSignMessageSheet: View {

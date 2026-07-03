@@ -30,6 +30,7 @@ struct EthereumWalletView: View {
     @State private var showNetworkPicker = false
     @State private var showSignMessage = false
     @State private var showVerifyMessage = false
+    @State private var showWalletConnect = false
     @State private var detailToken: EthereumToken?
 
     private var activeWallet: EthereumWalletDescriptor? {
@@ -113,6 +114,12 @@ struct EthereumWalletView: View {
                     } label: {
                         Label("Verify message", systemImage: "checkmark.seal")
                     }
+                    Divider()
+                    Button {
+                        showWalletConnect = true
+                    } label: {
+                        Label("WalletConnect", systemImage: "link")
+                    }
                 } label: {
                     Image(systemName: "plus.circle")
                 }
@@ -146,6 +153,9 @@ struct EthereumWalletView: View {
         }
         .sheet(isPresented: $showVerifyMessage) {
             EthereumVerifyMessageSheet()
+        }
+        .sheet(isPresented: $showWalletConnect) {
+            WalletConnectView()
         }
         .sheet(isPresented: $showReceive) {
             if let activeWallet, let addr = activeWallet.address {
@@ -520,8 +530,14 @@ struct EthereumWalletView: View {
                     Button("See all") { showAllTxs = true }.font(.callout)
                 }
             }
-            let pending = pendingForActive
             let items = mergedTxItems
+            // Hide a pending row the moment its tx shows up confirmed in EITHER
+            // feed. A contract call (e.g. a WalletConnect swap) often surfaces
+            // only as an ERC-20 token transfer, not the native txlist, so dedupe
+            // against both or the pending + confirmed rows double up.
+            let shownHashes = Set(recentTxs.map { $0.hash.lowercased() })
+                .union(recentTokenTxs.map { $0.hash.lowercased() })
+            let pending = pendingForActive.filter { !shownHashes.contains($0.txHash.lowercased()) }
             if pending.isEmpty && items.isEmpty {
                 emptyTxs
             } else {
@@ -736,6 +752,12 @@ struct EthereumWalletView: View {
                 perPage: 100
             )
             recentTokenTxs = tokenTransfers
+            // A contract call can confirm into the token-transfer feed only (not
+            // the native txlist), so evict pending against these hashes too.
+            store.ethereumWalletStore.dropConfirmedPending(
+                walletId: descriptor.id,
+                confirmedTxHashes: Set(tokenTransfers.map { $0.hash })
+            )
         } catch {
             // Non-fatal: keep whatever we had on a transient
             // Etherscan blip.

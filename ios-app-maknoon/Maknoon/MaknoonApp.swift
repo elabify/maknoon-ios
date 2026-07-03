@@ -6,6 +6,7 @@
 
 import SwiftUI
 import UIKit
+import ReownWalletKit
 
 /// App-wide interface-orientation gate. The onboarding flow locks the device
 /// to portrait (the welcome screens are designed portrait-first); the rest of
@@ -57,9 +58,15 @@ struct MaknoonApp: App {
                 .preferredColorScheme(displayPrefs.resolvedColorScheme)
                 .environment(\.locale, displayPrefs.language.locale ?? Locale.current)
                 .modifier(LanguageLayoutDirectionModifier(language: displayPrefs.language))
+                .walletConnectSheets()
+                .onOpenURL { url in
+                    guard url.scheme == "wc" else { return }
+                    Task { await WalletConnectManager.shared.pair(uriString: url.absoluteString) }
+                }
                 .task {
                     autoLock.configure(timeoutSec: displayPrefs.autoLock.seconds)
                     await bootIdentity()
+                    configureWalletConnect()
                 }
                 .onChange(of: displayPrefs.autoLock) { _, new in
                     autoLock.configure(timeoutSec: new.seconds)
@@ -85,6 +92,260 @@ struct MaknoonApp: App {
         }
     }
 
+    /// Configure WalletConnect (ADR-0049) and wire it to the existing wallet
+    /// store + signer. The project ID comes from Info.plist (overridable in
+    /// Settings later); the two closures keep the manager decoupled from the
+    /// store. EVM-only; software wallets for signing in this build.
+    private func configureWalletConnect() {
+        let projectId = Bundle.main.object(forInfoDictionaryKey: "ELABIFY_WC_PROJECT_ID") as? String ?? ""
+        let mgr = WalletConnectManager.shared
+        // Optional self-hosted relay override (one relay across all networks).
+        let relayHost = store.ethereumSettings.walletConnectRelayHost
+        mgr.configureIfNeeded(projectId: projectId, relayHost: relayHost)
+        mgr.evmAddressesProvider = { [store] in
+            // Offer the ACTIVE wallet (the one WalletConnect was opened from), so
+            // the dApp signs with exactly that wallet. Offering every wallet let
+            // the dApp pick accounts[0] (often a different device), which routed
+            // signing to the wrong hardware wallet. Fall back to all if there is
+            // no cached active address yet.
+            let active = store.ethereumWalletStore.activeWallet
+            LogStore.shared.info("walletconnect", "offer active wallet: label=\(active?.label ?? "nil") kind=\(String(describing: active?.kind)) addr=\(active?.cachedAddress ?? "nil")")
+            if let addr = active?.cachedAddress, !addr.isEmpty {
+                return [addr]
+            }
+            return store.ethereumWalletStore.wallets.compactMap { $0.cachedAddress }.filter { !$0.isEmpty }
+        }
+        mgr.connectingWalletId = { [store] in
+            store.ethereumWalletStore.activeWallet?.id.uuidString
+        }
+        mgr.walletRequiresHostPassphrase = { [store] address, walletId in
+            guard let d = Self.resolveWallet(wallets: store.ethereumWalletStore.wallets, address: address, walletId: walletId) else { return false }
+            return d.hidden?.needsHostPassphrase == true
+        }
+        mgr.signerContext = { [store] address, walletId in
+            guard let d = Self.resolveWallet(wallets: store.ethereumWalletStore.wallets, address: address, walletId: walletId) else {
+                return (nil, nil)
+            }
+            if case .hardware(let deviceId, _, _) = d.kind {
+                return (d.label, store.devices.find(id: deviceId))
+            }
+            return (d.label, nil)
+        }
+        mgr.personalSign = { [store] message, address, walletId, hostPassphrase in
+            guard let descriptor = Self.resolveWallet(wallets: store.ethereumWalletStore.wallets, address: address, walletId: walletId) else {
+                LogStore.shared.warn("walletconnect", "sign: no wallet matches requested addr=\(address) walletId=\(walletId ?? "nil")")
+                throw WalletConnectSignError.unknownAddress
+            }
+            LogStore.shared.info("walletconnect", "sign: reqAddr=\(address) resolved label=\(descriptor.label) kind=\(String(describing: descriptor.kind)) hidden=\(String(describing: descriptor.hidden))")
+            // personal_sign carries the message as hex; fall back to UTF-8.
+            let hex = message.hasPrefix("0x") ? String(message.dropFirst(2)) : message
+            let data = Data(wcHexString: hex) ?? Data(message.utf8)
+            switch descriptor.kind {
+            case .software(let account):
+                guard let sandwich = store.sandwich else { throw WalletConnectSignError.locked }
+                return try EthereumDescriptors.signPersonalMessageFromSandwich(
+                    sandwich: sandwich,
+                    account: account,
+                    message: data,
+                    biometricReason: "Sign this message for the connected app"
+                )
+            case .hardware(let deviceId, let account, _):
+                guard let device = store.devices.find(id: deviceId) else {
+                    LogStore.shared.warn("walletconnect", "sign: descriptor deviceId=\(deviceId) not found in registry")
+                    throw WalletConnectSignError.unknownAddress
+                }
+                LogStore.shared.info("walletconnect", "sign over BLE: device label=\(device.label) kind=\(String(describing: device.kind)) account=\(account)")
+                // Ledger/Trezor EIP-191 over BLE; Trezor hidden-wallet passphrase
+                // is applied via `hidden` + the host-typed passphrase. The user
+                // confirms on the device screen.
+                return try await EthereumMessageSigning.signOverBLE(
+                    device: device,
+                    account: account,
+                    message: data,
+                    hidden: descriptor.hidden,
+                    hostEntered: hostPassphrase
+                )
+            }
+        }
+        mgr.sendTransaction = { [store] request, address, walletId, broadcast, hostPassphrase in
+            try await Self.runWalletConnectTransaction(
+                store: store, request: request, address: address,
+                walletId: walletId, broadcast: broadcast, hostPassphrase: hostPassphrase
+            )
+        }
+        mgr.isChainConfigured = { [store] chainId in
+            Self.resolveNetwork(store: store, chainId: chainId) != nil
+        }
+        mgr.signTypedData = { [store] typedDataJSON, address, walletId, hostPassphrase in
+            guard let descriptor = Self.resolveWallet(wallets: store.ethereumWalletStore.wallets, address: address, walletId: walletId) else {
+                LogStore.shared.warn("walletconnect", "typedData: no wallet matches addr=\(address) walletId=\(walletId ?? "nil")")
+                throw WalletConnectSignError.unknownAddress
+            }
+            LogStore.shared.info("walletconnect", "typedData: resolved label=\(descriptor.label) kind=\(String(describing: descriptor.kind))")
+            switch descriptor.kind {
+            case .software(let account):
+                guard let sandwich = store.sandwich else { throw WalletConnectSignError.locked }
+                return try EthereumDescriptors.signTypedDataFromSandwich(
+                    sandwich: sandwich,
+                    account: account,
+                    typedDataJSON: typedDataJSON,
+                    biometricReason: "Sign typed data for the connected app"
+                )
+            case .hardware(let deviceId, let account, _):
+                guard let device = store.devices.find(id: deviceId) else {
+                    throw WalletConnectSignError.unknownAddress
+                }
+                return try await EthereumMessageSigning.signTypedDataOverBLE(
+                    device: device,
+                    account: account,
+                    typedDataJSON: typedDataJSON,
+                    hidden: descriptor.hidden,
+                    hostEntered: hostPassphrase
+                )
+            }
+        }
+    }
+
+    /// Build, sign and (optionally) broadcast a WalletConnect transaction. Fills
+    /// in whatever the dApp omitted (nonce, gas, fees) from the chain the request
+    /// names, then runs the SAME software / hardware signer as the in-app send.
+    @MainActor
+    private static func runWalletConnectTransaction(
+        store: HolderStore,
+        request: Request,
+        address: String,
+        walletId: String?,
+        broadcast: Bool,
+        hostPassphrase: String?
+    ) async throws -> String {
+        guard let descriptor = resolveWallet(wallets: store.ethereumWalletStore.wallets, address: address, walletId: walletId) else {
+            throw WalletConnectSignError.unknownAddress
+        }
+        guard let txs = try? request.params.get([WCEthTx].self), let tx = txs.first, let to = tx.to else {
+            throw WalletConnectSignError.badTransaction
+        }
+        guard let chainId = UInt64(request.chainId.reference),
+              let network = resolveNetwork(store: store, chainId: chainId) else {
+            throw WalletConnectSignError.unsupportedChain(request.chainId.absoluteString)
+        }
+        let rpcURL = network.rpcURL
+        let wallet = EthereumWallet(descriptor: descriptor)
+
+        let value = (tx.value.flatMap { try? EthereumWeiValue(hex: $0) }) ?? .zero
+        let data = tx.data.flatMap { Data(wcHexString: $0.hasPrefix("0x") ? String($0.dropFirst(2)) : $0) } ?? Data()
+
+        // Nonce: the WALLET owns nonce management, like MetaMask. A dApp's
+        // suggested nonce is routinely stale (computed before our previous tx
+        // landed), which causes "nonce too low". Always use the chain's current
+        // pending count and ignore tx.nonce.
+        let nonce = try await wallet.pendingNonce(rpcURL: rpcURL)
+
+        // Gas: honor the dApp's limit (Uniswap sends one), else estimate.
+        let gas: UInt64
+        if let g = tx.gas ?? tx.gasLimit, let parsed = UInt64(Self.strip0x(g), radix: 16) {
+            gas = parsed
+        } else {
+            gas = try await wallet.estimateGasUnits(to: to, value: value, data: data.isEmpty ? nil : data, rpcURL: rpcURL)
+        }
+
+        // Fees: honor EIP-1559 caps, else a legacy gasPrice (mapped to both
+        // caps), else estimate the standard tier for this chain.
+        let maxFee: EthereumWeiValue
+        let maxPriority: EthereumWeiValue
+        if let mf = tx.maxFeePerGas.flatMap({ try? EthereumWeiValue(hex: $0) }),
+           let mp = tx.maxPriorityFeePerGas.flatMap({ try? EthereumWeiValue(hex: $0) }) {
+            maxFee = mf; maxPriority = mp
+        } else if let gp = tx.gasPrice.flatMap({ try? EthereumWeiValue(hex: $0) }) {
+            maxFee = gp; maxPriority = gp
+        } else {
+            let tiers = try await EthereumGasEstimator.estimate(rpcURL: rpcURL)
+            let std = tiers.first { $0.tier == .standard } ?? tiers[0]
+            maxFee = std.maxFeePerGas; maxPriority = std.maxPriorityFeePerGas
+        }
+
+        let payload: EthereumTxPlan.Payload = data.isEmpty ? .native : .contractCall(data: data)
+        let plan = EthereumTxPlan(
+            chainId: chainId, nonce: nonce, toAddress: to, value: value,
+            gasLimit: gas, maxFeePerGas: maxFee, maxPriorityFeePerGas: maxPriority,
+            payload: payload
+        )
+
+        LogStore.shared.info("walletconnect", "tx: chain=\(chainId) to=\(to) wallet=\(descriptor.label) kind=\(String(describing: descriptor.kind)) gas=\(gas) broadcast=\(broadcast)")
+
+        let rawTx: String
+        switch descriptor.kind {
+        case .software(let account):
+            guard let sandwich = store.sandwich else { throw WalletConnectSignError.locked }
+            _ = try await sandwich.recoveryMaterialFresh(localizedReason: "Authorize a \(network.displayName) transaction for the connected app")
+            rawTx = try EthereumDescriptors.signTransactionFromSandwich(
+                sandwich: sandwich, account: account, plan: plan,
+                biometricReason: "Authorize a \(network.displayName) transaction for the connected app"
+            )
+        case .hardware(let deviceId, let account, _):
+            guard let device = store.devices.find(id: deviceId) else {
+                throw WalletConnectSignError.unknownAddress
+            }
+            rawTx = try await EthereumHardwareTx.sign(
+                plan: plan, device: device, account: account,
+                hidden: descriptor.hidden, derivationPath: descriptor.derivationPath,
+                hostEntered: hostPassphrase
+            )
+        }
+
+        if broadcast {
+            let hash = try await wallet.broadcast(rawTx: rawTx, rpcURL: rpcURL)
+            LogStore.shared.info("walletconnect", "tx broadcast hash=\(hash)")
+            // Show it immediately as pending in the wallet (same mechanism as the
+            // in-app send), so a WalletConnect tx no longer needs a manual resync
+            // to appear. The native value is shown; a token/contract swap carries
+            // value 0, which is correct for the pending row.
+            store.ethereumWalletStore.markPendingOutbound(
+                senderWalletId: descriptor.id,
+                txHash: hash,
+                senderAddress: address,
+                recipientAddress: to,
+                weiValue: value.decimal.description
+            )
+            return hash
+        }
+        return rawTx
+    }
+
+    private static func strip0x(_ s: String) -> String {
+        s.hasPrefix("0x") ? String(s.dropFirst(2)) : s
+    }
+
+    /// Resolve the network config (for the RPC URL) the dApp's chainId names,
+    /// across built-in and user-defined custom networks. nil if the user has not
+    /// configured that chain, so we never broadcast to an unknown endpoint.
+    private static func resolveNetwork(store: HolderStore, chainId: UInt64) -> ResolvedNetwork? {
+        if let builtin = EthereumNetwork.allCases.first(where: { $0.chainId == chainId }) {
+            return store.ethereumWalletStore.resolve(.builtin(builtin), customs: store.ethereumCustomNetworks, settings: store.ethereumSettings)
+        }
+        if let custom = store.ethereumCustomNetworks.networks.first(where: { $0.chainId == chainId }) {
+            return store.ethereumWalletStore.resolve(.custom(custom.id), customs: store.ethereumCustomNetworks, settings: store.ethereumSettings)
+        }
+        return nil
+    }
+
+    /// Resolve the wallet for a WalletConnect request. Prefer the wallet the
+    /// session was bound to (by stable id) so two wallets sharing an address (a
+    /// Ledger and a hidden-passphrase Trezor on the same seed) never get
+    /// confused. Verify the bound wallet's address still matches the request;
+    /// otherwise fall back to a plain address match for older, unbound sessions.
+    private static func resolveWallet(
+        wallets: [EthereumWalletDescriptor],
+        address: String,
+        walletId: String?
+    ) -> EthereumWalletDescriptor? {
+        if let walletId,
+           let byId = wallets.first(where: { $0.id.uuidString == walletId }),
+           (byId.cachedAddress ?? "").lowercased() == address.lowercased() {
+            return byId
+        }
+        return wallets.first { ($0.cachedAddress ?? "").lowercased() == address.lowercased() }
+    }
+
     /// Token under UserDefaults that survives only as long as the
     /// app's container does. iOS wipes UserDefaults on app deletion
     /// but leaves Keychain items intact, so on first launch after a
@@ -106,6 +367,34 @@ struct MaknoonApp: App {
             LogStore.shared.warn("launch", "first-launch Keychain wipe failed: \(error.localizedDescription)")
         }
         UserDefaults.standard.set(UUID().uuidString, forKey: Self.firstLaunchTokenKey)
+    }
+}
+
+enum WalletConnectSignError: LocalizedError {
+    case unknownAddress, hardwareUnsupported, locked, badTransaction
+    case unsupportedChain(String)
+    var errorDescription: String? {
+        switch self {
+        case .unknownAddress: return "That address is not one of your wallets."
+        case .hardwareUnsupported: return "WalletConnect signing supports software wallets in this build; hardware support is coming."
+        case .locked: return "Your wallet is locked. Unlock it and try again."
+        case .badTransaction: return "The app sent a transaction this wallet could not read."
+        case .unsupportedChain(let chain): return "This wallet has no network configured for \(chain). Add it under the Ethereum network settings, then try again."
+        }
+    }
+}
+
+private extension Data {
+    init?(wcHexString hex: String) {
+        let chars = Array(hex)
+        guard chars.count % 2 == 0 else { return nil }
+        var bytes = [UInt8](); bytes.reserveCapacity(chars.count / 2)
+        var i = 0
+        while i < chars.count {
+            guard let b = UInt8(String(chars[i...i+1]), radix: 16) else { return nil }
+            bytes.append(b); i += 2
+        }
+        self = Data(bytes)
     }
 }
 

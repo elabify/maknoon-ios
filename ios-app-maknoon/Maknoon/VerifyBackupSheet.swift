@@ -15,7 +15,7 @@ struct VerifyBackupSheet: View {
     private enum Status: Equatable {
         case idle
         case working
-        case ok
+        case ok([String])
         case failed(String)
     }
 
@@ -50,10 +50,22 @@ struct VerifyBackupSheet: View {
                     .disabled(status == .working || passphrase.isEmpty)
 
                     switch status {
-                    case .ok:
+                    case .ok(let items):
                         Label("Backup verified. This file opens with that password.", systemImage: "checkmark.seal.fill")
                             .font(.callout)
                             .foregroundStyle(.green)
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("This backup includes")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            ForEach(items, id: \.self) { item in
+                                Label(item, systemImage: "checkmark").font(.callout)
+                            }
+                            Text("Compare this against the confirmation shown when you saved the backup.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .padding(.top, 4)
+                        }
                     case .failed(let msg):
                         Label(msg, systemImage: "xmark.octagon.fill")
                             .font(.callout)
@@ -101,8 +113,15 @@ struct VerifyBackupSheet: View {
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
         do {
             let blob = try Data(contentsOf: url)
-            try EncryptedBackup.verify(blob, passphrase: passphrase)
-            status = .ok
+            let decrypted = try EncryptedBackup.verify(blob, passphrase: passphrase)
+            let items = EncryptedBackup.backupManifest(
+                settings: decrypted.settings,
+                lightningCount: decrypted.lightningAccounts?.count ?? 0,
+                credentialsCount: decrypted.credentials?.credentials.count ?? 0,
+                idDocumentsCount: decrypted.idDocuments?.documents.count ?? 0,
+                walletState: decrypted.walletState
+            )
+            status = .ok(items)
         } catch {
             status = .failed("Could not open this backup with that password: \(error.localizedDescription)")
         }
