@@ -66,12 +66,57 @@ private struct CatalogDetailView: View {
     @Environment(HolderStore.self) private var store
     @State private var selectedEntry: AppStoreEntry?
 
-    /// Hide beta-channel apps unless the user opted in. Installed apps are
-    /// unaffected (this only filters the browse list).
+    /// One row per app id (ADR-0052): a v2 catalog (or a flat catalog that
+    /// repeats an id per channel) is grouped so the same app never shows as two
+    /// tiles. The representative is the default channel (stable, else beta when
+    /// beta apps are shown), preferring a host-compatible + highest version.
+    /// Beta-only apps are hidden unless the user opted in.
     private var visibleApps: [AppStoreEntry] {
-        store.appStores.showBetaApps
-            ? catalog.apps
-            : catalog.apps.filter { !AppStoreRegistry.isBeta($0) }
+        let showBeta = store.appStores.showBetaApps
+        var seen = Set<String>()
+        var out: [AppStoreEntry] = []
+        for entry in catalog.apps where !seen.contains(entry.id) {
+            seen.insert(entry.id)
+            if let rep = Self.representative(of: variants(for: entry.id), showBeta: showBeta) {
+                out.append(rep)
+            }
+        }
+        return out
+    }
+
+    private func variants(for appId: String) -> [AppStoreEntry] {
+        catalog.apps.filter { $0.id == appId }
+    }
+
+    /// Pick the tile's representative variant: stable by default, beta only when
+    /// shown; within a channel prefer a host-compatible variant, then highest
+    /// version. Returns nil when the only variants are beta and beta is hidden.
+    static func representative(of variants: [AppStoreEntry], showBeta: Bool) -> AppStoreEntry? {
+        let stable = variants.filter { !AppStoreRegistry.isBeta($0) }
+        let beta = variants.filter { AppStoreRegistry.isBeta($0) }
+        // The tile defaults to stable; a beta-only app appears only when "show
+        // beta apps" is on. Choosing beta for an app that also has a stable is
+        // done in the install sheet's channel picker, not here.
+        let pool = !stable.isEmpty ? stable : (showBeta ? beta : [])
+        guard !pool.isEmpty else { return nil }
+        let compatible = pool.filter {
+            !DAppCompatibility.evaluate(requires: $0.requiresMaknoonVersion,
+                                        supersededAt: $0.supersededAtMaknoonVersion).blocksInstall
+        }
+        let candidates = compatible.isEmpty ? pool : compatible
+        return candidates.max { versionLess($0.version, $1.version) }
+    }
+
+    /// Compare optional semantic-ish versions numerically (missing = lowest).
+    private static func versionLess(_ a: String?, _ b: String?) -> Bool {
+        func parts(_ s: String?) -> [Int] { (s ?? "").split(separator: ".").map { Int($0) ?? 0 } }
+        let (x, y) = (parts(a), parts(b))
+        for i in 0..<max(x.count, y.count) {
+            let xi = i < x.count ? x[i] : 0
+            let yi = i < y.count ? y[i] : 0
+            if xi != yi { return xi < yi }
+        }
+        return false
     }
 
     var body: some View {
@@ -148,15 +193,37 @@ private struct InstallSheet: View {
     @Environment(HolderStore.self) private var store
     @Environment(\.dismiss) private var dismiss
 
+    /// Picked channel (default stable). Drives which variant is described + installed.
+    @State private var channel: String = "stable"
+
+    private var variants: [AppStoreEntry] { catalog.apps.filter { $0.id == entry.id } }
+    private var stableVariant: AppStoreEntry? { variants.first { !AppStoreRegistry.isBeta($0) } }
+    private var betaVariant: AppStoreEntry? { variants.first { AppStoreRegistry.isBeta($0) } }
+    /// Offer a Stable|Beta picker only when both channels exist AND beta apps are
+    /// enabled (beta stays hidden until the user opts in globally).
+    private var showChannelPicker: Bool {
+        store.appStores.showBetaApps && stableVariant != nil && betaVariant != nil
+    }
+    /// The variant to describe + install, per the picked channel.
+    private var chosen: AppStoreEntry {
+        if channel == "beta", let b = betaVariant { return b }
+        return stableVariant ?? entry
+    }
+
     private var isInstalled: Bool {
         store.appStores.isInstalled(storeId: catalog.id, appId: entry.id)
     }
+    private var installedApp: AppStoreRegistry.InstalledApp? {
+        store.appStores.installedApps.first { $0.storeId == catalog.id && $0.appId == entry.id }
+    }
+    /// True when the CHOSEN channel's version is the one already installed.
+    private var chosenInstalled: Bool { installedApp?.entry.version == chosen.version }
 
     /// Disclose the install/per-use capabilities the app requests, with
     /// reasons. Installing grants this set; auto capabilities aren't shown.
     @ViewBuilder
     private var capabilitiesSection: some View {
-        let caps = MiniAppCapabilityRegistry.disclosable(entry.declaredCapabilityTokens)
+        let caps = MiniAppCapabilityRegistry.disclosable(chosen.declaredCapabilityTokens)
         if !caps.isEmpty {
             VStack(alignment: .leading, spacing: 10) {
                 Text("This app can").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
@@ -188,25 +255,32 @@ private struct InstallSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     HStack(spacing: 12) {
-                        Image(systemName: entry.iconName)
+                        Image(systemName: chosen.iconName)
                             .font(.system(size: 36))
                             .foregroundStyle(.purple)
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(entry.title).font(.title3.weight(.semibold))
-                            Text("\(entry.channelLabel)\(entry.version.map { " · v\($0)" } ?? "")")
+                            Text(chosen.title).font(.title3.weight(.semibold))
+                            Text("\(chosen.channelLabel)\(chosen.version.map { " · v\($0)" } ?? "")")
                                 .font(.caption.weight(.medium))
-                                .foregroundStyle(entry.statusColor)
+                                .foregroundStyle(chosen.statusColor)
                         }
                     }
-                    DAppCompatibilityRow(requires: entry.requiresMaknoonVersion,
-                                         supersededAt: entry.supersededAtMaknoonVersion)
+                    if showChannelPicker {
+                        Picker("Channel", selection: $channel) {
+                            Text("Stable").tag("stable")
+                            Text("Beta").tag("beta")
+                        }
+                        .pickerStyle(.segmented)
+                    }
+                    DAppCompatibilityRow(requires: chosen.requiresMaknoonVersion,
+                                         supersededAt: chosen.supersededAtMaknoonVersion)
                     Divider()
-                    Text(entry.summary).font(.callout.weight(.medium))
-                    Text(entry.details).font(.callout).foregroundStyle(.secondary)
+                    Text(chosen.summary).font(.callout.weight(.medium))
+                    Text(chosen.details).font(.callout).foregroundStyle(.secondary)
                     capabilitiesSection
                     Spacer(minLength: 0)
-                    if isInstalled {
-                        if entry.isMiniApp {
+                    if chosenInstalled {
+                        if chosen.isMiniApp {
                             Button {
                                 let app = store.appStores.installedApps.first { $0.id == "\(catalog.id)::\(entry.id)" }
                                 dismiss()
@@ -227,13 +301,14 @@ private struct InstallSheet: View {
                         .buttonStyle(.bordered)
                     } else {
                         let compatibility = DAppCompatibility.evaluate(
-                            requires: entry.requiresMaknoonVersion,
-                            supersededAt: entry.supersededAtMaknoonVersion)
+                            requires: chosen.requiresMaknoonVersion,
+                            supersededAt: chosen.supersededAtMaknoonVersion)
                         let blocked = compatibility.blocksInstall
                         Button {
-                            store.appStores.install(entry, fromStore: catalog.id)
-                            // Jump straight in for a runnable mini app.
-                            if entry.isMiniApp {
+                            // Upsert: installs the chosen channel, switching if a
+                            // different channel of this app was already installed.
+                            store.appStores.install(chosen, fromStore: catalog.id)
+                            if chosen.isMiniApp {
                                 let app = store.appStores.installedApps.first { $0.id == "\(catalog.id)::\(entry.id)" }
                                 dismiss()
                                 if let app { onOpen?(app) }
@@ -241,7 +316,8 @@ private struct InstallSheet: View {
                                 dismiss()
                             }
                         } label: {
-                            Label("Install to Apps tab", systemImage: "plus.circle.fill")
+                            Label(isInstalled ? "Switch to \(chosen.channelLabel)" : "Install to Apps tab",
+                                  systemImage: isInstalled ? "arrow.triangle.2.circlepath" : "plus.circle.fill")
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.borderedProminent)

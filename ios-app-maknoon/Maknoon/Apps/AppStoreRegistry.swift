@@ -213,8 +213,11 @@ final class AppStoreRegistry: @unchecked Sendable {
     /// Install, granting `granted` capability tokens (default: everything the
     /// entry declares). The install UI passes the set the user accepted.
     func install(_ entry: AppStoreEntry, fromStore storeId: String, granted: Set<String>? = nil) {
-        guard !isInstalled(storeId: storeId, appId: entry.id) else { return }
         let tokens = granted ?? entry.declaredCapabilityTokens
+        // Upsert: replace any existing install of this app id so picking a
+        // different channel swaps the snapshotted manifest (a channel switch),
+        // rather than being a no-op.
+        installedApps.removeAll { $0.storeId == storeId && $0.appId == entry.id }
         installedApps.append(InstalledApp(
             id: "\(storeId)::\(entry.id)",
             storeId: storeId,

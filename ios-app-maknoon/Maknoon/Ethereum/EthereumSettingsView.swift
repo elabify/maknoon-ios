@@ -14,7 +14,6 @@ struct EthereumSettingsView: View {
     @State private var ensRPCURL: String = ""
     @State private var catalogDraft: String = ""
     @State private var logoDraft: String = ""
-    @State private var wcRelayHost: String = ""
     @State private var editingCustomNetwork: CustomEthereumNetwork?
     @State private var showAddCustomNetwork: Bool = false
 
@@ -104,8 +103,6 @@ struct EthereumSettingsView: View {
             tokenCatalogSection
 
             tokenLogoSection
-
-            walletConnectSection
 
             Section {
                 Button("Save changes") { save() }
@@ -257,27 +254,6 @@ struct EthereumSettingsView: View {
         }
     }
 
-    /// Global WalletConnect relay override (EVM-only today, but one relay for
-    /// all networks). Advanced: blank uses the built-in default relay.
-    private var walletConnectSection: some View {
-        Section {
-            TextField("relay.walletconnect.com", text: $wcRelayHost)
-                .autocorrectionDisabled().textInputAutocapitalization(.never)
-                .keyboardType(.URL)
-                .font(.system(.caption, design: .monospaced))
-            Button("Use default") {
-                wcRelayHost = ""
-                save()
-            }
-            .foregroundStyle(.blue)
-        } header: {
-            Text("Self-hosted WalletConnect relay (Advanced)")
-        } footer: {
-            Text("Leave blank to use the default WalletConnect relay. Host only (e.g. relay.example.com). Applies to all networks; takes effect next app launch.")
-                .font(.caption)
-        }
-    }
-
     private func loadFromStore() {
         rpcURL = store.ethereumSettings.rpcURLByNetwork[selectedNetwork] ?? ""
         explorerURL = store.ethereumSettings.explorerURLByNetwork[selectedNetwork] ?? ""
@@ -288,7 +264,6 @@ struct EthereumSettingsView: View {
         catalogDraft = savedCatalog == EthereumTokenRegistry.defaultCatalogURL ? "" : savedCatalog
         let savedLogo = store.ethereumSettings.logoTemplate
         logoDraft = savedLogo == EthereumSettings.defaultLogoTemplate ? "" : savedLogo
-        wcRelayHost = store.ethereumSettings.walletConnectRelayHost
     }
 
     private func save() {
@@ -298,11 +273,6 @@ struct EthereumSettingsView: View {
         store.ethereumSettings.ensRPCURL = ensRPCURL.trimmingCharacters(in: .whitespaces)
         store.ethereumSettings.setTokenCatalogURL(catalogDraft)
         store.ethereumSettings.setLogoTemplate(logoDraft)
-        var h = wcRelayHost.trimmingCharacters(in: .whitespaces)
-        if let r = h.range(of: "://") { h = String(h[r.upperBound...]) }
-        h = h.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        wcRelayHost = h
-        store.ethereumSettings.walletConnectRelayHost = h
         store.ethereumSettings.persist()
     }
 }

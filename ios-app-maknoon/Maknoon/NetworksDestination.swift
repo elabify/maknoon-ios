@@ -8,6 +8,12 @@ import SwiftUI
 struct NetworksDestination: View {
     @Environment(HolderStore.self) private var store
 
+    // Global self-hosted WalletConnect relay (EVM-only today, but a single
+    // relay across ALL networks) so it lives here under Networks, not inside
+    // the Ethereum screen. Storage stays on ethereumSettings.
+    @State private var wcRelayHost: String = ""
+    @State private var advancedExpanded = false
+
     var body: some View {
         Form {
             Section {
@@ -74,9 +80,38 @@ struct NetworksDestination: View {
             } header: {
                 Text("Networks")
             }
+
+            Section {
+                DisclosureGroup("Advanced", isExpanded: $advancedExpanded) {
+                    Text("WalletConnect Relay")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    TextField("relay.walletconnect.com", text: $wcRelayHost)
+                        .autocorrectionDisabled().textInputAutocapitalization(.never)
+                        .keyboardType(.URL)
+                        .font(.system(.caption, design: .monospaced))
+                        .onSubmit { saveRelay() }
+                    Button("Use default") {
+                        wcRelayHost = ""
+                        saveRelay()
+                    }
+                    .foregroundStyle(.blue)
+                }
+            }
         }
         .navigationTitle("Networks")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear { wcRelayHost = store.ethereumSettings.walletConnectRelayHost }
+    }
+
+    /// Normalize (strip scheme + trailing slashes) and persist the relay host.
+    private func saveRelay() {
+        var h = wcRelayHost.trimmingCharacters(in: .whitespaces)
+        if let r = h.range(of: "://") { h = String(h[r.upperBound...]) }
+        h = h.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        wcRelayHost = h
+        store.ethereumSettings.walletConnectRelayHost = h
+        store.ethereumSettings.persist()
     }
 
     private func networkRow(

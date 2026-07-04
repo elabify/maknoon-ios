@@ -38,6 +38,12 @@ final class EthereumTokenStore: @unchecked Sendable {
     /// Add or update a token. Used by both the curated seed path
     /// and the "Add custom" sheet.
     func add(_ token: EthereumToken) {
+        addInMemory(token)
+        persist()
+    }
+
+    /// Insert-or-replace without persisting (used during the load reconcile).
+    private func addInMemory(_ token: EthereumToken) {
         var current = tokensByNetwork[token.network] ?? []
         if let idx = current.firstIndex(where: { $0.contractAddress == token.contractAddress }) {
             current[idx] = token
@@ -45,7 +51,10 @@ final class EthereumTokenStore: @unchecked Sendable {
             current.append(token)
         }
         tokensByNetwork[token.network] = current
-        persist()
+    }
+
+    private func seedKey(_ network: EthereumNetwork, _ contract: String) -> String {
+        "\(network.rawValue):\(contract.lowercased())"
     }
 
     func remove(_ token: EthereumToken) {
@@ -66,6 +75,10 @@ final class EthereumTokenStore: @unchecked Sendable {
     private struct Snapshot: Codable {
         let tokens: [EthereumToken]
         let seededNetworks: [String]
+        // Optional so legacy snapshots (which predate per-contract tracking)
+        // still decode; nil is treated as "none seeded yet" so the reconcile
+        // unions in the current catalog defaults once.
+        let seededContracts: [String]?
     }
 
     /// Networks where we've already run first-run seed. Tracked so a
@@ -73,10 +86,17 @@ final class EthereumTokenStore: @unchecked Sendable {
     /// reappear at next launch. Persisted as part of the snapshot.
     private var seededNetworks: Set<EthereumNetwork> = []
 
+    /// Every curated catalog default ever seeded, keyed "network:contract".
+    /// Lets us union in tokens ADDED to the catalog after a network was first
+    /// seeded (e.g. Arbitrum USDC) exactly once, without resurrecting a token
+    /// the user later removed on every launch.
+    private var seededContracts: Set<String> = []
+
     /// Reset to defaults then re-read UserDefaults (post-restore refresh).
     func reload() {
         tokensByNetwork = [:]
         seededNetworks = []
+        seededContracts = []
         load()
     }
 
@@ -95,14 +115,27 @@ final class EthereumTokenStore: @unchecked Sendable {
         }
         self.tokensByNetwork = grouped
         self.seededNetworks = Set(snap.seededNetworks.compactMap { EthereumNetwork(rawValue: $0) })
+        self.seededContracts = Set(snap.seededContracts ?? [])
         // Seed networks the user hasn't seen yet (added after the
         // app was first launched). Idempotent because we only seed
         // networks not in seededNetworks.
         for n in EthereumNetwork.allCases where !seededNetworks.contains(n) {
             for t in EthereumTokenCatalog.defaults(for: n) {
-                add(t)
+                addInMemory(t)
             }
             seededNetworks.insert(n)
+        }
+        // Reconcile: ensure every curated catalog default has been seeded at
+        // least once. Adds tokens introduced to the catalog AFTER a network was
+        // first seeded (e.g. Arbitrum USDC on an install that predates it),
+        // which the seededNetworks gate alone would miss. Tracked per-contract
+        // so a token the user removes later is not resurrected next launch.
+        for n in EthereumNetwork.allCases {
+            for t in EthereumTokenCatalog.defaults(for: n) {
+                if seededContracts.insert(seedKey(n, t.contractAddress)).inserted {
+                    addInMemory(t)
+                }
+            }
         }
         persist()
     }
@@ -111,6 +144,9 @@ final class EthereumTokenStore: @unchecked Sendable {
         for n in EthereumNetwork.allCases {
             tokensByNetwork[n] = EthereumTokenCatalog.defaults(for: n)
             seededNetworks.insert(n)
+            for t in EthereumTokenCatalog.defaults(for: n) {
+                seededContracts.insert(seedKey(n, t.contractAddress))
+            }
         }
         persist()
     }
@@ -119,7 +155,8 @@ final class EthereumTokenStore: @unchecked Sendable {
         let flat = tokensByNetwork.values.flatMap { $0 }
         let snap = Snapshot(
             tokens: flat,
-            seededNetworks: seededNetworks.map { $0.rawValue }
+            seededNetworks: seededNetworks.map { $0.rawValue },
+            seededContracts: Array(seededContracts)
         )
         if let data = try? JSONEncoder().encode(snap) {
             UserDefaults.standard.set(data, forKey: Self.storeKey)

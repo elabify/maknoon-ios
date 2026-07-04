@@ -18,6 +18,9 @@ struct AppStoreCatalog: Codable, Identifiable, Hashable, Sendable {
     let curator: String
     let summary: String
     let url: URL?
+    /// Always flat in memory: a v2 (`catalogFormat: 2`) catalog is expanded at
+    /// decode time into one entry per channel, all sharing the app `id`, so the
+    /// browse view groups them into a single tile (ADR-0052).
     let apps: [AppStoreEntry]
 
     init(id: String, name: String, curator: String, summary: String, url: URL?, apps: [AppStoreEntry]) {
@@ -27,6 +30,86 @@ struct AppStoreCatalog: Codable, Identifiable, Hashable, Sendable {
         self.summary = summary
         self.url = url
         self.apps = apps
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, curator, summary, url, apps, catalogFormat
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(String.self, forKey: .id) ?? "catalog"
+        name = try c.decodeIfPresent(String.self, forKey: .name) ?? "Apps"
+        curator = try c.decodeIfPresent(String.self, forKey: .curator) ?? ""
+        summary = try c.decodeIfPresent(String.self, forKey: .summary) ?? ""
+        url = try c.decodeIfPresent(URL.self, forKey: .url)
+        let format = try c.decodeIfPresent(Int.self, forKey: .catalogFormat) ?? 1
+        if format >= 2 {
+            let v2 = try c.decodeIfPresent([AppStoreCatalogV2App].self, forKey: .apps) ?? []
+            apps = v2.flatMap { $0.expanded() }
+        } else {
+            apps = try c.decodeIfPresent([AppStoreEntry].self, forKey: .apps) ?? []
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        // Persist the flat (v1) form; v2 is a wire-only input shape.
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(name, forKey: .name)
+        try c.encode(curator, forKey: .curator)
+        try c.encode(summary, forKey: .summary)
+        try c.encodeIfPresent(url, forKey: .url)
+        try c.encode(apps, forKey: .apps)
+    }
+}
+
+/// ADR-0052 `catalogFormat: 2` app: one id with optional per-channel releases.
+/// Decode-only; expanded into flat `AppStoreEntry` values sharing the app id.
+private struct AppStoreCatalogV2App: Decodable {
+    let id: String
+    let title: String
+    let summary: String?
+    let details: String?
+    let iconName: String?
+    let curatedBy: String?
+    let stable: Channel?
+    let beta: Channel?
+
+    struct Channel: Decodable {
+        let version: String?
+        let manifestURL: URL?
+        let manifestSha256: String?
+        let requiresMaknoonVersion: String?
+        let supersededAtMaknoonVersion: String?
+        let permissions: [String]?
+        let capabilities: [AppStoreEntry.DeclaredCapability]?
+    }
+
+    func expanded() -> [AppStoreEntry] {
+        var out: [AppStoreEntry] = []
+        func make(_ ch: Channel, channel: String) -> AppStoreEntry {
+            AppStoreEntry(
+                id: id,
+                title: title,
+                summary: summary ?? "",
+                details: details ?? "",
+                iconName: iconName ?? "app.badge",
+                statusLabel: channel.prefix(1).uppercased() + channel.dropFirst(),
+                curatedBy: curatedBy ?? "",
+                version: ch.version,
+                channel: channel,
+                requiresMaknoonVersion: ch.requiresMaknoonVersion,
+                supersededAtMaknoonVersion: ch.supersededAtMaknoonVersion,
+                manifestURL: ch.manifestURL,
+                manifestSha256: ch.manifestSha256,
+                permissions: ch.permissions,
+                capabilities: ch.capabilities
+            )
+        }
+        if let s = stable { out.append(make(s, channel: "stable")) }
+        if let b = beta { out.append(make(b, channel: "beta")) }
+        return out
     }
 }
 
