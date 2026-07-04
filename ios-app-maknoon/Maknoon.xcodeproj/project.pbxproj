@@ -1924,6 +1924,7 @@
 					"@executable_path/Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.elabify.app.maknoon;
+				PROVISIONING_PROFILE_SPECIFIER = "${IOS_PROVISIONING_PROFILE_NAME}";
 				SDKROOT = iphoneos;
 				SWIFT_STRICT_CONCURRENCY = minimal;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -1967,6 +1968,7 @@
 					"@executable_path/Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.elabify.app.maknoon;
+				PROVISIONING_PROFILE_SPECIFIER = "${IOS_PROVISIONING_PROFILE_NAME}";
 				SDKROOT = iphoneos;
 				SWIFT_STRICT_CONCURRENCY = minimal;
 				TARGETED_DEVICE_FAMILY = "1,2";

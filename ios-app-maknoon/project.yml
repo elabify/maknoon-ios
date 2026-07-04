@@ -295,6 +295,16 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.elabify.app.maknoon
         TARGETED_DEVICE_FAMILY: "1,2"
         CODE_SIGN_ENTITLEMENTS: Maknoon/Maknoon.entitlements
+        # Distribution provisioning profile, scoped to THIS app target only.
+        # It must NOT be a global xcodebuild setting: a project-wide
+        # PROVISIONING_PROFILE_SPECIFIER also lands on the Reown WalletKit SPM
+        # framework targets, which reject a manually specified profile
+        # ("... does not support provisioning profiles"). XcodeGen substitutes
+        # ${IOS_PROVISIONING_PROFILE_NAME} from the environment at generate time,
+        # so the secret profile name never lives in this committed/mirrored spec.
+        # Empty for local builds, where CODE_SIGN_STYLE Automatic (project base)
+        # ignores it; CI forces Manual on the archive command and exports the name.
+        PROVISIONING_PROFILE_SPECIFIER: ${IOS_PROVISIONING_PROFILE_NAME}
         # Downgrade strict concurrency from `complete` (Swift 6
         # default) to `minimal` because UniFFI 0.31.1's generated
         # Swift uses helper functions that take @Sendable closures

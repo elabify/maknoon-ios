@@ -164,6 +164,13 @@ jobs:
           BUILD_NUMBER: ${{ github.run_number }}
         run: |
           set -euo pipefail
+          # Scope the provisioning profile to the app target via XcodeGen env
+          # substitution (project.yml reads ${IOS_PROVISIONING_PROFILE_NAME}).
+          # It is deliberately NOT passed as a global xcodebuild setting below:
+          # a project-wide PROVISIONING_PROFILE_SPECIFIER also hits the Reown
+          # WalletKit SPM framework targets, which reject a manual profile
+          # ("... does not support provisioning profiles") and fail the archive.
+          export IOS_PROVISIONING_PROFILE_NAME="$PROFILE_NAME"
           xcodegen generate
           xcodebuild archive \
             -project Maknoon.xcodeproj \
@@ -174,7 +181,6 @@ jobs:
             CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
             CODE_SIGN_STYLE=Manual \
             DEVELOPMENT_TEAM="$TEAM_ID" \
-            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
             CODE_SIGN_IDENTITY="Apple Distribution"
           cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
