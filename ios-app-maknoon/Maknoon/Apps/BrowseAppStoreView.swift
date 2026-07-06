@@ -52,11 +52,28 @@ struct BrowseAppStoreView: View {
                 .frame(width: 30)
             VStack(alignment: .leading, spacing: 2) {
                 Text(catalog.name).font(.callout.weight(.semibold))
-                Text("\(catalog.apps.count) app\(catalog.apps.count == 1 ? "" : "s")")
+                let n = visibleAppCount(catalog)
+                Text("\(n) app\(n == 1 ? "" : "s")")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
         .padding(.vertical, 2)
+    }
+
+    /// Count apps as the browser will show them: grouped by app id and filtered
+    /// by the live "show beta apps" flag (beta OFF counts apps with a stable
+    /// version; beta ON counts apps with any version), so POS's stable+beta
+    /// entries count as one app. Mirrors CatalogDetailView.visibleApps.
+    private func visibleAppCount(_ catalog: AppStoreCatalog) -> Int {
+        let showBeta = store.appStores.showBetaApps
+        var seen = Set<String>()
+        var n = 0
+        for entry in catalog.apps where !seen.contains(entry.id) {
+            seen.insert(entry.id)
+            let variants = catalog.apps.filter { $0.id == entry.id }
+            if CatalogDetailView.representative(of: variants, showBeta: showBeta) != nil { n += 1 }
+        }
+        return n
     }
 }
 

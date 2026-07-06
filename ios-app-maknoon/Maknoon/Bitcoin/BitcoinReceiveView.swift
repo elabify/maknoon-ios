@@ -36,6 +36,7 @@ struct BitcoinReceiveView: View {
             .task { await loadAddress() }
             .navigationTitle("Receive")
             .navigationBarTitleDisplayMode(.inline)
+            .maxBrightnessWhilePresented()
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }

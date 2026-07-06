@@ -178,6 +178,7 @@
 		81B12FA83DCC3D91C5179900 /* TapIDDocumentSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92D74B60A61C7A1B55DCC6B2 /* TapIDDocumentSheet.swift */; };
 		82981D02B237CB1B71A6D53D /* SolanaWalletDiscovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18516F31B3939D3CE4127D38 /* SolanaWalletDiscovery.swift */; };
 		8302A011A458059EE26BC343 /* CommerceMerchantPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2D988492442E1E0996499FF /* CommerceMerchantPolicy.swift */; };
+		83FA99EC86545E2354CECDE6 /* MaxBrightness.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E9490C2155C2461F66882E9 /* MaxBrightness.swift */; };
 		848F218D42E2EAF279B7E830 /* WCCryptoProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = C016E2F91D283A47BEF4C281 /* WCCryptoProvider.swift */; };
 		85950FAA1E3128AC0C33D37C /* IDDocumentIssuanceClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31A5E06677C85122400D3F55 /* IDDocumentIssuanceClient.swift */; };
 		878FA5D320C9E591C005BC3B /* PresentationFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30B7F468C4D22746D1F6AA48 /* PresentationFactory.swift */; };
@@ -214,6 +215,7 @@
 		A944BADC8334EDBD49013A40 /* BIP39.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8E2A4D8F22B59D7DC125302 /* BIP39.swift */; };
 		A969B4B04CBFCF9AA991412C /* NetworkCancellation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9F0CC49DC330517B3D6B068 /* NetworkCancellation.swift */; };
 		A9AD725D95A7F4B41912A688 /* AddTronWalletSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 789A9F5B37A8AEAEA6D03A5E /* AddTronWalletSheet.swift */; };
+		A9B825862657DD8D216AD407 /* OnChainVerifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F0221FDEED18EAF085F49B0 /* OnChainVerifier.swift */; };
 		AB0DEC0A63FF2C93DC2460A6 /* MiniAppScanSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D86DB7FD0E9874D1C3C90E7 /* MiniAppScanSheet.swift */; };
 		ABBAEA4E86B386F0103D9B85 /* LocalFrames.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0FCA2105A947F349A466D61 /* LocalFrames.swift */; };
 		AC4931D3EB2BBE1ECD575B71 /* SanctionsScreeningClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A601F3DD81F329EFDED94B92 /* SanctionsScreeningClient.swift */; };
@@ -360,6 +362,7 @@
 		0CD5F324AF647D654A835161 /* DiscoverHardwareWalletsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverHardwareWalletsView.swift; sourceTree = "<group>"; };
 		0DBAC208B2138A44D9547884 /* IdentityBridgeHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdentityBridgeHandler.swift; sourceTree = "<group>"; };
 		0E44F9E4BD34C6E2FD2A2F41 /* EthereumABI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EthereumABI.swift; sourceTree = "<group>"; };
+		0E9490C2155C2461F66882E9 /* MaxBrightness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaxBrightness.swift; sourceTree = "<group>"; };
 		0F39342E0F8BEB1937D85DBC /* PrivacyCurtain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyCurtain.swift; sourceTree = "<group>"; };
 		123AE24905B970516285F026 /* ActivityTrackingHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityTrackingHost.swift; sourceTree = "<group>"; };
 		124806FAB9D690153B7747C9 /* EthereumTokenStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EthereumTokenStore.swift; sourceTree = "<group>"; };
@@ -539,6 +542,7 @@
 		9D8BD2DF7A6B9B51B09BBFB1 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		9DDF5D78FA829EB2551AC88F /* LightningSendView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LightningSendView.swift; sourceTree = "<group>"; };
 		9E827F02EB31CBA8E06F09FC /* AddSolanaWalletSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddSolanaWalletSheet.swift; sourceTree = "<group>"; };
+		9F0221FDEED18EAF085F49B0 /* OnChainVerifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnChainVerifier.swift; sourceTree = "<group>"; };
 		9F6F9E7E9308F7D795287D7B /* WCSocketFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WCSocketFactory.swift; sourceTree = "<group>"; };
 		9FFB5A467ABC1703419DABB2 /* LogStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogStore.swift; sourceTree = "<group>"; };
 		A0089A29F77AC06D988671DE /* EthereumTokenDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EthereumTokenDetailView.swift; sourceTree = "<group>"; };
@@ -1135,11 +1139,13 @@
 				330630C68D2881DC45E9A776 /* Maknoon.entitlements */,
 				5266F1677045AE99DDEB0739 /* MaknoonApp.swift */,
 				ABACF72979216EB86C67B1B4 /* MatchingEngine.swift */,
+				0E9490C2155C2461F66882E9 /* MaxBrightness.swift */,
 				98E681B727D330E2D7954129 /* MLDSAClient.swift */,
 				C4D7E0B8A791A0E5C57EE873 /* Models.swift */,
 				C45C79B1823E2220CBB8AA02 /* Network.swift */,
 				33873ECD91EFAAD6724203A1 /* NetworksDestination.swift */,
 				D08CC1B0A8548C6A25754CD6 /* OnboardingView.swift */,
+				9F0221FDEED18EAF085F49B0 /* OnChainVerifier.swift */,
 				F3CE2A9AF57176BEE841C3EE /* PBKDF2.swift */,
 				2EA467B33F3A6E3077615D90 /* PendingPickupsStore.swift */,
 				30B7F468C4D22746D1F6AA48 /* PresentationFactory.swift */,
@@ -1304,6 +1310,7 @@
 				6776FF953DA6E05D62D738EE /* Sources */,
 				A06E53C9F34D3F4103086647 /* Resources */,
 				A7678B9C7E441707A3E0F381 /* Frameworks */,
+				89E57E17785933641E8DF9FF /* Stamp build commit into Info.plist */,
 			);
 			buildRules = (
 			);
@@ -1411,6 +1418,28 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		89E57E17785933641E8DF9FF /* Stamp build commit into Info.plist */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Stamp build commit into Info.plist";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "COMMIT=$(git -C \"$SRCROOT\" rev-parse --short HEAD 2>/dev/null || echo dev)\nPLIST=\"${TARGET_BUILD_DIR}/${INFOPLIST_PATH}\"\nif [ -f \"$PLIST\" ]; then\n  /usr/libexec/PlistBuddy -c \"Set :ELABIFY_BUILD_COMMIT $COMMIT\" \"$PLIST\" 2>/dev/null \\\n    || /usr/libexec/PlistBuddy -c \"Add :ELABIFY_BUILD_COMMIT string $COMMIT\" \"$PLIST\"\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		607211CF36B52A4C8D469FD2 /* Sources */ = {
@@ -1598,6 +1627,7 @@
 				BEB40B0A4C698C4EC6B3BA2C /* MaknoonApp.swift in Sources */,
 				EBC7F3CA13596150B4EC0AFA /* MaknoonAppAttest.swift in Sources */,
 				480AC49291149EC0A8F71396 /* MatchingEngine.swift in Sources */,
+				83FA99EC86545E2354CECDE6 /* MaxBrightness.swift in Sources */,
 				CF24FA07263A321B79D65341 /* MerchantBridgeHandler.swift in Sources */,
 				C6FF9B79053239E6268E3BE2 /* MerchantIdentityStore.swift in Sources */,
 				ADB0BDF238D9D19AE6F6712A /* MiniAppBridge.swift in Sources */,
@@ -1620,6 +1650,7 @@
 				A717B73CC4CEC687FBA2788C /* Network.swift in Sources */,
 				A969B4B04CBFCF9AA991412C /* NetworkCancellation.swift in Sources */,
 				E1E1B4F0DFD477B5B6A505A1 /* NetworksDestination.swift in Sources */,
+				A9B825862657DD8D216AD407 /* OnChainVerifier.swift in Sources */,
 				30F8707AC0AFA49B4C868EEF /* OnboardingView.swift in Sources */,
 				43475EB4EB56E82C3B5DB5C7 /* PBKDF2.swift in Sources */,
 				05B4F738223BC3E3DB2D67CD /* PINProtocolV1.swift in Sources */,
@@ -1803,7 +1834,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.6.3;
+				MARKETING_VERSION = 0.6.4;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1890,7 +1921,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.6.3;
+				MARKETING_VERSION = 0.6.4;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

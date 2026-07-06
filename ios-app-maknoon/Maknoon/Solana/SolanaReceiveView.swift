@@ -58,6 +58,7 @@ struct SolanaReceiveView: View {
         }
         .navigationTitle("Receive")
         .navigationBarTitleDisplayMode(.inline)
+        .maxBrightnessWhilePresented()
         .task { await load() }
     }
 

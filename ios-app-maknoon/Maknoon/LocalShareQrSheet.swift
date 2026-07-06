@@ -36,12 +36,16 @@ struct LocalShareQrSheet: View {
                 } else if let img = currentImage {
                     ScrollView {
                         VStack(spacing: 14) {
+                            // Fill the width (was capped at 360pt): a larger QR
+                            // gives the scanning phone more camera pixels per
+                            // module, which is what makes these dense multi-frame
+                            // frames decode reliably on the peer (item 10).
                             Image(uiImage: img)
                                 .resizable()
                                 .interpolation(.none)
                                 .aspectRatio(1, contentMode: .fit)
-                                .frame(maxWidth: 360)
-                                .padding(20)
+                                .frame(maxWidth: .infinity)
+                                .padding(12)
                                 .background(Color.white)
                                 .clipShape(RoundedRectangle(cornerRadius: 16))
 
@@ -89,6 +93,7 @@ struct LocalShareQrSheet: View {
             }
             .navigationTitle("Offline QR")
             .navigationBarTitleDisplayMode(.inline)
+            .maxBrightnessWhilePresented()
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { onClose() }

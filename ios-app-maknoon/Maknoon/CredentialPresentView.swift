@@ -293,6 +293,7 @@ private struct BadgeMode: View {
             Text("Static QR. Anyone with this code can confirm the credential exists and is anchored on chain, but cannot read your personal information from it.")
                 .font(.caption)
         }
+        .maxBrightnessWhilePresented()
 
         Section("What this shares") {
             kv("Issuer",     verifiedIssuer ?? shortIssuerName(payload.iss))

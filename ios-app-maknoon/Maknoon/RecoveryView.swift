@@ -385,6 +385,14 @@ struct RecoveryView: View {
             store.reloadAfterRestore()
             displayPrefs.reload()
 
+            // Re-run passport chip authenticity against a freshly-downloaded
+            // CSCA bundle. The genuine/verified badge is not carried in the
+            // backup, so recompute it here after forcing a CSCA refresh (see
+            // ADR-0050); awaited so the badge is correct the first time a
+            // restored passport is opened, not amber "Genuine" until a manual
+            // re-check.
+            await store.refreshCSCAThenReverifyPassports()
+
             // 4) Show the confirmation. Adopting the sandwich (which swaps to
             //    the main app) happens on Continue, so the user sees what was
             //    restored (and any warnings) before leaving this screen.

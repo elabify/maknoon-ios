@@ -36,6 +36,10 @@ struct VerifyOtherSheet: View {
     @State private var permission: CameraPermissionState = CameraPermission.current
     @StateObject private var frames = LocalFrameReceiver()
     @StateObject private var ble = BLECentralClient()
+    // Holder-independent on-chain verification (ADR-0054, item 7). Runs after the
+    // offline verdict is shown; nil while pending / offline.
+    @State private var onChain: OnChainVerdict?
+    @State private var onChainRunning = false
 
     var body: some View {
         NavigationStack {
@@ -234,7 +238,9 @@ struct VerifyOtherSheet: View {
             if !v.disclosed.isEmpty {
                 Section("Disclosed claims") {
                     ForEach(v.disclosed.keys.sorted(), id: \.self) { k in
-                        kv(k, v.disclosed[k]?.displayText ?? "-")
+                        // Expand nested claim objects (e.g. sdnScreen) fully by
+                        // default instead of collapsing to "{3 fields}".
+                        kv(k, v.disclosed[k]?.prettyText ?? "-")
                     }
                 }
             }
@@ -250,14 +256,104 @@ struct VerifyOtherSheet: View {
                 row("timestampValid",       v.checks.timestampValid)
                 row("expiryValid",          v.checks.expiryValid)
                 row("verifierRequestValid", v.checks.verifierRequestValid)
-                row("issuerRegistered",     v.checks.issuerRegistered)
-                row("credentialNotRevoked", v.checks.credentialNotRevoked)
-                row("rootCurrent",          v.checks.rootCurrent)
+            }
+            // Item 7 (ADR-0054): the holder confirms the chain-gated checks itself
+            // via a read-only RPC, no verifier server. Shown as a separate tier so
+            // "Locally valid" is no longer conflated with "fully verified".
+            if v.decision != "SELF_ATTESTED" {
+                onChainSection
             }
             Section {
-                Button("Scan another") { frames.reset(); phase = .scanning }
+                Button("Scan another") { frames.reset(); phase = .scanning; onChain = nil }
             }
         }
+        .task(id: p.header.cid) {
+            if v.decision != "SELF_ATTESTED" { await runOnChain(p, v) }
+        }
+    }
+
+    /// On-chain verification tiers (item 7). Header banner reflects the combined
+    /// state; rows show each chain-gated check as it resolves.
+    @ViewBuilder
+    private var onChainSection: some View {
+        Section {
+            if onChainRunning && onChain == nil {
+                HStack(spacing: 10) {
+                    ProgressView()
+                    Text("Checking on-chain…").font(.callout).foregroundStyle(.secondary)
+                }
+            } else if let oc = onChain {
+                if oc.reachedChain {
+                    onchainRow("Issuer registered", oc.issuerRegistered)
+                    onchainRow("Not revoked", oc.notRevoked)
+                    onchainRow("Root current", oc.rootCurrent)
+                    onchainRow("Header signature (on-chain key)", oc.headerSigValid)
+                    if let csca = oc.cscaProvenance {
+                        onchainRow("Passport CSCA provenance", csca)
+                    }
+                } else {
+                    HStack(spacing: 10) {
+                        Image(systemName: "wifi.slash").foregroundStyle(.orange)
+                        Text("Online checks pending. Could not reach the chain RPC.")
+                            .font(.callout).foregroundStyle(.secondary)
+                    }
+                    Button("Retry online checks") { Task { await runOnChain(p: nil, retry: true) } }
+                }
+            }
+        } header: {
+            Text("Online verification (on-chain)")
+        } footer: {
+            if let oc = onChain, oc.reachedChain, oc.fullyVerified {
+                Label("Fully verified: issuer registered, not revoked, root current, signature valid.",
+                      systemImage: "checkmark.seal.fill")
+                    .font(.caption).foregroundStyle(.green)
+            } else {
+                Text("These checks talk directly to the chain over a read-only RPC (Settings, Networks, Ethereum). No issuer or verifier server is involved.")
+                    .font(.caption)
+            }
+        }
+    }
+
+    private func onchainRow(_ name: String, _ tier: OnChainTier) -> some View {
+        HStack {
+            Text(name).font(.callout)
+            Spacer(minLength: 8)
+            switch tier {
+            case .pass:
+                Label("verified", systemImage: "checkmark.seal.fill")
+                    .labelStyle(.iconOnly).foregroundStyle(.green)
+            case .fail(let reason):
+                Label(reason, systemImage: "xmark.octagon.fill")
+                    .font(.caption).foregroundStyle(.red)
+            case .unknown(let reason):
+                Label(reason, systemImage: "questionmark.circle")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, 1)
+    }
+
+    /// Run the online pass. When `p` is nil (a retry), reuse the current verdict's
+    /// presentation captured at display time is not available, so retry only
+    /// re-runs when a presentation is in scope; the primary path passes it.
+    private func runOnChain(_ p: Presentation, _ v: LocalVerdict) async {
+        onChainRunning = true
+        defer { onChainRunning = false }
+        // Passport CSCA cert id, when disclosed, drives the CSCA provenance tier.
+        var cscaCertId: String?
+        if case .string(let s)? = v.disclosed["cscaCertId"] { cscaCertId = s }
+        // Bundle + discover: bundled Sepolia deployment defaults. The RPC/address
+        // discovery overlay (issuer well-known / verifier info / Settings RPC
+        // override) plugs in here on RegistryConfig.
+        let config = RegistryConfig.sepoliaDefault
+        onChain = await OnChainVerifier(config: config)
+            .verify(header: p.header, headerSig: p.headerSig, cscaCertIdHex: cscaCertId)
+    }
+
+    /// Retry shim used by the offline banner button.
+    private func runOnChain(p: Presentation?, retry: Bool) async {
+        guard case .verdict(let pres, let verdict) = phase else { return }
+        await runOnChain(pres, verdict)
     }
 
     private func rejectedView(reason: String) -> some View {
@@ -324,7 +420,7 @@ struct VerifyOtherSheet: View {
     private func kv(_ key: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(LocalizedStringKey(key)).font(.caption).foregroundStyle(.secondary)
-            Text(value).font(.callout.monospaced()).textSelection(.enabled).lineLimit(2)
+            Text(value).font(.callout.monospaced()).textSelection(.enabled)
         }
         .padding(.vertical, 2)
     }

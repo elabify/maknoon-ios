@@ -32,6 +32,7 @@ struct EthereumReceiveView: View {
             }
             .navigationTitle("Receive \(network.displayName)")
             .navigationBarTitleDisplayMode(.inline)
+            .maxBrightnessWhilePresented()
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }

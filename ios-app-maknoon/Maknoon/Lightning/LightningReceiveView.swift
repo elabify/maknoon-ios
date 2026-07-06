@@ -34,6 +34,7 @@ struct LightningReceiveView: View {
             }
             .navigationTitle("Receive Lightning")
             .navigationBarTitleDisplayMode(.inline)
+            .maxBrightnessWhilePresented()
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") { dismiss() }

@@ -160,4 +160,28 @@ extension HolderStore {
         )
         idDocuments.setPassiveAuthResult(result, for: doc.id)
     }
+
+    /// Post-restore chip re-check (ADR-0050). The genuine/verified badge is
+    /// intentionally not carried in the backup, so it must be recomputed. Force
+    /// a CSCA bundle refresh (ignoring the 7-day throttle) and AWAIT it so the
+    /// re-check runs against the current national signer list, not a stale or
+    /// empty cache, which would otherwise downgrade a genuine passport to amber
+    /// "Genuine" until the user manually forced a re-check. Then re-verify each
+    /// restored passport (refresh is now a no-op, so this does not re-download
+    /// per document).
+    func refreshCSCAThenReverifyPassports() async {
+        let cscaSource = knownIssuers.hosts
+            .compactMap { knownIssuers.outboundBaseURL(forEntry: $0) }
+            .first
+        if let cscaSource {
+            await CSCATrustStore.shared.refresh(from: cscaSource, force: true)
+        }
+        // Results are transient (nil after restore), so force:false still
+        // re-verifies; its internal refresh is a no-op now that the cache is
+        // fresh, avoiding a re-download per document. Any chip-bearing document
+        // (has an SOD) gets re-checked; ensurePassiveAuth is a no-op for the rest.
+        for doc in idDocuments.documents where idDocuments.sodBytes(for: doc) != nil {
+            await ensurePassiveAuth(for: doc, force: false)
+        }
+    }
 }

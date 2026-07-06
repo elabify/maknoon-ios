@@ -71,10 +71,11 @@ final class QRScannerController: UIViewController, AVCaptureMetadataOutputObject
 
     private func setupSession() {
         let session = AVCaptureSession()
-        guard let device = AVCaptureDevice.default(for: .video) else { return }
+        guard let device = Self.bestScanDevice() else { return }
         guard let input = try? AVCaptureDeviceInput(device: device),
               session.canAddInput(input) else { return }
         session.addInput(input)
+        Self.configureFocus(device)
 
         let output = AVCaptureMetadataOutput()
         guard session.canAddOutput(output) else { return }
@@ -89,6 +90,35 @@ final class QRScannerController: UIViewController, AVCaptureMetadataOutputObject
 
         self.captureSession = session
         self.previewLayer = layer
+    }
+
+    /// Prefer a macro-capable virtual camera so close-up QR codes focus: on
+    /// supporting iPhones the triple / dual-wide device auto-switches to the
+    /// ultra-wide macro lens at short range. Falls back to the plain wide
+    /// camera, then the system default.
+    private static func bestScanDevice() -> AVCaptureDevice? {
+        let types: [AVCaptureDevice.DeviceType] = [
+            .builtInTripleCamera,
+            .builtInDualWideCamera,
+            .builtInWideAngleCamera,
+        ]
+        let discovery = AVCaptureDevice.DiscoverySession(
+            deviceTypes: types, mediaType: .video, position: .back)
+        return discovery.devices.first ?? AVCaptureDevice.default(for: .video)
+    }
+
+    /// Enable continuous autofocus and allow near-range focus so a QR held
+    /// close to the lens stays sharp (the default range restriction can refuse
+    /// to focus that close).
+    private static func configureFocus(_ device: AVCaptureDevice) {
+        guard (try? device.lockForConfiguration()) != nil else { return }
+        defer { device.unlockForConfiguration() }
+        if device.isFocusModeSupported(.continuousAutoFocus) {
+            device.focusMode = .continuousAutoFocus
+        }
+        if device.isAutoFocusRangeRestrictionSupported {
+            device.autoFocusRangeRestriction = .near
+        }
     }
 
     private func startSession() {

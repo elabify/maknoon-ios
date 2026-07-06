@@ -43,7 +43,7 @@ settings:
     # isolated SWIFT_VERSION.
     SWIFT_VERSION: "5.10"
     IPHONEOS_DEPLOYMENT_TARGET: "26.0"
-    MARKETING_VERSION: "0.6.3"
+    MARKETING_VERSION: "0.6.4"
     # Local-build default only. CI overrides via xcodebuild
     # CURRENT_PROJECT_VERSION=${{ github.run_number }} (ADR-0048 0.6.3 hardening) so
     # every TestFlight upload gets a unique, monotonic build number.
@@ -152,6 +152,23 @@ targets:
     scheme:
       testTargets:
         - MaknoonTests
+    # Stamp the real git short SHA into the built Info.plist at build time, so
+    # Settings > About shows the commit for BOTH local Xcode builds and CI
+    # archives without any xcodebuild CLI flag (parity with Android's
+    # build.gradle gitShortSha()). Runs after Info.plist processing and before
+    # code signing; falls back to the project.yml default ("dev") when git is
+    # unavailable. The CI archive also passes ELABIFY_BUILD_COMMIT as a
+    # belt-and-braces override.
+    postBuildScripts:
+      - name: Stamp build commit into Info.plist
+        basedOnDependencyAnalysis: false
+        script: |
+          COMMIT=$(git -C "$SRCROOT" rev-parse --short HEAD 2>/dev/null || echo dev)
+          PLIST="${TARGET_BUILD_DIR}/${INFOPLIST_PATH}"
+          if [ -f "$PLIST" ]; then
+            /usr/libexec/PlistBuddy -c "Set :ELABIFY_BUILD_COMMIT $COMMIT" "$PLIST" 2>/dev/null \
+              || /usr/libexec/PlistBuddy -c "Add :ELABIFY_BUILD_COMMIT string $COMMIT" "$PLIST"
+          fi
     sources:
       - path: Maknoon
       # UniFFI-generated Swift glue for ledger-btc-core (Rust core

@@ -97,11 +97,22 @@ struct AppsView: View {
             } else {
                 ForEach(store.appStores.installedApps) { app in
                     Button {
-                        selectedInstalled = app
+                        // Tap launches the app straight into its host (mini
+                        // apps); non-runnable entries fall back to the detail
+                        // sheet. Management moved to a left-swipe pencil.
+                        if app.entry.isMiniApp { runningApp = app } else { selectedInstalled = app }
                     } label: {
                         installedRow(app)
                     }
                     .buttonStyle(.plain)
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                        Button {
+                            selectedInstalled = app
+                        } label: {
+                            Label("Manage", systemImage: "pencil")
+                        }
+                        .tint(.purple)
+                    }
                 }
             }
         } header: {

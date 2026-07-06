@@ -565,6 +565,7 @@ struct DropQrSheet: View {
             }
             .navigationTitle("Online QR")
             .navigationBarTitleDisplayMode(.inline)
+            .maxBrightnessWhilePresented()
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { onClose() }
