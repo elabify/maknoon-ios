@@ -6,7 +6,7 @@
 
 Maknoon is a self-custodial holder app. It is the iOS reference surface for the Musnad post-quantum identity stack and also includes a self-custodial Bitcoin and Ethereum wallet. This document describes what data the app handles, where that data lives, and what (very little) leaves your device.
 
-If you have not yet read it, the project-wide privacy stance is in [`/PRIVACY.md`](https://musnad.elabify.com/privacy) at the repository root. This document is the app-specific overlay.
+This document is the Maknoon iOS app's privacy policy.
 
 ---
 
@@ -67,7 +67,7 @@ Maknoon makes outbound network calls only in response to a user action. The endp
 
 Maknoon does not contact Elabify-operated servers for telemetry. There is no analytics endpoint, no crash-report endpoint, no remote feature-flag service, no push token registration server.
 
-Hosts contacted for issuance and presentation are pinned to a configured allowlist in production builds (`MusnadConfig.allowedIssuerHosts` and equivalent).
+Hosts contacted for issuance and presentation are pinned to a configured allowlist in production builds.
 
 ---
 
@@ -76,7 +76,7 @@ Hosts contacted for issuance and presentation are pinned to a configured allowli
 When you pair or use a hardware device, the data exchange is local-radio or local-USB:
 
 - **Ledger Nano X over Bluetooth Low Energy**: Maknoon scans for and connects to the specific peripheral UUID captured at pair time. Sent: APDUs for the Bitcoin app (`registerWallet`, `getExtendedPubkey`, `signPsbt`, `getMasterFingerprint`) and the Ethereum app (`personal_sign` for Identity Sandwich wrap). Received: the device's responses to those APDUs.
-- **Trezor Safe 5 over Bluetooth Low Energy**: same model. Trezor BLE support is in progress; currently a scaffold.
+- **Trezor Safe 5 over Bluetooth Low Energy**: same model, over a hand-rolled Trezor Host Protocol (THP v2) transport. Sent: THP frames carrying address/xpub requests and signing requests for Bitcoin (PSBT), Ethereum (transactions + `personal_sign` for the Identity Sandwich wrap), Solana, and Tron. Received: the device's signed responses. Supports hidden (passphrase) wallets and custom derivation paths.
 - **YubiKey 5 series over NFC or USB-C**: NFC is the primary transport. For serial read, Maknoon opens the Management application on the key and reads `DeviceInfo`. For Identity Sandwich enrollment and unlock, Maknoon opens a FIDO2 session and calls `makeCredential` or `getAssertion` with a deterministic client data hash. The hash binds your wrap salt and device serial; the resulting signature is hashed locally into the wrap key. No FIDO2 data leaves the phone.
 - **SeedSigner over QR camera**: Maknoon reads QR codes the SeedSigner displays. No radio exchange; nothing is transmitted to SeedSigner besides what you scan back.
 

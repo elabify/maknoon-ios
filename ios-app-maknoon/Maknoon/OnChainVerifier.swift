@@ -31,12 +31,20 @@ struct RegistryConfig: Sendable {
     var cscaRegistry: String?
 
     /// The committed Sepolia deployment (the smart contracts).
-    static let sepoliaDefault = RegistryConfig(
-        rpcURL: "https://eth-sepolia.public.blastapi.io",
-        identityRegistry: "0x8ca4260A49F4B05c652F926Cc402D909CA0881dB",
-        revocationRegistry: "0x56CCaCEf210fc24007a8C327C10540Ea0d5ac52A",
-        cscaRegistry: nil
-    )
+    /// The RPC is NOT hardcoded here: the registries live on Sepolia, so the
+    /// caller passes the app's effective Sepolia RPC (Settings > Networks >
+    /// Ethereum, which honors the user's per-network override and otherwise
+    /// falls back to EthereumNetwork.sepolia.defaultRPCURL). This keeps the
+    /// on-chain verifier on the same endpoint the wallet already uses instead of
+    /// a private hardcoded URL.
+    static func sepolia(rpcURL: String) -> RegistryConfig {
+        RegistryConfig(
+            rpcURL: rpcURL,
+            identityRegistry: "0x8ca4260A49F4B05c652F926Cc402D909CA0881dB",
+            revocationRegistry: "0x56CCaCEf210fc24007a8C327C10540Ea0d5ac52A",
+            cscaRegistry: nil
+        )
+    }
 }
 
 /// Result of one on-chain check.
@@ -138,11 +146,68 @@ struct OnChainVerifier {
 
     /// Run the online pass for a presented credential. `cscaCertIdHex` is the
     /// passport's on-chain CSCA cert id when the credential carries one.
-    func verify(header: CredentialHeader, headerSig: String, cscaCertIdHex: String?) async -> OnChainVerdict {
-        guard let rpc = EthereumRPCClient(urlString: config.rpcURL) else {
-            return .unreachable("No RPC configured")
+    /// `anchorBatchRoot` is the credential's ANCHOR batch root for this registry's
+    /// chain (from `presentation.anchor.anchors[].batchRoot`), NOT `header.root`:
+    /// the issuer anchors a Merkle-of-roots `batchRoot` per epoch (ADR-0022), and
+    /// `header.root` (the per-credential root) is never an on-chain epoch root, so
+    /// isRootRecent must be checked against the batchRoot.
+    /// Identity checks (isActive / getIssuerPubkey) run on the issuer's identity
+    /// chain (`config`, Sepolia). Revocation + root run on the chain the credential
+    /// is ACTUALLY anchored on: `anchorRevocationRegistry` + `anchorRPCURL` +
+    /// `anchorBatchRoot` come from the presented anchor entry, so a Base-Sepolia
+    /// anchored credential is checked on Base Sepolia, not Sepolia.
+    func verify(
+        header: CredentialHeader,
+        headerSig: String,
+        cscaCertIdHex: String?,
+        anchorBatchRoot: String?,
+        anchorRPCURL: String?,
+        anchorRevocationRegistry: String?
+    ) async -> OnChainVerdict {
+        // Reuse the reference pass (which also fetches the on-chain issuer key),
+        // then layer headerSigValid on top using the full header + signature.
+        let ref = await verifyReference(
+            did: header.iss, cid: header.cid, iat: header.iat,
+            cscaCertIdHex: cscaCertIdHex, anchorBatchRoot: anchorBatchRoot,
+            anchorRPCURL: anchorRPCURL, anchorRevocationRegistry: anchorRevocationRegistry
+        )
+        var v = ref.verdict
+        if let pk = ref.issuerPubkey, !pk.isEmpty,
+           let headerBytes = Self.canonicalHeaderBytes(header),
+           let sig = ChainABI.dataFromHexOrNil(headerSig) {
+            v.headerSigValid = MLDSAClient.verify(publicKey: pk, signature: sig, message: headerBytes)
+                ? .pass
+                : .fail("Header signature does not verify against the on-chain issuer key")
+        } else if v.reachedChain {
+            v.headerSigValid = .unknown("Issuer key not published on-chain")
         }
-        let did = header.iss
+        return v
+    }
+
+    /// The result of a REFERENCE pass: the verdict (with headerSigValid left
+    /// "unknown", since a reference/badge carries no full header to verify) plus
+    /// the on-chain issuer pubkey (so the caller can bind HAVID via the on-chain
+    /// key instead of a credential signature).
+    struct ReferenceResult { var verdict: OnChainVerdict; var issuerPubkey: Data? }
+
+    /// On-chain checks that need only a credential REFERENCE (did + cid + iat +
+    /// anchor): issuerRegistered, notRevoked, rootCurrent, cscaProvenance. Also
+    /// fetches the issuer's on-chain pubkey. Used directly by the badge flow.
+    func verifyReference(
+        did: String,
+        cid: String,
+        iat: Int64,
+        cscaCertIdHex: String?,
+        anchorBatchRoot: String?,
+        anchorRPCURL: String?,
+        anchorRevocationRegistry: String?
+    ) async -> ReferenceResult {
+        guard let rpc = EthereumRPCClient(urlString: config.rpcURL) else {
+            return ReferenceResult(verdict: .unreachable("No RPC configured"), issuerPubkey: nil)
+        }
+        // Revocation + root live on the anchor's chain (may differ from identity).
+        let anchorRPC = anchorRPCURL.flatMap { EthereumRPCClient(urlString: $0) }
+        let revRegistry = anchorRevocationRegistry ?? config.revocationRegistry
         var reached = false
 
         // issuerRegistered: isActive(string)
@@ -155,54 +220,56 @@ struct OnChainVerifier {
             issuerRegistered = ok ? .pass : .fail("Issuer is not registered / not active on-chain")
         }
 
-        // notRevoked: isRevoked(string,bytes32) -> invert
-        var notRevoked: OnChainTier = .unknown("RPC unreachable")
-        let cidData = ChainABI.bytes32(hex: header.cid)
-        if let hex = try? await rpc.ethCall(
-            to: config.revocationRegistry,
-            data: ChainABI.selector("isRevoked(string,bytes32)") + ChainABI.word(0x40) + cidData + ChainABI.stringTail(did)
-        ), let revoked = ChainABI.decodeBool(hex) {
-            reached = true
-            notRevoked = revoked ? .fail("Credential has been revoked on-chain") : .pass
+        // notRevoked + rootCurrent run on the anchor's chain (anchorRPC + the
+        // RevocationRegistry the anchor names). Without a reachable anchor chain we
+        // leave them "unknown" (not failed).
+        var notRevoked: OnChainTier = .unknown("No reachable anchor chain")
+        var rootCurrent: OnChainTier = .unknown("Carries no on-chain anchor for a supported network")
+        if let arpc = anchorRPC {
+            let cidData = ChainABI.bytes32(hex: cid)
+            if let hex = try? await arpc.ethCall(
+                to: revRegistry,
+                data: ChainABI.selector("isRevoked(string,bytes32)") + ChainABI.word(0x40) + cidData + ChainABI.stringTail(did)
+            ), let revoked = ChainABI.decodeBool(hex) {
+                reached = true
+                notRevoked = revoked ? .fail("Credential has been revoked on-chain") : .pass
+            } else {
+                notRevoked = .unknown("Could not read the revocation registry")
+            }
+
+            if let batchRoot = anchorBatchRoot, !batchRoot.isEmpty {
+                let rootData = ChainABI.bytes32(hex: batchRoot)
+                if let hex = try? await arpc.ethCall(
+                    to: revRegistry,
+                    data: ChainABI.selector("isRootRecent(string,bytes32,uint256)")
+                        + ChainABI.word(0x60) + rootData + ChainABI.word(rootFreshnessWindowSec)
+                        + ChainABI.stringTail(did)
+                ), let recent = ChainABI.decodeBool(hex) {
+                    reached = true
+                    rootCurrent = recent
+                        ? .pass
+                        : .fail("Credential anchor root is not current on-chain (batch may be stale or unanchored)")
+                } else {
+                    rootCurrent = .unknown("Could not read the anchor root on-chain")
+                }
+            }
         }
 
-        // rootCurrent: isRootRecent(string,bytes32,uint256)
-        var rootCurrent: OnChainTier = .unknown("RPC unreachable")
-        let rootData = ChainABI.bytes32(hex: header.root)
-        if let hex = try? await rpc.ethCall(
-            to: config.revocationRegistry,
-            data: ChainABI.selector("isRootRecent(string,bytes32,uint256)")
-                + ChainABI.word(0x60) + rootData + ChainABI.word(rootFreshnessWindowSec)
-                + ChainABI.stringTail(did)
-        ), let recent = ChainABI.decodeBool(hex) {
-            reached = true
-            rootCurrent = recent ? .pass : .fail("Credential root is not current on-chain")
-        }
-
-        // headerSigValid: fetch the on-chain issuer pubkey, verify the header sig
-        // against it. This is the anchor that upgrades the offline UNVERIFIED
-        // header signature to a chain-backed PASS.
-        var headerSigValid: OnChainTier = .unknown("RPC unreachable")
+        // On-chain issuer pubkey (for headerSigValid in verify(), and for the
+        // caller to bind HAVID via the on-chain key).
+        var issuerPubkey: Data?
         if let hex = try? await rpc.ethCall(
             to: config.identityRegistry,
             data: ChainABI.selector("getIssuerPubkey(string)") + ChainABI.word(0x20) + ChainABI.stringTail(did)
         ) {
             reached = true
-            if let pubkey = ChainABI.decodeFirstBytes(hex), !pubkey.isEmpty,
-               let headerBytes = Self.canonicalHeaderBytes(header),
-               let sig = ChainABI.dataFromHexOrNil(headerSig) {
-                headerSigValid = MLDSAClient.verify(publicKey: pubkey, signature: sig, message: headerBytes)
-                    ? .pass
-                    : .fail("Header signature does not verify against the on-chain issuer key")
-            } else {
-                headerSigValid = .unknown("Issuer key not published on-chain")
-            }
+            issuerPubkey = ChainABI.decodeFirstBytes(hex)
         }
 
         // cscaProvenance (passports only): isValidAt(bytes32,uint64)
         var cscaProvenance: OnChainTier?
         if let certIdHex = cscaCertIdHex, let cscaRegistry = config.cscaRegistry {
-            let ts = UInt64(max(0, header.iat))
+            let ts = UInt64(max(0, iat))
             if let hex = try? await rpc.ethCall(
                 to: cscaRegistry,
                 data: ChainABI.selector("isValidAt(bytes32,uint64)") + ChainABI.bytes32(hex: certIdHex) + ChainABI.word(ts)
@@ -214,14 +281,15 @@ struct OnChainVerifier {
             }
         }
 
-        return OnChainVerdict(
+        let verdict = OnChainVerdict(
             reachedChain: reached,
             issuerRegistered: issuerRegistered,
             notRevoked: notRevoked,
             rootCurrent: rootCurrent,
-            headerSigValid: headerSigValid,
+            headerSigValid: .unknown("Needs the full credential (a badge is a reference)"),
             cscaProvenance: cscaProvenance
         )
+        return ReferenceResult(verdict: verdict, issuerPubkey: issuerPubkey)
     }
 
     /// Canonical bytes the issuer signed for the header (re-encode + canonicalize,

@@ -137,7 +137,16 @@ struct IdentityView: View {
                 .environment(store)
         }
         .sheet(isPresented: $showVerifyOther) {
-            VerifyOtherSheet(onClose: { showVerifyOther = false })
+            VerifyOtherSheet(
+                onClose: { showVerifyOther = false },
+                knownIssuerBaseURLs: store.knownIssuers.hosts.compactMap {
+                    store.knownIssuers.outboundBaseURL(forEntry: $0)
+                },
+                chainRPCs: [
+                    "eip155:11155111": store.ethereumSettings.rpcURL(for: .sepolia),
+                    "eip155:84532": store.ethereumSettings.rpcURL(for: .baseSepolia),
+                ]
+            )
         }
         #if MAKNOON_NFC
         .sheet(isPresented: $showTapIDDocument) {

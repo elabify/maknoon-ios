@@ -27,17 +27,27 @@ Each device kind produces a deterministic-per-(device, salt, serial) secret. Mak
 
 This path is stable across enrollment and unlock and across app reinstalls; the same Ledger always produces the same wrap key for a given (salt, serial).
 
-### YubiKey FIDO2 (current build, **broken** for unlock; tracked as a separate fix)
+### YubiKey FIDO2 with the hmac-secret extension
 
-- **Mechanism today**: FIDO2 `getAssertion` over NFC with a fixed clientDataHash; the resulting raw ECDSA signature is hashed (SHA-256) into a 32-byte secret used as HKDF input keying material.
-- **Problem**: FIDO2 `authenticatorData` includes a 4-byte signature counter that **increments on every getAssertion call**. The signature is computed over `authData || clientDataHash`, so consecutive calls produce different signatures even when the message is identical. Enrollment-time signature != unlock-time signature, the HKDF outputs differ, AES-GCM open fails with `authenticationFailure` on the same physical YubiKey.
-- **User-visible symptom**: enrollment succeeds; first unlock attempt produces "Could not unseal master material: wrap key did not match (wrong device, or device signature drifted since enrollment)" even with the correct PIN and the same key.
+YubiKey enrollment and unlock use FIDO2's `hmac-secret` extension (CTAP2.1),
+which produces a 32-byte HMAC output keyed by a credential-resident secret with a
+host-provided salt. The salt is fixed per enrollment (derived from the wrap salt +
+device serial), so the output is deterministic across calls, the FIDO2 signature
+counter is not part of the HMAC input, so unlock reproduces the enrollment-time
+secret exactly (unlike a plain `getAssertion` signature, whose incrementing
+counter would drift). The hmac-secret output is the HKDF input keying material for
+the AES wrap key.
 
-### YubiKey FIDO2 with hmac-secret extension (planned proper fix)
-
-- **Mechanism**: FIDO2's `hmac-secret` extension (CTAP2.1) produces a 32-byte HMAC output keyed by a credential-resident secret, with a host-provided salt. The salt is a fixed value derived from (salt, serial) per enrollment; the output is deterministic across calls because the counter is not part of the HMAC input.
-- **Implementation cost**: YubiKit-iOS does not expose hmac-secret as a high-level API. The implementation requires manual CTAP2 ECDH key agreement with the authenticator (`clientPin.getKeyAgreement`), AES-256-CBC encryption of the salt under the shared secret with IV=0, HMAC-SHA256-truncated saltAuth, passing both via the `extensions` parameter on `makeCredential` and `getAssertion`, and AES-CBC decryption of the response. Approximately 2 to 3 days of careful crypto + CTAP2 work.
-- **Status**: tracked separately. Until it lands, prefer Ledger enrollment for the Identity Sandwich. YubiKeys can still be enrolled today; they just cannot complete an unlock until hmac-secret ships.
+- **Mechanism**: `makeCredentialHMACSecret` at enrollment and `getAssertionHMACSecret`
+  at unlock, over NFC. On YubiKeys with a clientPin set, hmac-secret requires user
+  verification, so unlock prompts for the FIDO2 PIN before the tap.
+- **Implementation**: YubiKit-iOS does not expose hmac-secret directly, so Maknoon
+  drives CTAP2 by hand: PIN-protocol ECDH key agreement, AES-CBC salt encryption
+  under the shared secret, the saltAuth HMAC, the `hmac-secret` extension on
+  makeCredential/getAssertion, and AES-CBC decryption of the response
+  (`YubiKeyClient.swift`, `HardwareUnlockView.swift`).
+- **Status**: implemented; Ledger, Trezor, and YubiKey can all seal + unlock the
+  Identity Sandwich.
 
 ## Persistence shape
 

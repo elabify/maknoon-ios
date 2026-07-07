@@ -45,6 +45,7 @@
 		219E3154C0BC894AA013BF74 /* HardwareUnlockView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 274CB5300CF94A36DC590B34 /* HardwareUnlockView.swift */; };
 		23007971E171747E00BA2F00 /* LockScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC64F2BA18F4E17047518E7C /* LockScreen.swift */; };
 		231C4E32BFF323AFE1D22345 /* CommercePaySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDDFA9ACEC935B5415EE980F /* CommercePaySheet.swift */; };
+		2453BB7BE48B3AA3F62914D7 /* HavidVerifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32827D006F955DC3FA073318 /* HavidVerifier.swift */; };
 		2488BA7A14B2F16F7E5520ED /* CommerceTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22996BA2648A3ED8F6983C83 /* CommerceTransport.swift */; };
 		26373649BC18A20370239138 /* AddLightningAccountSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E29C53F5B7D656B08F44532 /* AddLightningAccountSheet.swift */; };
 		264DE284CDF0AAAAEDA7C5E9 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 25F7F84C14EFE18929BEB078 /* PrivacyInfo.xcprivacy */; };
@@ -94,6 +95,7 @@
 		41E0468A32A408065681675B /* LightningAccountsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62F9278BFC039C35C7058E4B /* LightningAccountsView.swift */; };
 		41F04959B6F2CB17CE5CF28E /* EthereumRPCClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE8A965D6C61B1A7DDEEBDBD /* EthereumRPCClient.swift */; };
 		42BC51ACC24A45B4EA246CBC /* EthereumWalletView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58B2520CFB319E9F5802132B /* EthereumWalletView.swift */; };
+		432033DADA9BEE47069C576F /* MinimalX509Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 279AEB3EC9996E7F43942444 /* MinimalX509Tests.swift */; };
 		43475EB4EB56E82C3B5DB5C7 /* PBKDF2.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3CE2A9AF57176BEE841C3EE /* PBKDF2.swift */; };
 		439606C4F0428DC85855C80A /* VerifyBackupSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8679062258E0DA8EC3FA2E6 /* VerifyBackupSheet.swift */; };
 		43BFB231048C6DA3BC7FFA2A /* HolderStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29C81B84BD472BD42B318254 /* HolderStore.swift */; };
@@ -397,6 +399,7 @@
 		24AF6BC078BE81D91DE8DDF3 /* FiatPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FiatPreferences.swift; sourceTree = "<group>"; };
 		25F7F84C14EFE18929BEB078 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		274CB5300CF94A36DC590B34 /* HardwareUnlockView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HardwareUnlockView.swift; sourceTree = "<group>"; };
+		279AEB3EC9996E7F43942444 /* MinimalX509Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MinimalX509Tests.swift; sourceTree = "<group>"; };
 		29AD69C41F3B2B9E29239FC8 /* BitcoinWalletView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BitcoinWalletView.swift; sourceTree = "<group>"; };
 		29C81B84BD472BD42B318254 /* HolderStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HolderStore.swift; sourceTree = "<group>"; };
 		2A24E5FB213F912B7E0BF695 /* TronDescriptors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TronDescriptors.swift; sourceTree = "<group>"; };
@@ -411,6 +414,7 @@
 		30B7F468C4D22746D1F6AA48 /* PresentationFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresentationFactory.swift; sourceTree = "<group>"; };
 		31A5E06677C85122400D3F55 /* IDDocumentIssuanceClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IDDocumentIssuanceClient.swift; sourceTree = "<group>"; };
 		3216838A447CA2FC496D267C /* BitcoinMessageSign.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BitcoinMessageSign.swift; sourceTree = "<group>"; };
+		32827D006F955DC3FA073318 /* HavidVerifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HavidVerifier.swift; sourceTree = "<group>"; };
 		330630C68D2881DC45E9A776 /* Maknoon.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Maknoon.entitlements; sourceTree = "<group>"; };
 		33873ECD91EFAAD6724203A1 /* NetworksDestination.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworksDestination.swift; sourceTree = "<group>"; };
 		367A19E6AB5B12D23CE2DCCF /* TronSendView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TronSendView.swift; sourceTree = "<group>"; };
@@ -855,6 +859,7 @@
 				05C1D115C59094CAEA05FDA1 /* LocalPassportCredentialTests.swift */,
 				C616DC631565450CA7DA4870 /* MessageSigningKATTests.swift */,
 				5B9297341985E832789E5D8E /* MiniAppTests.swift */,
+				279AEB3EC9996E7F43942444 /* MinimalX509Tests.swift */,
 			);
 			path = MaknoonTests;
 			sourceTree = "<group>";
@@ -1123,6 +1128,7 @@
 				8A9694FEFCA6CAF655B1D00A /* FiatCurrencyCatalog.swift */,
 				24AF6BC078BE81D91DE8DDF3 /* FiatPreferences.swift */,
 				274CB5300CF94A36DC590B34 /* HardwareUnlockView.swift */,
+				32827D006F955DC3FA073318 /* HavidVerifier.swift */,
 				29C81B84BD472BD42B318254 /* HolderStore.swift */,
 				3CAAD3AA895C97261C6E0AA7 /* iCloudBackup.swift */,
 				440EAB68D2F42B883FECA1ED /* IdentitySandwich.swift */,
@@ -1453,6 +1459,7 @@
 				1D62C327CF2D60AE5DAC8598 /* LocalPassportCredentialTests.swift in Sources */,
 				5371E6E610AB1B7FA70F1C11 /* MessageSigningKATTests.swift in Sources */,
 				4A1803C646A323BAC90258C0 /* MiniAppTests.swift in Sources */,
+				432033DADA9BEE47069C576F /* MinimalX509Tests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1587,6 +1594,7 @@
 				219E3154C0BC894AA013BF74 /* HardwareUnlockView.swift in Sources */,
 				06F960265F6CB044680355EB /* HardwareWalletManager.swift in Sources */,
 				6D27E662AF795DE108DF276C /* HardwareWalletProtocol.swift in Sources */,
+				2453BB7BE48B3AA3F62914D7 /* HavidVerifier.swift in Sources */,
 				43BFB231048C6DA3BC7FFA2A /* HolderStore.swift in Sources */,
 				621E33FA471D8F2266850DDD /* IDDocument.swift in Sources */,
 				1BC662600CC4C011B909BE60 /* IDDocumentCard.swift in Sources */,
