@@ -53,7 +53,15 @@ protocol MiniAppNamespaceHandler: AnyObject {
     /// Permission token (in `AppStoreEntry.permissions`) the app must hold
     /// to use this namespace. nil = always allowed.
     var requiredPermission: String? { get }
+    /// Permission the app must hold for a SPECIFIC method. Lets one handler
+    /// require different tokens per method (e.g. Web3BridgeHandler gates reads,
+    /// writes, and signing separately). Defaults to `requiredPermission`.
+    func requiredPermission(forMethod method: String) -> String?
     func handle(method: String, params: Any?) async throws -> Any?
+}
+
+extension MiniAppNamespaceHandler {
+    func requiredPermission(forMethod method: String) -> String? { requiredPermission }
 }
 
 @MainActor
@@ -90,7 +98,7 @@ final class MiniAppBridge: NSObject, WKScriptMessageHandlerWithReply {
             replyHandler(Self.envelope(error: .unsupported("namespace \(namespace)")), nil)
             return
         }
-        if let needed = handler.requiredPermission, !granted.contains(needed) {
+        if let needed = handler.requiredPermission(forMethod: method), !granted.contains(needed) {
             LogStore.shared.warn(Self.category, "app \(entry.id) called \(namespace).\(method) without '\(needed)' permission")
             replyHandler(Self.envelope(error: .unauthorized("app lacks '\(needed)' permission")), nil)
             return

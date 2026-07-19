@@ -119,12 +119,16 @@ struct EthereumRPCClient: Sendable {
     /// Read-only contract call. Used for ERC-20 `balanceOf`,
     /// `symbol`, `decimals`. Returns the raw response bytes as a
     /// 0x-prefixed hex string; callers ABI-decode.
-    func ethCall(to: String, data: Data, block: String = "latest") async throws -> String {
+    func ethCall(to: String, data: Data, from: String? = nil, block: String = "latest") async throws -> String {
         let hexData = "0x" + data.map { String(format: "%02x", $0) }.joined()
-        let call: [String: Param] = [
+        var call: [String: Param] = [
             "to":   .string(to),
             "data": .string(hexData),
         ]
+        // Some reads depend on the caller: e.g. a Uniswap v4 Quoter simulates the
+        // swap, so the pool's beforeSwap hook checks isAllowed(tx.origin); without
+        // `from` the simulation sees address(0) and reverts.
+        if let from { call["from"] = .string(from) }
         return try await self.call(
             method: "eth_call",
             params: [.object(call), .string(block)]
@@ -138,6 +142,13 @@ struct EthereumRPCClient: Sendable {
             method: "eth_sendRawTransaction",
             params: [.string(hex)]
         )
+    }
+
+    /// Receipt of a mined transaction, including its event logs. Throws if the
+    /// tx is unknown/pending (null result) — callers treat that as "unreadable".
+    func getTransactionReceipt(_ txHash: String) async throws -> EthereumTxReceipt {
+        let hex = txHash.hasPrefix("0x") ? txHash : "0x" + txHash
+        return try await call(method: "eth_getTransactionReceipt", params: [.string(hex)])
     }
 
     // MARK: -- transport
@@ -201,6 +212,17 @@ private struct RPCEnvelope<T: Decodable>: Decodable {
 private struct RPCError: Decodable {
     let code: Int
     let message: String
+}
+
+/// eth_getTransactionReceipt result (only the fields we read).
+struct EthereumTxReceipt: Decodable {
+    let logs: [EthereumLog]
+}
+
+struct EthereumLog: Decodable {
+    let address: String
+    let topics: [String]
+    let data: String
 }
 
 private struct FeeHistoryResult: Decodable {

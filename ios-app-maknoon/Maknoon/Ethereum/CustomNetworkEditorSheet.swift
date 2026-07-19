@@ -25,7 +25,7 @@ struct CustomNetworkEditorSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Network") {
+                Section("Chain") {
                     TextField("Name (e.g. Aurora Mainnet)", text: $name)
                     HStack {
                         Text("Chain ID")
@@ -92,13 +92,13 @@ struct CustomNetworkEditorSheet: View {
                 }
 
                 Section {
-                    Button(isEdit ? "Save changes" : "Add network") {
+                    Button(isEdit ? "Save changes" : "Add chain") {
                         save()
                     }
                     .disabled(!canSave)
                 }
             }
-            .navigationTitle(isEdit ? "Edit network" : "Add custom network")
+            .navigationTitle(isEdit ? "Edit chain" : "Add custom chain")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {

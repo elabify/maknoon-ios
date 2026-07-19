@@ -375,7 +375,7 @@ struct EthereumSendView: View {
     /// alphabetically by symbol. Switching re-keys the balance/estimate load and
     /// every asset-dependent computation (ADR-0033 Phase 2b round-2).
     private var assetSection: some View {
-        let tokens = store.ethereumTokenStore.tokens(on: activeNetwork)
+        let tokens = store.ethereumTokenStore.tokens(on: activeNetwork, walletId: wallet.descriptor.id)
             .sorted { $0.symbol.lowercased() < $1.symbol.lowercased() }
         let currentLabel = token.map { "\($0.symbol) · \($0.name)" } ?? "\(activeNetwork.ticker) (native)"
         return Section("Asset") {

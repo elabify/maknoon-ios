@@ -43,6 +43,24 @@ enum MiniAppCapabilityRegistry {
                          label: "Payments",
                          reason: "Make a payment to a receiving address.",
                          icon: "creditcard"),
+        // Hierarchical per-network wallet capabilities (ADR-0057). The dotted
+        // token is `wallet.<network>.<capability>`; granularity is per-network
+        // (Ethereum covers all EVM chains). read is install-tier (silent RPC
+        // reads + connect + chain switch); write/sign are perUse (a native
+        // approval sheet runs for each). Bitcoin/Solana are reserved by the ADR.
+        "wallet.ethereum.read": .init(token: "wallet.ethereum.read", tier: .install,
+                     label: "Ethereum: Network Access",
+                     reason: "Read Ethereum network state (balances, gas, contract reads) and switch chains.",
+                     icon: "network"),
+        "wallet.ethereum.write": .init(token: "wallet.ethereum.write", tier: .perUse,
+                     label: "Ethereum: Write Transactions",
+                     reason: "Submit Ethereum transactions from your wallet. You approve each one.",
+                     icon: "paperplane"),
+        "wallet.ethereum.sign": .init(token: "wallet.ethereum.sign", tier: .perUse,
+                     label: "Ethereum: Sign Messages",
+                     reason: "Sign Ethereum messages and typed data. You approve each one.",
+                     icon: "signature"),
+        // Legacy flat token, superseded by wallet.ethereum.* (expanded at parse).
         "evm": .init(token: "evm", tier: .perUse,
                      label: "Ethereum wallet",
                      reason: "Connect and request signatures or transactions",

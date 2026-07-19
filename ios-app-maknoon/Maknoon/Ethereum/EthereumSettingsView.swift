@@ -19,8 +19,8 @@ struct EthereumSettingsView: View {
 
     var body: some View {
         Form {
-            Section("Network for these settings") {
-                Picker("Network", selection: $selectedNetwork) {
+            Section("Chain for these settings") {
+                Picker("Chain", selection: $selectedNetwork) {
                     Section {
                         ForEach(EthereumNetwork.displayOrdered.filter { !$0.isTestnet }, id: \.self) {
                             Text($0.displayName).tag($0)
@@ -86,7 +86,7 @@ struct EthereumSettingsView: View {
                     }
                     .foregroundStyle(.blue)
                 } else {
-                    Text("This network does not expose an Etherscan-style API. Maknoon falls back to RPC-only history fetching here, which is more limited.")
+                    Text("This chain does not expose an Etherscan-style API. Maknoon falls back to RPC-only history fetching here, which is more limited.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             } header: {
@@ -163,12 +163,12 @@ struct EthereumSettingsView: View {
             Button {
                 showAddCustomNetwork = true
             } label: {
-                Label("Add a custom network", systemImage: "plus.circle")
+                Label("Add a custom chain", systemImage: "plus.circle")
             }
         } header: {
-            Text("Custom networks")
+            Text("Custom chains")
         } footer: {
-            Text("Add an arbitrary EVM chain by pasting its chain ID, RPC URL, ticker, and explorer URL. Custom chains appear in the wallet's network dropdown alongside built-ins, but auto-discover and the reputable-token list only cover built-in chains.")
+            Text("Add an arbitrary EVM chain by pasting its chain ID, RPC URL, ticker, and explorer URL. Custom chains appear in the wallet's chain picker alongside built-ins, but auto-discover and the reputable-token list only cover built-in chains.")
                 .font(.caption)
         }
     }

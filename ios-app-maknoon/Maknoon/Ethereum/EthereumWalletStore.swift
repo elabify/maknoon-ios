@@ -154,6 +154,10 @@ final class EthereumWalletStore {
         pendingTxsByWallet[walletId] = list
     }
 
+    /// Public lookup of a wallet id by its 0x address, used by the mini-app
+    /// "open wallet" bridge to re-activate the exact wallet a swap used.
+    func walletId(forAddress address: String) -> UUID? { walletIdForAddress(address) }
+
     /// Resolve a 0x address to a wallet id we know about. All EVM
     /// wallets carry the address on the descriptor, so this works
     /// for both software and hardware.

@@ -26,12 +26,18 @@ struct MiniAppHostView: View {
 
     @State private var phase: Phase = .loading
     @State private var compatWarningDismissed = false
+    @State private var updateNoticeDismissed = false
+    /// Set when the user taps "Update": the newer entry to load in place of the
+    /// install-time snapshot for the rest of this session. The persisted pin is
+    /// swapped by AppStoreRegistry.applyUpdate; this just drives the reload.
+    @State private var effectiveEntry: AppStoreEntry?
     @State private var identityCoordinator = MiniAppIdentityCoordinator()
     @State private var collectCoordinator = MiniAppCollectCoordinator()
     @State private var web3Coordinator = MiniAppWeb3Coordinator()
     @State private var paymentCoordinator = MiniAppPaymentCoordinator()
     @State private var scanCoordinator = MiniAppScanCoordinator()
     @State private var commerceCoordinator = MiniAppCommerceCoordinator()
+    @State private var openWalletCoordinator = MiniAppOpenWalletCoordinator()
 
     private enum Phase {
         case loading
@@ -39,13 +45,17 @@ struct MiniAppHostView: View {
         case failed(String)
     }
 
+    /// The entry currently in effect: the newer one adopted this session (after
+    /// an in-app Update), else the install-time snapshot.
+    private var currentEntry: AppStoreEntry { effectiveEntry ?? app.entry }
+
     var body: some View {
         Group {
             switch phase {
             case .loading:
                 VStack(spacing: 12) {
                     ProgressView()
-                    Text("Loading \(app.entry.title)…").font(.callout).foregroundStyle(.secondary)
+                    Text("Loading \(currentEntry.title)…").font(.callout).foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             case .failed(let msg):
@@ -65,37 +75,93 @@ struct MiniAppHostView: View {
                     web3Coordinator: web3Coordinator,
                     paymentCoordinator: paymentCoordinator,
                     scanCoordinator: scanCoordinator,
-                    commerceCoordinator: commerceCoordinator
+                    commerceCoordinator: commerceCoordinator,
+                    openWalletCoordinator: openWalletCoordinator
                 )
                 .ignoresSafeArea(.container, edges: .bottom)
+                // Re-key on the bundle dir so adopting an update (a new bundle)
+                // tears down and rebuilds the WebView with the new files instead
+                // of reusing the old scheme handler.
+                .id(bundle.rootDir.lastPathComponent)
             }
         }
-        .navigationTitle(app.entry.title)
+        .navigationTitle(currentEntry.title)
         .navigationBarTitleDisplayMode(.inline)
         // Open-time compatibility recheck: the host app version can change after
         // install, so re-evaluate the installed entry's bounds against the
         // CURRENT host and warn (non-blocking) if it's now out of range.
         .safeAreaInset(edge: .top, spacing: 0) {
-            let compat = DAppCompatibility.evaluate(
-                requires: app.entry.requiresMaknoonVersion,
-                supersededAt: app.entry.supersededAtMaknoonVersion)
-            if compat.warnsAtOpen && !compatWarningDismissed {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Image(systemName: compat.systemImage)
-                    Text(compat.label).font(.caption)
-                    Spacer(minLength: 8)
-                    Button {
-                        compatWarningDismissed = true
-                    } label: { Image(systemName: "xmark.circle.fill") }
-                        .buttonStyle(.plain)
+            VStack(spacing: 0) {
+                // Non-blocking "update available" notice. The installed version
+                // keeps working; tapping Update adopts + re-downloads the newer
+                // bundle for the rest of this session.
+                if store.appStores.availableUpdate(forInstalledAppId: app.id) != nil,
+                   !updateNoticeDismissed {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Image(systemName: "arrow.down.circle")
+                        Text("A newer version is available. Update recommended.").font(.caption)
+                        Spacer(minLength: 8)
+                        Button("Update") { applyUpdate() }
+                            .font(.caption.weight(.semibold))
+                            .buttonStyle(.plain)
+                        Button {
+                            updateNoticeDismissed = true
+                        } label: { Image(systemName: "xmark.circle.fill") }
+                            .buttonStyle(.plain)
+                    }
+                    .foregroundStyle(.blue)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(.blue.opacity(0.12))
                 }
-                .foregroundStyle(.orange)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .background(.orange.opacity(0.12))
+                // Open-time compatibility recheck: the host app version can change
+                // after install, so re-evaluate the entry's bounds against the
+                // CURRENT host and warn (non-blocking) if it's now out of range.
+                let compat = DAppCompatibility.evaluate(
+                    requires: currentEntry.requiresMaknoonVersion,
+                    supersededAt: currentEntry.supersededAtMaknoonVersion)
+                if compat.warnsAtOpen && !compatWarningDismissed {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Image(systemName: compat.systemImage)
+                        Text(compat.label).font(.caption)
+                        Spacer(minLength: 8)
+                        Button {
+                            compatWarningDismissed = true
+                        } label: { Image(systemName: "xmark.circle.fill") }
+                            .buttonStyle(.plain)
+                    }
+                    .foregroundStyle(.orange)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(.orange.opacity(0.12))
+                }
             }
         }
         .task { if case .loading = phase { await load() } }
+        // Refresh catalogs in the background so the "update available" banner can
+        // appear during/after loading even when the app was opened without
+        // visiting the Apps tab. Only fetches the small catalog.json; the bundle
+        // itself stays cache-first and is never re-fetched here.
+        .task { await store.appStores.refresh() }
+        // window.maknoon.walletView.open: leave the mini app and open the exact
+        // Ethereum wallet + chain the tx used (mirrors CommercePaySheet "View in
+        // wallet"). The wallet auto-resyncs on arrival and shows the pending tx.
+        .onChange(of: openWalletCoordinator.request) { _, req in
+            guard let req else { return }
+            openWalletCoordinator.request = nil
+            let ews = store.ethereumWalletStore
+            if let addr = req.address, let id = ews.walletId(forAddress: addr) {
+                ews.setActive(id)
+            }
+            if let cid = req.chainId,
+               let net = EthereumNetwork.allCases.first(where: { $0.chainId == cid }),
+               let wid = ews.activeWallet?.id {
+                ews.setCurrentNetwork(net, for: wid)
+            }
+            store.selectedTab = .wallet
+            store.walletNavigationPath.append(WalletChain.ethereum)
+            dismiss()
+        }
         .sheet(item: Binding(
             get: { identityCoordinator.active },
             set: { if $0 == nil { identityCoordinator.cancel() } }
@@ -113,7 +179,8 @@ struct MiniAppHostView: View {
             MiniAppWeb3Sheet(
                 request: req,
                 onApprove: { web3Coordinator.approve() },
-                onCancel: { web3Coordinator.cancel() }
+                onCancel: { web3Coordinator.cancel() },
+                onSelectWallet: { store.ethereumWalletStore.setActive($0) }
             )
         }
         .sheet(item: Binding(
@@ -162,15 +229,16 @@ struct MiniAppHostView: View {
 
     private func load() async {
         phase = .loading
-        guard let manifestURL = app.entry.manifestURL,
-              let manifestSha = app.entry.manifestSha256 else {
+        let entry = currentEntry
+        guard let manifestURL = entry.manifestURL,
+              let manifestSha = entry.manifestSha256 else {
             phase = .failed("This app does not have a runnable bundle.")
             return
         }
         do {
             let bundle = try await MiniAppBundleStore.shared.ensureBundle(
                 installedAppId: app.id,
-                appId: app.entry.id,
+                appId: entry.id,
                 manifestURL: manifestURL,
                 manifestSha256: manifestSha
             )
@@ -178,6 +246,17 @@ struct MiniAppHostView: View {
         } catch {
             phase = .failed(error.localizedDescription)
         }
+    }
+
+    /// Adopt the available update: swap the persisted pin, then reload this
+    /// session with the newer bundle (downloaded on demand). The old bundle
+    /// stays cached, so this is safe even offline mid-flight (reload just fails
+    /// to a Retry, leaving the pin swapped for the next open).
+    private func applyUpdate() {
+        guard let newer = store.appStores.applyUpdate(installedAppId: app.id) else { return }
+        effectiveEntry = newer
+        updateNoticeDismissed = true
+        Task { await load() }
     }
 }
 
@@ -196,6 +275,7 @@ private struct MiniAppWebView: UIViewRepresentable {
     let paymentCoordinator: MiniAppPaymentCoordinator
     let scanCoordinator: MiniAppScanCoordinator
     let commerceCoordinator: MiniAppCommerceCoordinator
+    let openWalletCoordinator: MiniAppOpenWalletCoordinator
 
     @MainActor
     func makeCoordinator() -> Coordinator {
@@ -211,7 +291,8 @@ private struct MiniAppWebView: UIViewRepresentable {
                 web3Coordinator: web3Coordinator,
                 paymentCoordinator: paymentCoordinator,
                 scanCoordinator: scanCoordinator,
-                commerceCoordinator: commerceCoordinator
+                commerceCoordinator: commerceCoordinator,
+                openWalletCoordinator: openWalletCoordinator
             )
         ))
     }
@@ -230,7 +311,8 @@ private struct MiniAppWebView: UIViewRepresentable {
         web3Coordinator: MiniAppWeb3Coordinator,
         paymentCoordinator: MiniAppPaymentCoordinator,
         scanCoordinator: MiniAppScanCoordinator,
-        commerceCoordinator: MiniAppCommerceCoordinator
+        commerceCoordinator: MiniAppCommerceCoordinator,
+        openWalletCoordinator: MiniAppOpenWalletCoordinator
     ) -> [MiniAppNamespaceHandler] {
         var handlers: [MiniAppNamespaceHandler] = []
         let granted = entry.grantedPermissions
@@ -258,8 +340,19 @@ private struct MiniAppWebView: UIViewRepresentable {
         handlers.append(ShareBridgeHandler())                    // "share"
         handlers.append(WalletBridgeHandler(store: store))       // "wallet"
         handlers.append(ScanBridgeHandler(appTitle: displayName, coordinator: scanCoordinator)) // "scan"
-        if granted.contains("evm") {
+        // ADR-0057: EVM access is granted under the hierarchical wallet.ethereum.* tokens
+        // (read/write/sign); accept the legacy "evm" token too for older bundles.
+        let hasEvm = granted.contains("evm") || granted.contains { $0.hasPrefix("wallet.ethereum.") }
+        if hasEvm {
             handlers.append(Web3BridgeHandler(store: store, coordinator: web3Coordinator, appTitle: displayName))
+            // window.maknoon.pools.list: read the issuer's public pool registry
+            // (the sandbox has connect-src 'none', so this network read must be
+            // native). No user data; gated by EVM access via this registration.
+            handlers.append(PoolRegistryBridgeHandler())
+            // window.maknoon.walletView.open: leave the mini app and open the
+            // Ethereum wallet + chain a tx used (e.g. after a swap). Navigation
+            // only; gated by EVM access via this registration.
+            handlers.append(OpenWalletBridgeHandler(coordinator: openWalletCoordinator))
         }
         if granted.contains("payment") {
             handlers.append(PaymentBridgeHandler(store: store, appTitle: displayName, coordinator: paymentCoordinator))
@@ -271,6 +364,13 @@ private struct MiniAppWebView: UIViewRepresentable {
                 store: store, appTitle: displayName, installedAppId: installedAppId,
                 coordinator: identityCoordinator,
                 collectCoordinator: collectCoordinator))
+        }
+        // Native credential-gated pool access (window.maknoon.poolAccess). Discloses
+        // a passport credential (identity) and proves control of the EVM wallet (evm),
+        // so it needs both grants; reuses the identity consent coordinator.
+        if granted.contains("identity") && hasEvm {
+            handlers.append(PoolAccessBridgeHandler(
+                store: store, appTitle: displayName, coordinator: identityCoordinator))
         }
         return handlers
     }

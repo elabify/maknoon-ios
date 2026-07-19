@@ -170,6 +170,7 @@ enum EncryptedBackup {
         "networks.ethereum.active.v1",
         "networks.ethereum.currentNetwork.v3",
         "networks.ethereum.tokens.v1",
+        "networks.ethereum.userTokens.v2",   // per-(wallet,chain) custom + discovered tokens (ADR-0060)
         "networks.ethereum.tokens.catalog.v1",
         "networks.ethereum.tokens.catalogFetch.v1",
         "networks.ethereum.custom.v1",

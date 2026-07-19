@@ -189,7 +189,9 @@ struct EthereumWalletView: View {
                 EthereumAddTokenSheet(
                     wallet: ethereum,
                     network: builtin,
-                    onAdded: {}
+                    // Refresh after adding so the new token's balance appears
+                    // without a manual full sync (ADR-0060).
+                    onAdded: { Task { await refresh() } }
                 )
                 .environment(store)
             }
@@ -231,7 +233,10 @@ struct EthereumWalletView: View {
         // Android, which lists every store token). Native ETH is NOT in this list;
         // it stays the headline balance card. The asset dropdown that leads with
         // native lives in the send screen, not here.
-        return store.ethereumTokenStore.tokens(on: activeNetwork)
+        // Scoped to the active wallet (ADR-0060): custom + discovered tokens
+        // belong to this wallet, not every wallet on the chain.
+        guard let walletId = activeWallet?.id else { return [] }
+        return store.ethereumTokenStore.tokens(on: activeNetwork, walletId: walletId)
     }
 
     /// Native + ERC-20 transfers merged into one timestamp-sorted
@@ -286,7 +291,9 @@ struct EthereumWalletView: View {
                                 Label("Copy contract address", systemImage: "doc.on.doc")
                             }
                             Button(role: .destructive) {
-                                store.ethereumTokenStore.remove(token)
+                                if let walletId = activeWallet?.id {
+                                    store.ethereumTokenStore.remove(token, walletId: walletId)
+                                }
                             } label: {
                                 Label("Remove token", systemImage: "trash")
                             }
@@ -587,7 +594,7 @@ struct EthereumWalletView: View {
 
     private var emptyTxsExtraNote: String {
         return activeNetwork.explorerAPIURL == nil
-            ? "This network does not expose an Etherscan-style API, so history is not fetched."
+            ? "This chain does not expose an Etherscan-style API, so history is not fetched."
             : ""
     }
 
@@ -649,7 +656,10 @@ struct EthereumWalletView: View {
     /// "+ Add custom token" path stays available).
     private func autoDiscoverTokens(
         from transfers: [EthereumTokenTransfer],
-        network: ResolvedNetwork
+        network: ResolvedNetwork,
+        walletId: UUID,
+        ethereum: EthereumWallet,
+        rpcURL: String
     ) async {
         // Auto-discover only works against built-in catalog
         // entries because the reputable token list is keyed by
@@ -657,7 +667,9 @@ struct EthereumWalletView: View {
         guard case .builtin(let builtin) = network.networkID else { return }
         let contracts = Set(transfers.map { $0.contractAddress.lowercased() })
         for contract in contracts {
-            if store.ethereumTokenStore.find(network: builtin, contract: contract) != nil {
+            // Discovered tokens are scoped to this wallet (ADR-0060); dedup
+            // against what this wallet already has (its own + curated).
+            if store.ethereumTokenStore.find(network: builtin, contract: contract, walletId: walletId) != nil {
                 continue
             }
             // Consult the remote registry first (fresh verified
@@ -665,8 +677,9 @@ struct EthereumWalletView: View {
             // weekly refresh fires), then fall back to the curated
             // in-tree list so offline first launches still resolve
             // long-standing tokens like USDC + USDT.
+            let discovered: EthereumToken?
             if let entry = store.ethereumTokenRegistry.find(network: builtin, contract: contract) {
-                let token = EthereumToken(
+                discovered = EthereumToken(
                     network: builtin,
                     contractAddress: entry.contract,
                     symbol: entry.symbol,
@@ -674,11 +687,31 @@ struct EthereumWalletView: View {
                     decimals: Int(entry.decimals),
                     curated: true
                 )
-                store.ethereumTokenStore.add(token)
-            } else if let token = EthereumTokenCatalog.find(network: builtin, contract: contract) {
-                store.ethereumTokenStore.add(token)
+            } else {
+                discovered = EthereumTokenCatalog.find(network: builtin, contract: contract)
             }
+            guard let token = discovered else { continue }
+            // Dust filter (ADR-0060): don't auto-add a token the wallet holds
+            // less than the dust threshold of. Fail-open: only skip when a
+            // balance is successfully read AND below the threshold, so a flaky
+            // RPC never drops a real token.
+            if let bal = try? await ethereum.tokenBalance(token: token, rpcURL: rpcURL),
+               Self.isDustBalance(bal, decimals: token.decimals) {
+                continue
+            }
+            store.ethereumTokenStore.add(token, walletId: walletId)
         }
+    }
+
+    /// Whole-token dust threshold for auto-discovery (ADR-0060): a holding below
+    /// this is not auto-added.
+    private static let tokenDustThreshold = Decimal(string: "0.0001")!
+
+    /// True when `wei` (raw base units) is below the dust threshold in whole
+    /// tokens, given the token's decimals.
+    private static func isDustBalance(_ wei: EthereumWeiValue, decimals: Int) -> Bool {
+        let human = wei.decimal / pow(Decimal(10), decimals)
+        return human < tokenDustThreshold
     }
 
     private func refresh() async {
@@ -763,10 +796,10 @@ struct EthereumWalletView: View {
             // Etherscan blip.
             tokenTransfers = recentTokenTxs
         }
-        await autoDiscoverTokens(from: tokenTransfers, network: network)
+        await autoDiscoverTokens(from: tokenTransfers, network: network, walletId: descriptor.id, ethereum: ethereum, rpcURL: rpcURL)
         // Refresh token balances last: auto-discover may have just added
         // tokens, and the list only shows entries with a positive balance.
-        await refreshTokenBalances(network: network, rpcURL: rpcURL)
+        await refreshTokenBalances(network: network, rpcURL: rpcURL, walletId: descriptor.id)
         if !partialErrors.isEmpty {
             lastError = partialErrors.joined(separator: "\n")
         }
@@ -778,10 +811,10 @@ struct EthereumWalletView: View {
     /// balance read fails is simply omitted (treated as zero) rather than
     /// surfacing an error, since balance/history above are the primary reads.
     @MainActor
-    private func refreshTokenBalances(network: ResolvedNetwork, rpcURL: String) async {
+    private func refreshTokenBalances(network: ResolvedNetwork, rpcURL: String, walletId: UUID) async {
         guard let ethereum else { return }
         var fresh: [String: EthereumWeiValue] = [:]
-        for token in store.ethereumTokenStore.tokens(on: network) {
+        for token in store.ethereumTokenStore.tokens(on: network, walletId: walletId) {
             if let bal = try? await ethereum.tokenBalance(token: token, rpcURL: rpcURL) {
                 fresh[token.id] = bal
             }

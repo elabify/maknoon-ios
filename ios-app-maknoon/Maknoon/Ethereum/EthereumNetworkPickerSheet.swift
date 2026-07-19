@@ -49,7 +49,7 @@ struct EthereumNetworkPickerSheet: View {
                     }
                 }
             }
-            .navigationTitle("Select network")
+            .navigationTitle("Select chain")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) { Button("Cancel") { dismiss() } }

@@ -1,32 +1,51 @@
-// User's installed ERC-20 tokens, per network. Seeded with the
-// curated catalog on first run; persists added / removed entries
-// across launches.
+// User's ERC-20 tokens. Two tiers (ADR-0060):
 //
-// Tokens persist regardless of which wallet is active. Each wallet
-// inherits the network's token list: open a Sepolia wallet, you see
-// the Sepolia tokens; switch to Base, you see Base's. This mirrors
-// MetaMask's pattern.
+//   * Curated catalog defaults (USDC/USDT/...) are seeded per network and
+//     shared across every wallet on that chain. Well-known assets are the
+//     same for everyone, so a chain-wide list is correct (and matches
+//     MetaMask): open any Sepolia wallet and you see the Sepolia defaults.
+//     These live in `tokensByNetwork`, keyed by network only.
+//
+//   * Tokens a user ADDS (the "Add custom token" sheet) or a wallet DISCOVERS
+//     (auto-discovery from its own transfer history) belong to a single
+//     wallet on a single chain, NOT to every wallet on the network. Adding a
+//     custom token to one wallet must not make it appear in another. These
+//     live in `userTokens`, keyed by (wallet UUID, network).
+//
+// Earlier builds stored everything network-wide, so a custom token added to
+// one wallet leaked into all wallets on that chain. Existing entries stay in
+// `tokensByNetwork` (still visible everywhere, so no data is lost on upgrade);
+// only NEW adds/discoveries are wallet-scoped. See ADR-0060.
 
 import Foundation
 import Observation
 
 @Observable
 final class EthereumTokenStore: @unchecked Sendable {
+    /// Curated catalog defaults, chain-wide (shared across wallets).
     var tokensByNetwork: [EthereumNetwork: [EthereumToken]] = [:]
 
+    /// Runtime-added tokens (custom + auto-discovered), scoped per
+    /// (wallet, chain). Keyed "<walletUUID>:<network.rawValue>".
+    private var userTokens: [String: [EthereumToken]] = [:]
+
     private static let storeKey = "networks.ethereum.tokens.v1"
+    private static let userStoreKey = "networks.ethereum.userTokens.v2"
+
+    private func walletKey(_ walletId: UUID, _ network: EthereumNetwork) -> String {
+        "\(walletId.uuidString):\(network.rawValue)"
+    }
 
     init() { load() }
 
-    /// All tokens on a given network. Returns curated defaults
-    /// seeded on first run plus any user-added entries; user-removed
-    /// curated entries are honoured (stored as an empty list rather
-    /// than re-seeded).
+    /// Chain-wide curated/seeded defaults for a network (no wallet scope).
+    /// Used for generic asset catalogs (e.g. the mini-app asset lister), which
+    /// list well-known tokens rather than one wallet's holdings.
     func tokens(on network: EthereumNetwork) -> [EthereumToken] {
         return tokensByNetwork[network] ?? []
     }
 
-    /// Overload that accepts a resolved network. Custom networks
+    /// Chain-wide overload accepting a resolved network. Custom networks
     /// (user-defined chains) don't currently have tokens.
     func tokens(on resolved: ResolvedNetwork) -> [EthereumToken] {
         switch resolved.networkID {
@@ -35,14 +54,42 @@ final class EthereumTokenStore: @unchecked Sendable {
         }
     }
 
-    /// Add or update a token. Used by both the curated seed path
-    /// and the "Add custom" sheet.
-    func add(_ token: EthereumToken) {
-        addInMemory(token)
-        persist()
+    /// Tokens visible to ONE wallet on a chain: the curated chain-wide defaults
+    /// plus that wallet's own added/discovered tokens, deduped by contract.
+    func tokens(on network: EthereumNetwork, walletId: UUID) -> [EthereumToken] {
+        let curated = tokensByNetwork[network] ?? []
+        let extra = userTokens[walletKey(walletId, network)] ?? []
+        var seen = Set(curated.map { $0.contractAddress })
+        var out = curated
+        for t in extra where seen.insert(t.contractAddress).inserted { out.append(t) }
+        return out
     }
 
-    /// Insert-or-replace without persisting (used during the load reconcile).
+    /// Wallet-scoped overload accepting a resolved network.
+    func tokens(on resolved: ResolvedNetwork, walletId: UUID) -> [EthereumToken] {
+        switch resolved.networkID {
+        case .builtin(let net): return tokens(on: net, walletId: walletId)
+        case .custom:           return []
+        }
+    }
+
+    /// Add or update a token for a specific wallet on its chain. Used by the
+    /// "Add custom token" sheet and auto-discovery; the token is scoped to this
+    /// wallet and does not appear in the user's other wallets (ADR-0060).
+    func add(_ token: EthereumToken, walletId: UUID) {
+        let key = walletKey(walletId, token.network)
+        var current = userTokens[key] ?? []
+        if let idx = current.firstIndex(where: { $0.contractAddress == token.contractAddress }) {
+            current[idx] = token
+        } else {
+            current.append(token)
+        }
+        userTokens[key] = current
+        persistUserTokens()
+    }
+
+    /// Insert-or-replace a curated default without persisting (load/seed only;
+    /// chain-wide).
     private func addInMemory(_ token: EthereumToken) {
         var current = tokensByNetwork[token.network] ?? []
         if let idx = current.firstIndex(where: { $0.contractAddress == token.contractAddress }) {
@@ -57,16 +104,31 @@ final class EthereumTokenStore: @unchecked Sendable {
         "\(network.rawValue):\(contract.lowercased())"
     }
 
-    func remove(_ token: EthereumToken) {
-        var current = tokensByNetwork[token.network] ?? []
-        current.removeAll { $0.contractAddress == token.contractAddress }
-        tokensByNetwork[token.network] = current
+    /// Remove a token from a wallet. A wallet-scoped (custom/discovered) token
+    /// is removed from just that wallet; a curated/legacy chain-wide token is
+    /// removed chain-wide (its prior behavior), so old leaked entries can still
+    /// be cleared in one action.
+    func remove(_ token: EthereumToken, walletId: UUID) {
+        let key = walletKey(walletId, token.network)
+        if let current = userTokens[key], current.contains(where: { $0.contractAddress == token.contractAddress }) {
+            userTokens[key] = current.filter { $0.contractAddress != token.contractAddress }
+            persistUserTokens()
+            return
+        }
+        var chainWide = tokensByNetwork[token.network] ?? []
+        chainWide.removeAll { $0.contractAddress == token.contractAddress }
+        tokensByNetwork[token.network] = chainWide
         persist()
     }
 
-    /// Lookup by network + contract address (case-insensitive).
-    func find(network: EthereumNetwork, contract: String) -> EthereumToken? {
+    /// Lookup by network + contract for one wallet (case-insensitive): the
+    /// wallet's own tokens first, then the chain-wide curated defaults. Lets
+    /// auto-discovery skip a contract this wallet already has.
+    func find(network: EthereumNetwork, contract: String, walletId: UUID) -> EthereumToken? {
         let needle = contract.lowercased()
+        if let t = userTokens[walletKey(walletId, network)]?.first(where: { $0.contractAddress == needle }) {
+            return t
+        }
         return tokensByNetwork[network]?.first { $0.contractAddress == needle }
     }
 
@@ -95,12 +157,14 @@ final class EthereumTokenStore: @unchecked Sendable {
     /// Reset to defaults then re-read UserDefaults (post-restore refresh).
     func reload() {
         tokensByNetwork = [:]
+        userTokens = [:]
         seededNetworks = []
         seededContracts = []
         load()
     }
 
     private func load() {
+        loadUserTokens()
         guard let data = UserDefaults.standard.data(forKey: Self.storeKey),
               let snap = try? JSONDecoder().decode(Snapshot.self, from: data)
         else {
@@ -160,6 +224,19 @@ final class EthereumTokenStore: @unchecked Sendable {
         )
         if let data = try? JSONEncoder().encode(snap) {
             UserDefaults.standard.set(data, forKey: Self.storeKey)
+        }
+    }
+
+    private func loadUserTokens() {
+        guard let data = UserDefaults.standard.data(forKey: Self.userStoreKey),
+              let decoded = try? JSONDecoder().decode([String: [EthereumToken]].self, from: data)
+        else { return }
+        userTokens = decoded
+    }
+
+    private func persistUserTokens() {
+        if let data = try? JSONEncoder().encode(userTokens) {
+            UserDefaults.standard.set(data, forKey: Self.userStoreKey)
         }
     }
 }

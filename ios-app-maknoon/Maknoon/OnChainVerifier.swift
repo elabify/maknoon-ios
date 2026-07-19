@@ -117,6 +117,20 @@ enum ChainABI {
         return Data(hexString: s) ?? Data()
     }
 
+    /// Full keccak256 of a UTF-8 string as 0x-hex. Used for an event-signature
+    /// topic0 and for an indexed dynamic-string topic (keccak of the value).
+    static func keccakHex(_ s: String) -> String {
+        "0x" + Hash.keccak256(data: Data(s.utf8)).map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// Normalize a hex value to a 32-byte (0x + 64 lowercase) topic form.
+    static func topic32(_ hex: String) -> String {
+        var h = (hex.hasPrefix("0x") ? String(hex.dropFirst(2)) : hex).lowercased()
+        if h.count > 64 { h = String(h.suffix(64)) }
+        if h.count < 64 { h = String(repeating: "0", count: 64 - h.count) + h }
+        return "0x" + h
+    }
+
     /// Decode a `bool` return (last byte non-zero).
     static func decodeBool(_ hexResult: String) -> Bool? {
         let d = dataFromHex(hexResult)
@@ -162,14 +176,16 @@ struct OnChainVerifier {
         cscaCertIdHex: String?,
         anchorBatchRoot: String?,
         anchorRPCURL: String?,
-        anchorRevocationRegistry: String?
+        anchorRevocationRegistry: String?,
+        anchorTxHash: String?
     ) async -> OnChainVerdict {
         // Reuse the reference pass (which also fetches the on-chain issuer key),
         // then layer headerSigValid on top using the full header + signature.
         let ref = await verifyReference(
             did: header.iss, cid: header.cid, iat: header.iat,
             cscaCertIdHex: cscaCertIdHex, anchorBatchRoot: anchorBatchRoot,
-            anchorRPCURL: anchorRPCURL, anchorRevocationRegistry: anchorRevocationRegistry
+            anchorRPCURL: anchorRPCURL, anchorRevocationRegistry: anchorRevocationRegistry,
+            anchorTxHash: anchorTxHash
         )
         var v = ref.verdict
         if let pk = ref.issuerPubkey, !pk.isEmpty,
@@ -190,6 +206,25 @@ struct OnChainVerifier {
     /// key instead of a credential signature).
     struct ReferenceResult { var verdict: OnChainVerdict; var issuerPubkey: Data? }
 
+    /// True iff `receipt` contains a RevocationRegistry `RootUpdated` log from
+    /// `registry` binding this issuer `did` + `batchRoot`. Topics only:
+    /// topic0 = keccak256 of the event signature, topic1 = keccak256(utf8(did))
+    /// (the indexed dynamic string), topic2 = the indexed bytes32 root.
+    private static func rootWasAnchored(_ receipt: EthereumTxReceipt, registry: String, did: String, batchRoot: String) -> Bool {
+        let topic0 = ChainABI.keccakHex("RootUpdated(string,string,bytes32,uint256,uint256)").lowercased()
+        let topic1 = ChainABI.keccakHex(did).lowercased()
+        let wantRoot = ChainABI.topic32(batchRoot)
+        let reg = registry.lowercased()
+        for log in receipt.logs where log.address.lowercased() == reg && log.topics.count >= 3 {
+            if log.topics[0].lowercased() == topic0
+                && log.topics[1].lowercased() == topic1
+                && ChainABI.topic32(log.topics[2]) == wantRoot {
+                return true
+            }
+        }
+        return false
+    }
+
     /// On-chain checks that need only a credential REFERENCE (did + cid + iat +
     /// anchor): issuerRegistered, notRevoked, rootCurrent, cscaProvenance. Also
     /// fetches the issuer's on-chain pubkey. Used directly by the badge flow.
@@ -200,7 +235,8 @@ struct OnChainVerifier {
         cscaCertIdHex: String?,
         anchorBatchRoot: String?,
         anchorRPCURL: String?,
-        anchorRevocationRegistry: String?
+        anchorRevocationRegistry: String?,
+        anchorTxHash: String?
     ) async -> ReferenceResult {
         guard let rpc = EthereumRPCClient(urlString: config.rpcURL) else {
             return ReferenceResult(verdict: .unreachable("No RPC configured"), issuerPubkey: nil)
@@ -237,20 +273,19 @@ struct OnChainVerifier {
                 notRevoked = .unknown("Could not read the revocation registry")
             }
 
-            if let batchRoot = anchorBatchRoot, !batchRoot.isEmpty {
-                let rootData = ChainABI.bytes32(hex: batchRoot)
-                if let hex = try? await arpc.ethCall(
-                    to: revRegistry,
-                    data: ChainABI.selector("isRootRecent(string,bytes32,uint256)")
-                        + ChainABI.word(0x60) + rootData + ChainABI.word(rootFreshnessWindowSec)
-                        + ChainABI.stringTail(did)
-                ), let recent = ChainABI.decodeBool(hex) {
+            if let batchRoot = anchorBatchRoot, !batchRoot.isEmpty,
+               let txHash = anchorTxHash, !txHash.isEmpty {
+                // ADR-0022 amendment: a v2 batch root is valid if it was genuinely
+                // anchored by the issuer (not merely "recent"). Confirm the anchor
+                // tx emitted RevocationRegistry RootUpdated(did, root) from the
+                // expected registry. Matches the server's wasRootAnchored.
+                if let receipt = try? await arpc.getTransactionReceipt(txHash) {
                     reached = true
-                    rootCurrent = recent
+                    rootCurrent = Self.rootWasAnchored(receipt, registry: revRegistry, did: did, batchRoot: batchRoot)
                         ? .pass
-                        : .fail("Credential anchor root is not current on-chain (batch may be stale or unanchored)")
+                        : .fail("Credential anchor root was not published in the anchor transaction on-chain")
                 } else {
-                    rootCurrent = .unknown("Could not read the anchor root on-chain")
+                    rootCurrent = .unknown("Could not read the anchor transaction on-chain")
                 }
             }
         }

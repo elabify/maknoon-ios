@@ -43,7 +43,7 @@ settings:
     # isolated SWIFT_VERSION.
     SWIFT_VERSION: "5.10"
     IPHONEOS_DEPLOYMENT_TARGET: "26.0"
-    MARKETING_VERSION: "0.6.4"
+    MARKETING_VERSION: "0.6.7"
     # Local-build default only. CI overrides via xcodebuild
     # CURRENT_PROJECT_VERSION=${{ github.run_number }} (ADR-0048 0.6.3 hardening) so
     # every TestFlight upload gets a unique, monotonic build number.

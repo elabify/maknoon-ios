@@ -211,12 +211,26 @@ struct AppStoreEntry: Codable, Identifiable, Hashable, Sendable {
     }
 
     /// All capability tokens this entry declares (from `capabilities` if
-    /// present, else the legacy `permissions`), lowercased.
+    /// present, else the legacy `permissions`), lowercased. The legacy flat
+    /// `evm` token is expanded to the hierarchical `wallet.ethereum.*` set
+    /// (ADR-0057 back-compat) so old declarations keep working.
     var declaredCapabilityTokens: Set<String> {
+        let raw: Set<String>
         if let caps = capabilities, !caps.isEmpty {
-            return Set(caps.map { $0.name.lowercased() })
+            raw = Set(caps.map { $0.name.lowercased() })
+        } else {
+            raw = Set((permissions ?? []).map { $0.lowercased() })
         }
-        return Set((permissions ?? []).map { $0.lowercased() })
+        return Self.expandLegacyCapabilities(raw)
+    }
+
+    /// Expand legacy flat capability tokens to their hierarchical equivalents.
+    static func expandLegacyCapabilities(_ tokens: Set<String>) -> Set<String> {
+        var out = tokens
+        if out.remove("evm") != nil {
+            out.formUnion(["wallet.ethereum.read", "wallet.ethereum.write", "wallet.ethereum.sign"])
+        }
+        return out
     }
 
     /// The per-capability reason to show at install: the catalog-provided

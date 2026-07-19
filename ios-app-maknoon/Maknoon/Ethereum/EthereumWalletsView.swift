@@ -425,7 +425,7 @@ struct AddEthereumWalletSheet: View {
         } header: {
             Text("New Ethereum wallet")
         } footer: {
-            Text("The same address works on every EVM network; switch networks from the wallet screen.")
+            Text("The same address works on every EVM chain; switch chains from the wallet screen.")
                 .font(.caption)
         }
     }

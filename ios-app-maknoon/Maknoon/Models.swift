@@ -102,6 +102,11 @@ struct ChallengeResponse: Codable, Sendable {
     let challenge: HexString
     let issuedAt: Int64
     let expiresAt: Int64
+    /// The DID the server minted this challenge under. The holder must sign the
+    /// challenge against THIS (the server checks challengeSig against its own
+    /// verifier DID), which can differ from an issuer/audience DID. Optional for
+    /// back-compat with servers that do not echo it.
+    let verifierDid: String?
 }
 
 struct VerifyRequest: Codable, Sendable {

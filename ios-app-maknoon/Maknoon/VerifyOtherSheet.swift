@@ -430,7 +430,8 @@ struct VerifyOtherSheet: View {
             .verify(header: p.header, headerSig: p.headerSig, cscaCertIdHex: cscaCertId,
                     anchorBatchRoot: anchor?.batchRoot,
                     anchorRPCURL: anchor.flatMap { chainRPCs[$0.chain] },
-                    anchorRevocationRegistry: anchor?.registry)
+                    anchorRevocationRegistry: anchor?.registry,
+                    anchorTxHash: anchor?.batchTxHash)
     }
 
     /// Retry shim used by the offline banner button.
@@ -496,7 +497,8 @@ struct VerifyOtherSheet: View {
             did: b.iss, cid: b.cid, iat: b.iat, cscaCertIdHex: nil,
             anchorBatchRoot: anchor?.batchRoot,
             anchorRPCURL: anchor.flatMap { chainRPCs[$0.chain] },
-            anchorRevocationRegistry: anchor.flatMap { $0.registry }
+            anchorRevocationRegistry: anchor.flatMap { $0.registry },
+            anchorTxHash: anchor?.batchTxHash
         )
         onChain = ref.verdict
         havid = await HavidVerifier()

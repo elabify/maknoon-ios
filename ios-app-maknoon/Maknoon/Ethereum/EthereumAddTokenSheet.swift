@@ -168,7 +168,9 @@ struct EthereumAddTokenSheet: View {
             decimals: dec,
             curated: false
         )
-        store.ethereumTokenStore.add(token)
+        // Scoped to this wallet on this chain (ADR-0060): a custom token added
+        // here does not appear in the user's other wallets.
+        store.ethereumTokenStore.add(token, walletId: wallet.descriptor.id)
         onAdded()
         dismiss()
     }

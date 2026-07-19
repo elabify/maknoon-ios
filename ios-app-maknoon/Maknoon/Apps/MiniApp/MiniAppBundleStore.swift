@@ -22,6 +22,15 @@
 //
 // Re-download only happens when the version is absent from the cache, so
 // opening an installed app offline serves the cached copy.
+//
+// Cache-first (ADR-0060): a NORMAL open serves the locally cached bundle for
+// the pinned manifest hash WITHOUT touching the network. We key the cache dir
+// on the pinned hash, so we can locate the verified bundle from the pin alone
+// (no live manifest fetch). This is what keeps an installed app working after
+// its bundle is re-published upstream with a new hash: the old, pinned version
+// keeps serving until the user explicitly updates (see AppStoreRegistry
+// updatesAvailable / applyUpdate). The integrity check against the pinned hash
+// runs only at DOWNLOAD time (install or update), never on every open.
 
 import Foundation
 import CryptoKit
@@ -82,6 +91,19 @@ actor MiniAppBundleStore {
 
     private static let category = "MiniApp"
 
+    /// Sidecar written inside each version dir at download time: the raw
+    /// manifest bytes. Lets a cache-first open recover the entry path +
+    /// version without re-fetching the manifest. Leading dot keeps it out of
+    /// the way; it is never listed in manifest.files so a bundle can never
+    /// legitimately ship this name.
+    private static let metaFileName = ".maknoon-manifest.json"
+
+    /// Downloads in flight, keyed by "<installedAppId>|<pinnedSha>". Lets
+    /// concurrent ensureBundle calls for the same pinned bundle (e.g. an
+    /// install/update prefetch racing the open that triggered it) share one
+    /// download instead of clobbering the shared temp dir.
+    private var inFlight: [String: Task<MiniAppBundle, Error>] = [:]
+
     /// Root cache dir: <AppSupport>/miniapps. Created lazily.
     private func miniappsRoot() throws -> URL {
         let base = try FileManager.default.url(
@@ -114,11 +136,53 @@ actor MiniAppBundleStore {
         manifestURL: URL,
         manifestSha256: String
     ) async throws -> MiniAppBundle {
+        let pinnedSha = manifestSha256.lowercased()
+
+        // 0. Cache-first: serve the verified bundle for this exact pinned hash
+        //    with NO network. This is the normal-open path. It also means a
+        //    bundle re-published upstream (new hash) never breaks the installed,
+        //    pinned version: opening the app keeps working on the old bundle
+        //    until the user explicitly updates it.
+        if let cached = cachedBundle(installedAppId: installedAppId, appId: appId, pinnedSha: pinnedSha) {
+            LogStore.shared.info(Self.category, "serving cached \(appId) (pinned \(pinnedSha.prefix(8)))")
+            return cached
+        }
+
+        // De-duplicate concurrent downloads of the SAME pinned bundle. An
+        // install/update prefetch can race the open that triggered it; without
+        // this, two ensureBundle calls interleave at their `await`s and clobber
+        // the shared temp dir, so one ends up seeing index.html missing and
+        // throws "failed its integrity check" (a Retry, running alone, then
+        // succeeds). Coalesce them onto a single download task instead.
+        let inFlightKey = installedAppId + "|" + pinnedSha
+        if let existing = inFlight[inFlightKey] {
+            return try await existing.value
+        }
+        let task = Task<MiniAppBundle, Error> {
+            try await self.downloadBundle(
+                installedAppId: installedAppId, appId: appId,
+                manifestURL: manifestURL, pinnedSha: pinnedSha)
+        }
+        inFlight[inFlightKey] = task
+        defer { inFlight[inFlightKey] = nil }
+        return try await task.value
+    }
+
+    /// Download + verify + cache the pinned bundle. Runs at most once per
+    /// (installedAppId, pinnedSha) concurrently, via `ensureBundle`'s in-flight map.
+    private func downloadBundle(
+        installedAppId: String,
+        appId: String,
+        manifestURL: URL,
+        pinnedSha: String
+    ) async throws -> MiniAppBundle {
         let session = URLSession(configuration: .ephemeral)
 
-        // 1. Fetch + pin the manifest.
+        // 1. Fetch + pin the manifest. A mismatch HERE is a real tamper /
+        //    misconfiguration at download time (the pin does not match the
+        //    bytes we just fetched), so it is correctly fatal.
         let manifestData = try await fetch(session: session, url: manifestURL)
-        guard Self.hexSHA256(manifestData) == manifestSha256.lowercased() else {
+        guard Self.hexSHA256(manifestData) == pinnedSha else {
             LogStore.shared.error(Self.category, "manifest hash mismatch for \(appId)")
             throw MiniAppBundleError.manifestHashMismatch
         }
@@ -136,7 +200,7 @@ actor MiniAppBundleStore {
         // gets a fresh directory and is re-downloaded instead of serving
         // the stale same-version files.
         let versionDir = appDir.appendingPathComponent(
-            sanitizeComponent(manifest.version) + "-" + String(manifestSha256.lowercased().prefix(12)),
+            sanitizeComponent(manifest.version) + "-" + String(pinnedSha.prefix(12)),
             isDirectory: true
         )
 
@@ -180,6 +244,11 @@ actor MiniAppBundleStore {
             throw MiniAppBundleError.fileHashMismatch(manifest.entryPath)
         }
 
+        // Persist the (already pin-verified) manifest bytes alongside the files
+        // so a later cache-first open can recover the entry path + version
+        // without any network fetch.
+        try? manifestData.write(to: tmpDir.appendingPathComponent(Self.metaFileName), options: .atomic)
+
         // 3. Swap temp -> versionDir.
         try? FileManager.default.removeItem(at: versionDir)
         try FileManager.default.createDirectory(at: appDir, withIntermediateDirectories: true)
@@ -195,6 +264,37 @@ actor MiniAppBundleStore {
         if let dir = try? appCacheDir(installedAppId: installedAppId) {
             try? FileManager.default.removeItem(at: dir)
         }
+    }
+
+    /// Locate an already-downloaded, complete bundle for the pinned manifest
+    /// hash, WITHOUT any network. Version dirs are named `<version>-<sha12>`,
+    /// so the pinned hash alone identifies the directory. Returns nil when the
+    /// pinned version is not cached (first open, or a fresh update pin).
+    private func cachedBundle(installedAppId: String, appId: String, pinnedSha: String) -> MiniAppBundle? {
+        guard let appDir = try? appCacheDir(installedAppId: installedAppId),
+              FileManager.default.fileExists(atPath: appDir.path) else { return nil }
+        let suffix = "-" + String(pinnedSha.prefix(12))
+        let dirs = (try? FileManager.default.contentsOfDirectory(
+            at: appDir, includingPropertiesForKeys: nil)) ?? []
+        for dir in dirs where dir.lastPathComponent.hasSuffix(suffix) {
+            // Prefer the persisted manifest sidecar; fall back to the default
+            // entry path for bundles cached before the sidecar existed.
+            let meta = readMeta(versionDir: dir)
+            let entryPath = meta?.entryPath ?? "index.html"
+            let version = meta?.version ?? String(dir.lastPathComponent.dropLast(suffix.count))
+            if FileManager.default.fileExists(atPath: dir.appendingPathComponent(entryPath).path) {
+                return MiniAppBundle(appId: appId, version: version, rootDir: dir, entryPath: entryPath)
+            }
+        }
+        return nil
+    }
+
+    /// Decode the manifest sidecar written at download time. nil for legacy
+    /// caches that predate it.
+    private func readMeta(versionDir: URL) -> MiniAppManifest? {
+        let url = versionDir.appendingPathComponent(Self.metaFileName)
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        return try? JSONDecoder().decode(MiniAppManifest.self, from: data)
     }
 
     // MARK: -- helpers

@@ -81,6 +81,27 @@
       collect: function (options) { return call("maknoon", "identity.collect", options || {}); },
       getDID: function () { return call("maknoon", "identity.getDID", null); },
     },
+    // Credential-gated pool access (requires "identity" + "evm"). grant(opts)
+    // discloses a passport credential + proves control of the EVM wallet, then
+    // asks the verifier to write the on-chain access grant. The presentation and
+    // key material stay native; the page only gets { granted, walletAddress,
+    // txHash, expiry }. opts: { verifierUrl, verifierDid, gateAddress? }.
+    poolAccess: {
+      grant: function (options) { return call("poolAccess", "poolAccess.grant", options || {}); },
+    },
+    // Read the Access Issuer's public credential-gated pool registry (GET
+    // /v1/pools). The sandbox has connect-src 'none', so this network read is
+    // done natively. list({ issuerUrl, caip2? }) -> { v, pools:[{name,chainId,
+    // caip2,poolManager,gate,hook,fee,tickSpacing,tokenA,tokenB}] }.
+    pools: {
+      list: function (options) { return call("pools", "pools.list", options || {}); },
+    },
+    // Leave the mini app and open the user's Ethereum wallet on the chain a tx
+    // used, so they can watch it confirm. open({ chainId?, address? }). Navigation
+    // only (no data returned); available to EVM-capable apps.
+    walletView: {
+      open: function (options) { return call("walletView", "walletView.open", options || {}); },
+    },
     // Durable, per-app, encrypted-backup-backed key-value settings.
     // NOTE: these are ASYNC (return Promises), unlike localStorage. The
     // WebView's own localStorage is ephemeral; use this for anything that

@@ -63,6 +63,12 @@ final class AppStoreRegistry: @unchecked Sendable {
     /// Apps the user has installed into the Apps tab.
     private(set) var installedApps: [InstalledApp] = []
 
+    /// Installed-app id -> the newer catalog entry available for it, computed by
+    /// `refresh()` by diffing each install's pinned manifest hash against the
+    /// freshly-fetched catalog. Drives the non-blocking "update available"
+    /// banner. Cleared for an app once the user applies its update.
+    private(set) var updatesAvailable: [String: AppStoreEntry] = [:]
+
     /// When false (the default), beta-channel apps are hidden from the browse
     /// list. Installed apps are unaffected. Backed up via `walletStateKeys`.
     private(set) var showBetaApps: Bool = false
@@ -158,7 +164,89 @@ final class AppStoreRegistry: @unchecked Sendable {
             }
         }
         persistStores()
+        recomputeUpdates()
         lastRefreshedAt = Date()
+    }
+
+    /// Diff each installed app's pinned manifest hash against the just-fetched
+    /// catalog entry (same store, app id, channel). A different hash that is not
+    /// a version downgrade is offered as an available update. Cheap + pure over
+    /// in-memory state; safe to call after every refresh.
+    private func recomputeUpdates() {
+        var out: [String: AppStoreEntry] = [:]
+        for inst in installedApps {
+            guard inst.entry.isMiniApp, let pinned = inst.entry.manifestSha256 else { continue }
+            guard let live = liveEntry(storeId: inst.storeId, appId: inst.appId, channel: inst.entry.channel),
+                  live.isMiniApp, let liveSha = live.manifestSha256 else { continue }
+            if liveSha.lowercased() == pinned.lowercased() { continue }   // same bundle
+            // Ignore downgrades: only offer an update when the live version is
+            // not older than what is installed (missing/unparseable versions
+            // are treated as offerable, since the hash already differs).
+            if let lv = live.version.flatMap(SemVer.init),
+               let iv = inst.entry.version.flatMap(SemVer.init), lv < iv { continue }
+            out[inst.id] = live
+        }
+        updatesAvailable = out
+    }
+
+    /// The current catalog entry matching an installed app's store, id, and
+    /// channel. Prefers a same-channel match, falling back to any same-id entry.
+    private func liveEntry(storeId: String, appId: String, channel: String?) -> AppStoreEntry? {
+        let apps: [AppStoreEntry]
+        if storeId == defaultStore.id {
+            apps = defaultStore.apps
+        } else if let s = userStores.first(where: { $0.id == storeId }) {
+            apps = s.cachedCatalog?.apps ?? []
+        } else {
+            return nil
+        }
+        return apps.first { $0.id == appId && ($0.channel ?? "") == (channel ?? "") }
+            ?? apps.first { $0.id == appId }
+    }
+
+    /// The newer entry available for an installed app, if any (banner query).
+    func availableUpdate(forInstalledAppId id: String) -> AppStoreEntry? {
+        updatesAvailable[id]
+    }
+
+    /// Adopt the newer catalog entry for an installed app (user tapped
+    /// "Update"). Swaps the pinned snapshot so the next open downloads + serves
+    /// the new bundle, preserving the user's existing capability grants, and
+    /// eagerly prefetches the new bundle. Returns the adopted entry so the host
+    /// view can reload with it. The old bundle stays cached and keeps working
+    /// until this is called.
+    @discardableResult
+    func applyUpdate(installedAppId: String) -> AppStoreEntry? {
+        guard let newer = updatesAvailable[installedAppId],
+              let idx = installedApps.firstIndex(where: { $0.id == installedAppId }) else { return nil }
+        let old = installedApps[idx]
+        installedApps[idx] = InstalledApp(
+            id: old.id,
+            storeId: old.storeId,
+            appId: old.appId,
+            installedAt: old.installedAt,
+            entry: newer,
+            grantedCapabilities: old.grantedCapabilities
+        )
+        updatesAvailable[installedAppId] = nil
+        persistInstalled()
+        prefetchBundle(newer, installedAppId: installedAppId)
+        return newer
+    }
+
+    /// Best-effort background download + verify + cache of an entry's bundle, so
+    /// a later open serves it offline (and, for a fresh install, so the bits are
+    /// on the phone before the first open). Failures are non-fatal: the open
+    /// path re-downloads if the cache is still cold. No-op for metadata-only
+    /// (non-mini-app) entries.
+    private func prefetchBundle(_ entry: AppStoreEntry, installedAppId: String) {
+        guard entry.isMiniApp, let url = entry.manifestURL, let sha = entry.manifestSha256 else { return }
+        let appId = entry.id
+        Task.detached(priority: .utility) {
+            _ = try? await MiniAppBundleStore.shared.ensureBundle(
+                installedAppId: installedAppId, appId: appId,
+                manifestURL: url, manifestSha256: sha)
+        }
     }
 
     /// One catalog fetch. Returns nil on any non-2xx, transport
@@ -218,15 +306,22 @@ final class AppStoreRegistry: @unchecked Sendable {
         // different channel swaps the snapshotted manifest (a channel switch),
         // rather than being a no-op.
         installedApps.removeAll { $0.storeId == storeId && $0.appId == entry.id }
+        let installedAppId = "\(storeId)::\(entry.id)"
         installedApps.append(InstalledApp(
-            id: "\(storeId)::\(entry.id)",
+            id: installedAppId,
             storeId: storeId,
             appId: entry.id,
             installedAt: Date(),
             entry: entry,
             grantedCapabilities: Array(tokens).sorted()
         ))
+        // A freshly-installed app is on its newest pin, so it never carries a
+        // pending update. Drop any stale flag from a prior install of this id.
+        updatesAvailable[installedAppId] = nil
         persistInstalled()
+        // Download the bits now so the first open works offline and never has
+        // to hit the network (which is what breaks after an upstream re-publish).
+        prefetchBundle(entry, installedAppId: installedAppId)
     }
 
     /// Replace an installed app's granted capability set (review/revoke UI).
@@ -238,6 +333,7 @@ final class AppStoreRegistry: @unchecked Sendable {
 
     func uninstall(installedAppId: String) {
         installedApps.removeAll { $0.id == installedAppId }
+        updatesAvailable[installedAppId] = nil
         persistInstalled()
     }
 
