@@ -38,6 +38,7 @@ struct MiniAppHostView: View {
     @State private var scanCoordinator = MiniAppScanCoordinator()
     @State private var commerceCoordinator = MiniAppCommerceCoordinator()
     @State private var openWalletCoordinator = MiniAppOpenWalletCoordinator()
+    @State private var hardwareSignCoordinator = MiniAppHardwareSignCoordinator()
 
     private enum Phase {
         case loading
@@ -76,7 +77,8 @@ struct MiniAppHostView: View {
                     paymentCoordinator: paymentCoordinator,
                     scanCoordinator: scanCoordinator,
                     commerceCoordinator: commerceCoordinator,
-                    openWalletCoordinator: openWalletCoordinator
+                    openWalletCoordinator: openWalletCoordinator,
+                    hardwareSignCoordinator: hardwareSignCoordinator
                 )
                 .ignoresSafeArea(.container, edges: .bottom)
                 // Re-key on the bundle dir so adopting an update (a new bundle)
@@ -225,6 +227,24 @@ struct MiniAppHostView: View {
                 onCancel: { scanCoordinator.cancel() }
             )
         }
+        // Pre-sign "Prepare Device" for a mini-app hardware signature (pool-access
+        // grant, web3 sign/send). Collects the hidden-wallet passphrase before BLE
+        // opens, mirroring the in-app send + WalletConnect flows.
+        .sheet(item: Binding(
+            get: { hardwareSignCoordinator.active },
+            set: { if $0 == nil { hardwareSignCoordinator.cancel() } }
+        )) { req in
+            DeviceReadyConfirmationSheet(
+                device: req.device,
+                purpose: req.purpose,
+                requiresPassphrase: req.requiresPassphrase,
+                signing: hardwareSignCoordinator.isSigning,
+                dismissesOnContinue: false,
+                onContinue: { hardwareSignCoordinator.confirm() },
+                onCancel: { hardwareSignCoordinator.cancel() },
+                onPassphrase: { hardwareSignCoordinator.setPassphrase($0) }
+            )
+        }
     }
 
     private func load() async {
@@ -276,6 +296,7 @@ private struct MiniAppWebView: UIViewRepresentable {
     let scanCoordinator: MiniAppScanCoordinator
     let commerceCoordinator: MiniAppCommerceCoordinator
     let openWalletCoordinator: MiniAppOpenWalletCoordinator
+    let hardwareSignCoordinator: MiniAppHardwareSignCoordinator
 
     @MainActor
     func makeCoordinator() -> Coordinator {
@@ -292,7 +313,8 @@ private struct MiniAppWebView: UIViewRepresentable {
                 paymentCoordinator: paymentCoordinator,
                 scanCoordinator: scanCoordinator,
                 commerceCoordinator: commerceCoordinator,
-                openWalletCoordinator: openWalletCoordinator
+                openWalletCoordinator: openWalletCoordinator,
+                hardwareSignCoordinator: hardwareSignCoordinator
             )
         ))
     }
@@ -312,7 +334,8 @@ private struct MiniAppWebView: UIViewRepresentable {
         paymentCoordinator: MiniAppPaymentCoordinator,
         scanCoordinator: MiniAppScanCoordinator,
         commerceCoordinator: MiniAppCommerceCoordinator,
-        openWalletCoordinator: MiniAppOpenWalletCoordinator
+        openWalletCoordinator: MiniAppOpenWalletCoordinator,
+        hardwareSignCoordinator: MiniAppHardwareSignCoordinator
     ) -> [MiniAppNamespaceHandler] {
         var handlers: [MiniAppNamespaceHandler] = []
         let granted = entry.grantedPermissions
@@ -344,7 +367,7 @@ private struct MiniAppWebView: UIViewRepresentable {
         // (read/write/sign); accept the legacy "evm" token too for older bundles.
         let hasEvm = granted.contains("evm") || granted.contains { $0.hasPrefix("wallet.ethereum.") }
         if hasEvm {
-            handlers.append(Web3BridgeHandler(store: store, coordinator: web3Coordinator, appTitle: displayName))
+            handlers.append(Web3BridgeHandler(store: store, coordinator: web3Coordinator, appTitle: displayName, hardwareSignCoordinator: hardwareSignCoordinator))
             // window.maknoon.pools.list: read the issuer's public pool registry
             // (the sandbox has connect-src 'none', so this network read must be
             // native). No user data; gated by EVM access via this registration.
@@ -370,7 +393,8 @@ private struct MiniAppWebView: UIViewRepresentable {
         // so it needs both grants; reuses the identity consent coordinator.
         if granted.contains("identity") && hasEvm {
             handlers.append(PoolAccessBridgeHandler(
-                store: store, appTitle: displayName, coordinator: identityCoordinator))
+                store: store, appTitle: displayName, coordinator: identityCoordinator,
+                hardwareSignCoordinator: hardwareSignCoordinator))
         }
         return handlers
     }

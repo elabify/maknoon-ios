@@ -152,7 +152,8 @@ enum EthereumNetwork: String, Codable, CaseIterable, Sendable {
         case .mainnet, .arbitrum, .optimism, .base, .scroll, .linea,
              .zksync, .polygonZkEvm:
             return "ethereum"
-        case .polygon:     return "matic-network"
+        case .polygon:     return "polygon-ecosystem-token" // POL (ex-MATIC); the old matic-network id is dead
+
         case .bnb:         return "binancecoin"
         case .avalanche:   return "avalanche-2"
         case .mantle:      return "mantle"

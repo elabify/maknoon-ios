@@ -74,6 +74,15 @@ struct DeviceReadyConfirmationSheet: View {
     /// disabled until a Type-Here passphrase is non-empty. Ledger never
     /// sets this (its passphrase lives on the device).
     var showsPassphraseSelector: Bool = false
+    /// When true, the user has confirmed and a BLE signature is in flight: the
+    /// sheet shows a "waiting for your device" spinner instead of the form and
+    /// cannot be dismissed. Used by the mini-app hardware-sign flow to keep the
+    /// sheet up across the device sign; other call sites leave it false.
+    var signing: Bool = false
+    /// When true (default), Continue dismisses the sheet itself. The mini-app
+    /// hardware-sign flow passes false so its coordinator keeps the sheet up
+    /// (switching it to the signing phase) until the sign completes.
+    var dismissesOnContinue: Bool = true
     let onContinue: () -> Void
     let onCancel: () -> Void
     /// Called with the passphrase the user typed, just before
@@ -103,6 +112,46 @@ struct DeviceReadyConfirmationSheet: View {
     }
 
     var body: some View {
+        if signing {
+            signingBody
+        } else {
+            readyBody
+        }
+    }
+
+    /// Shown while the BLE signature is in flight (mini-app flow only). The sheet
+    /// stays up and non-dismissable so the mini-app's own progress text is not
+    /// revealed until the signature is done.
+    private var signingBody: some View {
+        NavigationStack {
+            VStack(spacing: 16) {
+                ProgressView().controlSize(.large)
+                Text("Waiting for your \(device.kind.displayName)…")
+                    .font(.callout.weight(.medium))
+                Text(signingHint)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(32)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .navigationTitle("Signing")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.hidden)
+        .interactiveDismissDisabled(true)
+    }
+
+    private var signingHint: String {
+        switch device.kind {
+        case .ledger: return "Confirm the request on your Ledger."
+        case .trezor: return "Confirm the request on your Trezor. Enter the PIN if it asks."
+        default: return "Confirm the request on your device."
+        }
+    }
+
+    private var readyBody: some View {
         NavigationStack {
             Form {
                 Section {
@@ -178,8 +227,12 @@ struct DeviceReadyConfirmationSheet: View {
             // a full-screen takeover, while still preserving the
             // device serial + per-purpose app reminder. On iPad / in
             // landscape SwiftUI falls back to a normal sheet, which
-            // is fine.
-            .presentationDetents([.medium, .large])
+            // is fine. When a passphrase field is shown, open fully
+            // (.large) so the "type here" field + copy below the picker
+            // are not hidden under a medium detent.
+            .presentationDetents(
+                (showsPassphraseSelector || requiresPassphrase) ? [.large] : [.medium, .large]
+            )
             .presentationDragIndicator(.visible)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -195,7 +248,10 @@ struct DeviceReadyConfirmationSheet: View {
                             onPassphraseSelection?(selection, selectionPassphrase)
                         }
                         onContinue()
-                        dismiss()
+                        // The mini-app hardware-sign flow keeps the sheet up
+                        // (switching it to the signing phase) and dismisses it
+                        // itself once the sign finishes.
+                        if dismissesOnContinue { dismiss() }
                     }
                     .fontWeight(.semibold)
                     .disabled(passphraseMissing || selectionNotReady)

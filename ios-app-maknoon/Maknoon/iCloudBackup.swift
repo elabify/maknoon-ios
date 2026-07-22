@@ -204,6 +204,14 @@ enum EncryptedBackup {
         "display.theme",
         "display.autoLock",
         "display.language",
+        // Identity > Advanced: show testnet anchor badges on the passport card.
+        "maknoon.showTestnetAnchors",
+        // Network relay (privacy) toggle + self-host override (ADR-0065).
+        "app.relayEnabled",
+        "app.relayHost",
+        // Global price-source overrides (CoinGecko + FX base URLs, ADR-0065).
+        "app.priceCoinGeckoBaseURL",
+        "app.priceFxBaseURL",
         // Apps registry: configured catalogs + installed apps + preferences.
         "appstore.userStores.v1",
         "appstore.installed.v1",

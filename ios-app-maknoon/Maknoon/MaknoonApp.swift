@@ -279,7 +279,8 @@ struct MaknoonApp: App {
             _ = try await sandwich.recoveryMaterialFresh(localizedReason: "Authorize a \(network.displayName) transaction for the connected app")
             rawTx = try EthereumDescriptors.signTransactionFromSandwich(
                 sandwich: sandwich, account: account, plan: plan,
-                biometricReason: "Authorize a \(network.displayName) transaction for the connected app"
+                biometricReason: "Authorize a \(network.displayName) transaction for the connected app",
+                expectedAddress: descriptor.address
             )
         case .hardware(let deviceId, let account, _):
             guard let device = store.devices.find(id: deviceId) else {

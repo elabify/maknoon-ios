@@ -113,6 +113,12 @@ final class IdentitySandwich {
     /// Read the in-session CEK if one is cached (see `sessionCek`).
     var cachedSecondFactorCek: Data? { sessionCek }
 
+    /// True when the master seed material is cached in-session, so a
+    /// derivation-only read (`recoveryMaterial` / `addressFromSandwich`) returns
+    /// WITHOUT a biometric prompt. Lets passive UI (e.g. the ADR-0063 orphaned-
+    /// wallet check) derive an address only when it is free, never prompting.
+    var isUnlockedForDerivation: Bool { sessionMaterial != nil }
+
     /// Populate the in-session CEK cache.
     func cacheSecondFactorCek(_ cek: Data) { self.sessionCek = cek }
 

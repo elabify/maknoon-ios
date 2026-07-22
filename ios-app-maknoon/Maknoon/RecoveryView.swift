@@ -63,7 +63,12 @@ struct RecoveryView: View {
                 let s = done.sandwich
                 restoreDone = nil
                 store.adopt(s)
-                Task { await store.reissueCredentialsAfterRestore() }
+                // Do NOT auto-reissue/re-anchor after restore: the backup already
+                // carries each credential with its embedded anchor state, so the
+                // restored copies are valid as-is (Android does not reissue either,
+                // and restores cleanly). Auto-reissue caused a confusing re-anchor
+                // on every restore (and could partially fail per network). A stale
+                // credential can still be re-anchored manually from Advanced.
             }
             .interactiveDismissDisabled(true)
         }

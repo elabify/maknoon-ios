@@ -25,6 +25,12 @@ struct EthereumWalletView: View {
     @State private var showReceive = false
     @State private var showAllTxs = false
     @State private var showSend = false
+    /// ADR-0063: the active software wallet's cached address is not derivable
+    /// from the current identity seed (orphaned, e.g. a mismatched backup
+    /// restore) -> it can't sign, so warn + disable Send. Computed once per
+    /// wallet/network switch in openAndSync (only when the seed is already
+    /// unlocked, so it never triggers a biometric prompt).
+    @State private var orphaned = false
     @State private var showAddToken = false
     @State private var showAddWallet = false
     @State private var showNetworkPicker = false
@@ -55,6 +61,9 @@ struct EthereumWalletView: View {
             VStack(spacing: 18) {
                 SandwichLockedBanner(visible: showsLockedBanner)
                     .environment(store)
+                if orphaned, let w = activeWallet {
+                    orphanBanner(w)
+                }
                 walletPicker
                 accountRow
                 networkPicker
@@ -469,6 +478,31 @@ struct EthereumWalletView: View {
         return false
     }
 
+    /// ADR-0063 orphaned-wallet warning: this wallet can't sign (its cached
+    /// address belongs to a different identity seed). Explains that recovery
+    /// means restoring the backup that created it (which replaces everything),
+    /// and offers Remove.
+    private func orphanBanner(_ w: EthereumWalletDescriptor) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Wallet belongs to a different identity", systemImage: "exclamationmark.triangle.fill")
+                .font(.subheadline.weight(.semibold))
+            Text("This wallet was created under a different identity (for example, restored from a backup that did not include its recovery phrase), so it cannot sign transactions. To use it, restore the backup that created it \u{2014} note that restoring replaces everything on this device (recovery phrase, credentials, wallets, and settings). Otherwise you can remove it; its funds stay on-chain.")
+                .font(.caption)
+            HStack {
+                Spacer()
+                Button(role: .destructive) {
+                    store.ethereumWalletStore.remove(id: w.id)
+                } label: { Text("Remove") }
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.red.opacity(0.12))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .foregroundStyle(.red)
+        .padding(.horizontal, 16)
+    }
+
     private var actionButtons: some View {
         HStack(spacing: 12) {
             actionButton(
@@ -492,7 +526,20 @@ struct EthereumWalletView: View {
     /// disabled Send-on-Ledger state inside the sheet until Phase 2.1.
     private var canSend: Bool {
         guard let w = activeWallet, w.address != nil else { return false }
-        return true
+        return !orphaned
+    }
+
+    /// ADR-0063: true when a SOFTWARE wallet's cached address is not derivable
+    /// from the current identity seed. Only checks when the seed is already
+    /// unlocked (never prompts biometrics); conservative false otherwise.
+    private func computeOrphaned(_ descriptor: EthereumWalletDescriptor) -> Bool {
+        guard case .software(let acct) = descriptor.kind,
+              let cached = descriptor.address, !cached.isEmpty,
+              let sandwich = store.sandwich, sandwich.isUnlockedForDerivation,
+              let derived = try? EthereumDescriptors.addressFromSandwich(
+                  sandwich: sandwich, account: acct, biometricReason: "")
+        else { return false }
+        return derived.lowercased() != cached.lowercased()
     }
 
     private func actionButton(_ title: String, systemImage: String, enabled: Bool, action: @escaping () -> Void) -> some View {
@@ -635,6 +682,7 @@ struct EthereumWalletView: View {
     private func openAndSync() async {
         guard let descriptor = activeWallet else { return }
         ethereum = EthereumWallet(descriptor: descriptor)
+        orphaned = computeOrphaned(descriptor)
         // This runs only on a wallet/network switch (via .task(id: refreshKey)),
         // so clear the previous context's data before re-fetching. Otherwise a
         // failed/slow fetch on the new network leaves the old chain's balance and

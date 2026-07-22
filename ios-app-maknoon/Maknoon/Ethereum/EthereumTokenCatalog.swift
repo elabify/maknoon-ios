@@ -20,11 +20,13 @@ import Foundation
 
 enum EthereumTokenCatalog {
 
-    /// First-run seed. Intentionally small.
+    /// No first-run seed (ADR-0060): a wallet starts with NO ERC-20 tokens.
+    /// Tokens appear only when auto-discovery finds one in the wallet's own
+    /// transfer history, or the user adds one manually, both scoped to that
+    /// wallet + chain. `reputable(for:)` below is the discovery trust anchor
+    /// (used to NAME a discovered contract); it is never auto-installed.
     static func firstRunSeed(for network: EthereumNetwork) -> [EthereumToken] {
-        // Hand-pick: just USDC on every chain that has an official
-        // Circle deployment. Sepolia uses the Circle test USDC.
-        return reputable(for: network).filter { $0.symbol == "USDC" }
+        return []
     }
 
     /// Reputable token list used by auto-discover. ~5-15 entries

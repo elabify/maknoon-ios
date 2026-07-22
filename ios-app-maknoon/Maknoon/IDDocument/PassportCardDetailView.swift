@@ -29,6 +29,14 @@ struct PassportCardDetailView: View {
     @State private var sharing = false
     @State private var passiveAuthRunning = false
 
+    /// In-app privacy mask. Defaults to ON (blurred) every time the passport is
+    /// opened: the photo + all personal fields are blurred until the holder taps
+    /// the eyeball. This is a VIEW-ONLY state. It never affects what a QR or the
+    /// Share image contains (those render `forSharing: true`, always unmasked).
+    @State private var revealed = false
+    /// Blur strength for the masked state.
+    private let maskBlur: CGFloat = 9
+
     private var doc: IDDocument? { store.idDocuments.documents.first { $0.id == documentId } }
 
     private var matchedCredential: Credential? {
@@ -91,8 +99,11 @@ struct PassportCardDetailView: View {
     private func heroCard(_ doc: IDDocument, forSharing: Bool = false) -> some View {
         let palette = SchemaPalette.forSchema(passportSchemaURI)
         let fg = palette.foreground
+        // Masked on-screen unless the holder revealed it; never masked in the
+        // shareable render (forSharing), so Share / QR are unaffected.
+        let masked = !forSharing && !revealed
         VStack(alignment: .leading, spacing: 0) {
-            // header: icon + Passport + version, QR + Share
+            // header: icon + Passport + version, eyeball + logo
             HStack(alignment: .center, spacing: 9) {
                 Image(systemName: palette.iconSystemName).font(.title3)
                 Text("Passport").font(.title3.weight(.bold))
@@ -101,6 +112,21 @@ struct PassportCardDetailView: View {
                     .padding(.horizontal, 6).padding(.vertical, 1)
                     .overlay(Capsule().stroke(fg.opacity(0.4), lineWidth: 1))
                 Spacer()
+                // Privacy toggle, immediately left of the Maknoon logo. Off (eye
+                // slash) = blurred, the default; tap to reveal the underlying data.
+                if !forSharing {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.15)) { revealed.toggle() }
+                    } label: {
+                        Image(systemName: revealed ? "eye" : "eye.slash")
+                            .font(.title3)
+                            // Pulse while masked so it reads as the "tap to reveal"
+                            // control; stops once revealed.
+                            .symbolEffect(.pulse, options: .repeating, isActive: !revealed)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(revealed ? "Hide passport details" : "Show passport details")
+                }
                 Image("MaknoonLogo")
                     .resizable()
                     .scaledToFit()
@@ -120,10 +146,12 @@ struct PassportCardDetailView: View {
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 1) {
+                    // Label stays visible; only the value is blurred.
                     Text("Passport No").font(.system(size: 9, weight: .semibold)).opacity(0.7)
                     Text(doc.documentNumber)
                         .font(.system(.callout, design: .monospaced).weight(.semibold))
-                        .textSelection(.enabled)
+                        .blur(radius: masked ? maskBlur : 0)
+                        .modifier(SelectableUnlessMasked(masked: masked))
                 }
             }
             .foregroundStyle(fg)
@@ -132,20 +160,21 @@ struct PassportCardDetailView: View {
             // photo + fields
             HStack(alignment: .top, spacing: 14) {
                 photo(doc, fg: fg)
+                    .blur(radius: masked ? maskBlur : 0)
                 VStack(alignment: .leading, spacing: 7) {
-                    field("Surname", name(doc.latinSurname ?? doc.surname), fg: fg)
-                    field("Given names", name(doc.latinGivenNames ?? doc.givenNames), fg: fg)
+                    field("Surname", name(doc.latinSurname ?? doc.surname), fg: fg, masked: masked)
+                    field("Given names", name(doc.latinGivenNames ?? doc.givenNames), fg: fg, masked: masked)
                     HStack(alignment: .top, spacing: 18) {
-                        field("Nationality", issuerCodeFor(doc.nationality), fg: fg)
-                        if let sex = doc.sex, !sex.isEmpty { field("Sex", sex.uppercased(), fg: fg) }
-                        field("Date of birth", isoDate(doc.dateOfBirth, kind: .birth), fg: fg)
+                        field("Nationality", issuerCodeFor(doc.nationality), fg: fg, masked: masked)
+                        if let sex = doc.sex, !sex.isEmpty { field("Sex", sex.uppercased(), fg: fg, masked: masked) }
+                        field("Date of birth", isoDate(doc.dateOfBirth, kind: .birth), fg: fg, masked: masked)
                     }
                     HStack(alignment: .top, spacing: 18) {
-                        field("Issued", issueDate(doc) ?? "—", fg: fg)
-                        field("Expires", isoDate(doc.dateOfExpiry, kind: .expiry), fg: fg)
+                        field("Issued", issueDate(doc) ?? "—", fg: fg, masked: masked)
+                        field("Expires", isoDate(doc.dateOfExpiry, kind: .expiry), fg: fg, masked: masked)
                     }
                     if let pob = doc.formattedPlaceOfBirth, !pob.isEmpty {
-                        field("Place of birth", pob, fg: fg)
+                        field("Place of birth", pob, fg: fg, masked: masked)
                     }
                 }
                 Spacer(minLength: 0)
@@ -195,11 +224,13 @@ struct PassportCardDetailView: View {
         }
     }
 
-    private func field(_ label: String, _ value: String, fg: Color) -> some View {
+    private func field(_ label: String, _ value: String, fg: Color, masked: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 1) {
+            // The attribute label stays visible; only the value is blurred.
             Text(LocalizedStringKey(label)).font(.system(size: 9, weight: .semibold)).foregroundStyle(fg.opacity(0.7))
             Text(value).font(.callout.weight(.semibold)).foregroundStyle(fg)
-                .textSelection(.enabled)
+                .blur(radius: masked ? maskBlur : 0)
+                .modifier(SelectableUnlessMasked(masked: masked))
         }
     }
 
@@ -579,6 +610,17 @@ struct PassportCardDetailView: View {
         case .failed:        return ("xmark", Color(hex: 0xf87171), "Authenticity failed")
         default:             return ("questionmark", Color.gray, "Not verified")
         }
+    }
+}
+
+/// Enables text selection unless masked. A ternary `.textSelection(masked ? .disabled
+/// : .enabled)` won't type-check (the two selectabilities are distinct types), so a
+/// @ViewBuilder conditional picks one. Masked values can't be selected/copied.
+private struct SelectableUnlessMasked: ViewModifier {
+    let masked: Bool
+    @ViewBuilder func body(content: Content) -> some View {
+        if masked { content.textSelection(.disabled) }
+        else { content.textSelection(.enabled) }
     }
 }
 

@@ -30,6 +30,12 @@ struct AddHardwareDeviceFlow: View {
     @State private var pendingKind: DeviceKind?
     @State private var registerError: String?
     @State private var discoverDevice: RegisteredDevice?
+    /// Trezor only: the ready/passphrase-choice sheet shown BEFORE the sweep so a
+    /// hidden (passphrase) Trezor is discovered under its passphrase, matching the
+    /// normal Devices/per-network flow. Ledger skips this (passphrase on-device).
+    @State private var readyDevice: RegisteredDevice?
+    @State private var hwPassphrase: HiddenWalletSelection = .standard
+    @State private var hwHostPassphrase: String = ""
 
     var body: some View {
         List {
@@ -72,16 +78,39 @@ struct AddHardwareDeviceFlow: View {
         .sheet(item: $pendingKind) { kind in
             routeSheet(for: kind)
         }
+        // Trezor: collect the hidden-wallet passphrase choice before the sweep so
+        // a hidden Trezor is discovered under its passphrase (ADR-0033), the same
+        // as the normal flow. Continue schedules the discovery sweep with the
+        // captured bindings; cancel still completes (a device was registered).
+        .sheet(item: $readyDevice) { dev in
+            DeviceReadyConfirmationSheet(
+                device: dev,
+                purpose: .bitcoinDiscover(network: .mainnet),
+                showsPassphraseSelector: true,
+                onContinue: {
+                    readyDevice = nil
+                    scheduleDiscovery(dev)
+                },
+                onCancel: {
+                    readyDevice = nil
+                    onFinished(true)
+                },
+                onPassphraseSelection: { sel, pass in
+                    hwPassphrase = sel
+                    hwHostPassphrase = pass
+                }
+            )
+            .environment(store)
+        }
         .sheet(item: $discoverDevice, onDismiss: { onFinished(true) }) { dev in
             NavigationStack {
-                // Post-register sweep defaults to the standard wallet; a
-                // hidden-wallet passphrase is collected on the per-network
-                // Add screen instead.
+                // The sweep uses the passphrase choice captured just above (Trezor)
+                // or the standard wallet (Ledger, whose passphrase lives on-device).
                 DiscoverHardwareWalletsView(
                     device: dev,
                     network: .mainnet,
-                    hwPassphrase: .constant(.standard),
-                    hwHostPassphrase: .constant("")
+                    hwPassphrase: $hwPassphrase,
+                    hwHostPassphrase: $hwHostPassphrase
                 )
                     .environment(store)
                     .navigationTitle("Discover wallets")
@@ -98,6 +127,16 @@ struct AddHardwareDeviceFlow: View {
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 400_000_000)
             discoverDevice = device
+        }
+    }
+
+    /// Present the Trezor ready/passphrase-choice sheet, deferred so the
+    /// registration sheet finishes dismissing first (same reason as
+    /// `scheduleDiscovery`).
+    private func scheduleReady(_ device: RegisteredDevice) {
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            readyDevice = device
         }
     }
 
@@ -123,7 +162,12 @@ struct AddHardwareDeviceFlow: View {
                 pendingKind = nil
                 switch result {
                 case .success(let device):
-                    if autoDiscoverBitcoin && (device.kind == .ledger || device.kind == .trezor) {
+                    if autoDiscoverBitcoin && device.kind == .trezor {
+                        // Collect the hidden-wallet passphrase choice first.
+                        scheduleReady(device)
+                    } else if autoDiscoverBitcoin && device.kind == .ledger {
+                        hwPassphrase = .standard
+                        hwHostPassphrase = ""
                         scheduleDiscovery(device)
                     } else {
                         onFinished(true)

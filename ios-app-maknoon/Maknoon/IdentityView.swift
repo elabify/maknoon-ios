@@ -83,6 +83,10 @@ struct IdentityView: View {
             .padding(.bottom, 32)
         }
         .navigationTitle("Identity")
+        // Re-poll issuers for later-landing network anchors (ADR-0030) so each
+        // credential's card lights up every network as its batch lands, not just
+        // the first one that was anchored when the credential was picked up.
+        .task { await store.refreshAnchors() }
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button {

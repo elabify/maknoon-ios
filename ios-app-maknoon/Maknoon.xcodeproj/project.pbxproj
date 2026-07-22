@@ -192,6 +192,7 @@
 		88457E01A2A6FB41608E6B42 /* TronSendView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 367A19E6AB5B12D23CE2DCCF /* TronSendView.swift */; };
 		8878F636D334A32F9F4401FE /* SolanaRPCClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9E8028EE7B222BA6F26DAD1 /* SolanaRPCClient.swift */; };
 		88F6ECDCE525A4556A764317 /* SolanaMessageSign.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAE383A9EA0274CF5224F711 /* SolanaMessageSign.swift */; };
+		890B45DF982FA2939B573F2E /* WalletDerivationKATTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6222D0A2D19A86186B6E86C2 /* WalletDerivationKATTests.swift */; };
 		8927DB599E3A1E8FAE4F451F /* BitcoinDevKit in Frameworks */ = {isa = PBXBuildFile; productRef = C6AA67B6DC31F812D470536A /* BitcoinDevKit */; };
 		89B91A988861EFBB083DE12F /* PassportPairing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45C2CA496054741C583300A0 /* PassportPairing.swift */; };
 		89D5B1D78C5EA39AE796A7FF /* ExtendedKeyNormalize.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D7A6AEF293896F5027C58D4 /* ExtendedKeyNormalize.swift */; };
@@ -210,6 +211,7 @@
 		99703B134122145C5C37BA95 /* ledger_btc_core.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAA50E1AC8D8BB04D561FF03 /* ledger_btc_core.swift */; };
 		9C187C681CA557D951CDF90A /* PaymentURI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 872924E9C7A3DAEEC269B68D /* PaymentURI.swift */; };
 		9D6EABF8A70F0A48BEA93F95 /* ScanVerifierSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 491F12D271EC69DD66FDDDD2 /* ScanVerifierSheet.swift */; };
+		9E7B0C561A73E65A812A4CEE /* MiniAppHardwareSignCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1FA4B1A24E1087AC43F1F6F /* MiniAppHardwareSignCoordinator.swift */; };
 		9F41E4FEFFF6CE3B73EFBC95 /* BitcoinWalletKind.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13C92173A6DB04779DDCEA38 /* BitcoinWalletKind.swift */; };
 		A2A5097556AFCDC83FA42F17 /* TronTRC20TokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87B2D1CBB57F8E855F5F3CC6 /* TronTRC20TokenStore.swift */; };
 		A465AC29C8FE193F04DCA5C0 /* ChainMark.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5095CE0B965936B393457543 /* ChainMark.swift */; };
@@ -484,6 +486,7 @@
 		6029C11246370C9FC973A58F /* DiscoverSolanaWalletsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverSolanaWalletsView.swift; sourceTree = "<group>"; };
 		60D6541EA87D362AD70F4B13 /* LedgerERC20Descriptors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LedgerERC20Descriptors.swift; sourceTree = "<group>"; };
 		620573E34C128D213F04A821 /* TronWalletView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TronWalletView.swift; sourceTree = "<group>"; };
+		6222D0A2D19A86186B6E86C2 /* WalletDerivationKATTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletDerivationKATTests.swift; sourceTree = "<group>"; };
 		623F4E24A21E144B5A055DB1 /* MiniAppCapability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MiniAppCapability.swift; sourceTree = "<group>"; };
 		62C38B97574B2BBF62C26FC3 /* MiniAppSchemeHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MiniAppSchemeHandler.swift; sourceTree = "<group>"; };
 		62F9278BFC039C35C7058E4B /* LightningAccountsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LightningAccountsView.swift; sourceTree = "<group>"; };
@@ -558,6 +561,7 @@
 		9FFB5A467ABC1703419DABB2 /* LogStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogStore.swift; sourceTree = "<group>"; };
 		A0089A29F77AC06D988671DE /* EthereumTokenDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EthereumTokenDetailView.swift; sourceTree = "<group>"; };
 		A055EF2D8B6352004C3F1385 /* IDDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IDDocument.swift; sourceTree = "<group>"; };
+		A1FA4B1A24E1087AC43F1F6F /* MiniAppHardwareSignCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MiniAppHardwareSignCoordinator.swift; sourceTree = "<group>"; };
 		A1FD48DD113C43FEA00D4EAB /* SolanaSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SolanaSettings.swift; sourceTree = "<group>"; };
 		A22D1233790B8BD232F680C8 /* RelaySettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelaySettings.swift; sourceTree = "<group>"; };
 		A26492F32B298FD4FC287C13 /* CurrencySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CurrencySettingsView.swift; sourceTree = "<group>"; };
@@ -868,6 +872,7 @@
 				C616DC631565450CA7DA4870 /* MessageSigningKATTests.swift */,
 				5B9297341985E832789E5D8E /* MiniAppTests.swift */,
 				279AEB3EC9996E7F43942444 /* MinimalX509Tests.swift */,
+				6222D0A2D19A86186B6E86C2 /* WalletDerivationKATTests.swift */,
 			);
 			path = MaknoonTests;
 			sourceTree = "<group>";
@@ -1078,6 +1083,7 @@
 				577AE2A7696C00D917B2A65C /* MiniAppCollectSheet.swift */,
 				5BC36C7D9F3E9FAA70757B1A /* MiniAppCommerceCoordinator.swift */,
 				7EF4CA068672BC2BDE0E7324 /* MiniAppCommerceSheet.swift */,
+				A1FA4B1A24E1087AC43F1F6F /* MiniAppHardwareSignCoordinator.swift */,
 				D6388E309980045951A74497 /* MiniAppHostView.swift */,
 				EC267697FC0870866466D68B /* MiniAppIdentitySheet.swift */,
 				40A95AB5B1ECA5BC102B967C /* MiniAppInfoBridgeHandlers.swift */,
@@ -1472,6 +1478,7 @@
 				5371E6E610AB1B7FA70F1C11 /* MessageSigningKATTests.swift in Sources */,
 				4A1803C646A323BAC90258C0 /* MiniAppTests.swift in Sources */,
 				432033DADA9BEE47069C576F /* MinimalX509Tests.swift in Sources */,
+				890B45DF982FA2939B573F2E /* WalletDerivationKATTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1657,6 +1664,7 @@
 				3A8FEE297B56B1D382F307EC /* MiniAppCollectSheet.swift in Sources */,
 				6FAF6B2200509277F1470802 /* MiniAppCommerceCoordinator.swift in Sources */,
 				7402FA1B858EFAECB8D64863 /* MiniAppCommerceSheet.swift in Sources */,
+				9E7B0C561A73E65A812A4CEE /* MiniAppHardwareSignCoordinator.swift in Sources */,
 				E5FE78FD036853BCF5785575 /* MiniAppHostView.swift in Sources */,
 				764396F80DF27F87C25945CB /* MiniAppIdentitySheet.swift in Sources */,
 				B95F0E3C8B80B38158639F32 /* MiniAppInfoBridgeHandlers.swift in Sources */,

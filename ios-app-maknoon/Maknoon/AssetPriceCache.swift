@@ -77,7 +77,7 @@ final class AssetPriceCache: @unchecked Sendable {
         "bitcoin", "ethereum",
         // EVM-L1 alts that appear as native coins on the L1s we
         // support under EthereumNetwork.
-        "matic-network", "binancecoin", "avalanche-2",
+        "polygon-ecosystem-token", "binancecoin", "avalanche-2",
         "mantle", "hyperliquid",
         // Other native chains.
         "solana",

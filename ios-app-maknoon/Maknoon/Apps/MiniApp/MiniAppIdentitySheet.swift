@@ -25,6 +25,16 @@ final class MiniAppIdentityCoordinator {
         let requiredClaims: [String]
         let maxAgeSec: Int64?
         let matches: [Credential]
+        // Pool-access disclosure context (nil/false for a plain identity.request):
+        /// The issuer host that will RECEIVE this disclosure (shown so the user
+        /// knows where their data goes).
+        var recipientHost: String? = nil
+        /// The EVM wallet address that is ALSO shared and permanently linked to
+        /// this KYC on-chain (shown with a warning before the wallet-control sign).
+        var walletAddress: String? = nil
+        /// When true, the "Will disclose" section shows each claim's VALUE
+        /// (expanded JSON) from the selected credential, not just the key.
+        var showsDisclosedValues: Bool = false
     }
 
     private(set) var active: Request?
@@ -37,7 +47,10 @@ final class MiniAppIdentityCoordinator {
         purpose: String?,
         requiredClaims: [String],
         maxAgeSec: Int64?,
-        matches: [Credential]
+        matches: [Credential],
+        recipientHost: String? = nil,
+        walletAddress: String? = nil,
+        showsDisclosedValues: Bool = false
     ) async throws -> Credential {
         try await withCheckedThrowingContinuation { cont in
             self.continuation = cont
@@ -46,7 +59,10 @@ final class MiniAppIdentityCoordinator {
                 purpose: purpose,
                 requiredClaims: requiredClaims,
                 maxAgeSec: maxAgeSec,
-                matches: matches
+                matches: matches,
+                recipientHost: recipientHost,
+                walletAddress: walletAddress,
+                showsDisclosedValues: showsDisclosedValues
             )
         }
     }
@@ -92,14 +108,49 @@ struct MiniAppIdentitySheet: View {
                     }
                 }
 
+                if let host = request.recipientHost, !host.isEmpty {
+                    Section("Sending to") {
+                        Label(host, systemImage: "server.rack")
+                            .font(.callout.monospaced())
+                    }
+                }
+
                 Section("Will disclose") {
                     ForEach(request.requiredClaims, id: \.self) { key in
-                        Label(key, systemImage: "checkmark.seal")
-                            .font(.callout)
+                        if request.showsDisclosedValues {
+                            // Show the actual value being shared (expanded), not just
+                            // the attribute name, so the user can see exactly what the
+                            // recipient learns (e.g. the sanctions-screen result).
+                            VStack(alignment: .leading, spacing: 2) {
+                                Label(key, systemImage: "checkmark.seal")
+                                    .font(.callout.weight(.medium))
+                                Text(disclosedValue(key))
+                                    .font(.caption.monospaced())
+                                    .foregroundStyle(.secondary)
+                                    .textSelection(.enabled)
+                            }
+                        } else {
+                            Label(key, systemImage: "checkmark.seal")
+                                .font(.callout)
+                        }
                     }
                     if let maxAge = request.maxAgeSec {
                         Text("Requires a screening no older than \(humanAge(maxAge)).")
                             .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+
+                if let wallet = request.walletAddress, !wallet.isEmpty {
+                    Section("Wallet address shared") {
+                        Text(wallet)
+                            .font(.callout.monospaced())
+                            .textSelection(.enabled)
+                        Label(
+                            "This wallet is shared with the issuer and permanently linked to this verified identity on-chain.",
+                            systemImage: "exclamationmark.triangle.fill"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.orange)
                     }
                 }
 
@@ -113,9 +164,14 @@ struct MiniAppIdentitySheet: View {
                                     Text(SchemaPalette.forSchema(cred.header.schema).humanLabel)
                                         .font(.callout.weight(.medium))
                                         .foregroundStyle(.primary)
-                                    Text(issuerShort(cred.header.iss))
+                                    // The holder identity (0x) this credential attests, so
+                                    // the user knows which passport is being disclosed.
+                                    Text(holderShort(cred.header.sub))
                                         .font(.caption.monospaced())
                                         .foregroundStyle(.secondary)
+                                    Text(issuerShort(cred.header.iss))
+                                        .font(.caption2.monospaced())
+                                        .foregroundStyle(.tertiary)
                                 }
                                 Spacer()
                                 if selected?.id == cred.id {
@@ -179,6 +235,31 @@ struct MiniAppIdentitySheet: View {
     private func issuerShort(_ did: String) -> String {
         if did.count <= 30 { return did }
         return String(did.prefix(18)) + "…" + String(did.suffix(8))
+    }
+
+    /// The 0x the holder DID encodes (did:elabify:...:holder:0x…), so the user
+    /// sees which passport/identity is being disclosed. Falls back to a
+    /// shortened DID when no 0x is present.
+    private func holderShort(_ did: String) -> String {
+        if let r = did.range(of: "0x") {
+            let hex = String(did[r.lowerBound...])
+            return hex.count > 14 ? String(hex.prefix(8)) + "…" + String(hex.suffix(6)) : hex
+        }
+        if did.count <= 30 { return did }
+        return String(did.prefix(18)) + "…" + String(did.suffix(8))
+    }
+
+    /// The selected credential's value for `key`, pretty-printed, so the user
+    /// sees exactly what is disclosed (e.g. the sanctions-screen result).
+    private func disclosedValue(_ key: String) -> String {
+        guard let cred = selected ?? request.matches.first,
+              let value = cred.claims[key] else { return "—" }
+        let enc = JSONEncoder()
+        enc.outputFormatting = [.prettyPrinted, .sortedKeys]
+        if let data = try? enc.encode(value), let s = String(data: data, encoding: .utf8) {
+            return s
+        }
+        return "\(value)"
     }
 
     private func humanAge(_ seconds: Int64) -> String {

@@ -39,7 +39,10 @@ struct Credential: Codable, Identifiable, Sendable {
     let headerSig: HexString
     let claims: [String: JSONValue]
     let merkleTree: MerkleTreeDescriptor
-    let anchor: AnchorDescriptor?
+    // var (not let): later-landing network anchors are merged in post-pickup via
+    // the issuer's /v1/credentials/:cid/anchors re-poll (ADR-0030), so the card
+    // lights up each network as its batch lands.
+    var anchor: AnchorDescriptor?
 
     var id: String { header.cid }
 }

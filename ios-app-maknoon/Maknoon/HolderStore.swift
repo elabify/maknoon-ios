@@ -425,43 +425,19 @@ final class HolderStore {
         // below catches any orphans on top.
         idDocuments.reset()
 
-        // Every Maknoon-owned UserDefaults key falls under one of
-        // these prefixes. The first-launch install token under
-        // `maknoon.appInstallToken.*` is deliberately NOT here: we
-        // want subsequent launches to still see the token and
-        // therefore skip the first-launch re-wipe.
-        let prefixes = [
-            "networks.",
-            "yubikey.",
-            "devices.",
-            "addressBook",
-            "credentials",
-            "credentialNicknames",
-            "nostr.",
-            // ID document metadata key is "iddocuments.v1" (all lowercase).
-            // The legacy "idDocuments" spelling did not match and left
-            // passport scans visible after a reset.
-            "iddocuments",
-            "lightning.",
-            "appstore.",
-            "identity.",
-            // Fiat preferences keys are `app.fiatCurrencyCode` and
-            // `app.fiatReferenceEnabled`, the legacy `fiat.` prefix
-            // matched nothing.
-            "app.fiat",
-            "display.",
-            "autolock.",
-            "asset.",
-            "backup.",
-            "verifier.",
-            "pendingPickups",
-            // CredentialFolderStore: matches both `credentialFolders.v1`
-            // and `credentialFolderMembership.v1`.
-            "credentialFolder",
-        ]
-        let snapshot = UserDefaults.standard.dictionaryRepresentation()
-        for key in snapshot.keys where prefixes.contains(where: { key.hasPrefix($0) }) {
-            UserDefaults.standard.removeObject(forKey: key)
+        // Return UserDefaults to a fresh-install state by clearing the WHOLE app
+        // domain, preserving ONLY the device-bound first-launch install token
+        // (under `maknoon.appInstallToken.*`) so later launches still see it and
+        // skip the first-launch re-wipe. This replaces a hand-maintained delete
+        // allow-list that silently missed newly added settings (e.g.
+        // maknoon.showTestnetAnchors, app.relay*, app.price* survived a reset).
+        // Clearing the domain keeps the wipe in lockstep with the backup
+        // inventory: a new setting can no longer be forgotten here (ADR-0065).
+        if let domain = Bundle.main.bundleIdentifier {
+            let preserved = UserDefaults.standard.dictionaryRepresentation()
+                .filter { $0.key.hasPrefix("maknoon.appInstallToken") }
+            UserDefaults.standard.removePersistentDomain(forName: domain)
+            for (key, value) in preserved { UserDefaults.standard.set(value, forKey: key) }
         }
 
         // File-system caches under Documents. `networks/` holds the
@@ -637,6 +613,38 @@ final class HolderStore {
         /// v5: cardId -> folderId membership map keyed by
         /// `WalletCardData.id`. Same back-compat semantics.
         let folderMembership: [String: UUID]?
+    }
+
+    /// Re-poll each credential's issuer for later-landing network anchors
+    /// (ADR-0030) and merge any fuller anchor block into the stored copy, so the
+    /// passport card lights up each network as its batch lands. This is required
+    /// because the issuer marks a credential deliverable on the FIRST network to
+    /// anchor and the anchor set grows afterward; iOS's eager pickup otherwise
+    /// keeps the first (e.g. Base-Sepolia-only) snapshot forever. Best-effort +
+    /// non-fatal: the credential header's `iss` is a DID, not a URL, so we probe
+    /// the known-issuer hosts by cid. Anchors only grow, so we replace the stored
+    /// block only when the fetched one covers more networks. Safe to call on
+    /// every Identity-view appearance.
+    @MainActor
+    func refreshAnchors() async {
+        let hosts = knownIssuers.hosts
+        guard !hosts.isEmpty, !credentials.isEmpty else { return }
+        for cred in credentials {
+            let cid = cred.header.cid
+            let have = cred.anchor?.anchors.count ?? 0
+            for host in hosts {
+                guard let fetched = await IssuerClient.fetchAnchors(cid: cid, host: host) else {
+                    continue // wrong host / 404 — try the next known issuer
+                }
+                // This host issued the cid. Merge if it now has more networks.
+                if fetched.anchors.count > have,
+                   let idx = credentials.firstIndex(where: { $0.header.cid == cid }) {
+                    credentials[idx].anchor = fetched
+                    persistCredentials()
+                }
+                break
+            }
+        }
     }
 
     func captureCredentialsBackup() -> CredentialsBackup {

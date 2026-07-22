@@ -52,6 +52,22 @@ enum IssuerClient {
         }
     }
 
+    /// GET /v1/credentials/{cid}/anchors (ADR-0030). Returns the CURRENT anchor
+    /// block, which GROWS as each network's batch lands after the credential is
+    /// first delivered (the issuer marks it ready on the first network). The
+    /// holder re-polls this so the card lights up each network as it anchors.
+    /// Public + cid-keyed (not the one-time pickup token). Best-effort: returns
+    /// nil on any error (wrong host / not found / offline).
+    static func fetchAnchors(cid: String, host: String) async -> AnchorDescriptor? {
+        guard let url = URL(string: "https://\(host)/v1/credentials/\(cid)/anchors") else { return nil }
+        var req = URLRequest(url: url)
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        guard let (data, response) = try? await URLSession.shared.data(for: req),
+              let http = response as? HTTPURLResponse, 200..<300 ~= http.statusCode else { return nil }
+        struct AnchorsResponse: Decodable { let anchor: AnchorDescriptor? }
+        return (try? JSONDecoder().decode(AnchorsResponse.self, from: data))?.anchor
+    }
+
     // MARK: -- restore-time reissuance
 
     /// One reissued credential the issuer is re-minting; carries a fresh

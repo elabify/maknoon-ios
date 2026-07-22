@@ -19,11 +19,16 @@ enum EthereumDescriptorError: LocalizedError {
     case sandwichLocked
     case hdWalletFailed(String)
     case signingFailed(String)
+    case wrongIdentity
     var errorDescription: String? {
         switch self {
         case .sandwichLocked:         return "Maknoon is locked"
         case .hdWalletFailed(let m):  return "HD wallet derive failed: \(m)"
         case .signingFailed(let m):   return "Ethereum signing failed: \(m)"
+        // ADR-0063: the seed-derived signer does not match the wallet's cached
+        // address (an orphaned wallet, e.g. a mismatched backup restore).
+        case .wrongIdentity:
+            return "This wallet belongs to a different identity. Restore the backup that created it to use it."
         }
     }
 }
@@ -232,7 +237,13 @@ enum EthereumDescriptors {
         sandwich: IdentitySandwich,
         account: UInt32,
         plan: EthereumTxPlan,
-        biometricReason: String
+        biometricReason: String,
+        // ADR-0063 orphan guard: when set, the address derived from the seed
+        // must equal this (the wallet's cached address); otherwise this wallet
+        // was created under a different identity and cannot be signed for. Fails
+        // fast (before signing) with a clear error, not a downstream node
+        // "insufficient funds ... have 0". nil = no check (back-compat).
+        expectedAddress: String? = nil
     ) throws -> String {
         let material = try sandwich.recoveryMaterial(localizedReason: biometricReason)
         let words = material.words.joined(separator: " ")
@@ -248,6 +259,12 @@ enum EthereumDescriptors {
             change: 0,
             address: 0
         )
+        if let expected = expectedAddress, !expected.isEmpty {
+            let signer = CoinType.ethereum.deriveAddress(privateKey: key)
+            if signer.lowercased() != expected.lowercased() {
+                throw EthereumDescriptorError.wrongIdentity
+            }
+        }
 
         var input = EthereumSigningInput()
         input.chainID = EthereumWeiValue(uint64: plan.chainId).bigEndianBytes

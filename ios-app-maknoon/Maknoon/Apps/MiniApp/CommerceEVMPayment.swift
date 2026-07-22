@@ -103,7 +103,8 @@ enum CommerceEVMPayment {
         let p = try await buildPlan(from: from, rpcURLString: rpcURLString,
                                     recipient: recipient, amount: amount, asset: asset)
         return try EthereumDescriptors.signTransactionFromSandwich(
-            sandwich: sandwich, account: account, plan: p, biometricReason: biometricReason)
+            sandwich: sandwich, account: account, plan: p, biometricReason: biometricReason,
+            expectedAddress: from)
     }
 
     /// Merchant broadcasts the holder's signed transaction. Returns the tx hash.

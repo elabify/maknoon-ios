@@ -1,21 +1,16 @@
-// User's ERC-20 tokens. Two tiers (ADR-0060):
+// User's ERC-20 tokens (ADR-0060). A wallet starts with NO tokens: there is
+// NO curated first-run seed. Every token a wallet shows was either
+// auto-discovered from that wallet's own transfer history or added manually,
+// and BOTH are scoped to a single (wallet, chain) in `userTokens`, keyed
+// (wallet UUID, network). A discovered/added token never appears in the user's
+// other wallets or on other chains.
 //
-//   * Curated catalog defaults (USDC/USDT/...) are seeded per network and
-//     shared across every wallet on that chain. Well-known assets are the
-//     same for everyone, so a chain-wide list is correct (and matches
-//     MetaMask): open any Sepolia wallet and you see the Sepolia defaults.
-//     These live in `tokensByNetwork`, keyed by network only.
-//
-//   * Tokens a user ADDS (the "Add custom token" sheet) or a wallet DISCOVERS
-//     (auto-discovery from its own transfer history) belong to a single
-//     wallet on a single chain, NOT to every wallet on the network. Adding a
-//     custom token to one wallet must not make it appear in another. These
-//     live in `userTokens`, keyed by (wallet UUID, network).
-//
-// Earlier builds stored everything network-wide, so a custom token added to
-// one wallet leaked into all wallets on that chain. Existing entries stay in
-// `tokensByNetwork` (still visible everywhere, so no data is lost on upgrade);
-// only NEW adds/discoveries are wallet-scoped. See ADR-0060.
+// `tokensByNetwork` (keyed by network only) is a legacy chain-wide tier kept
+// solely so pre-ADR-0060 entries a user actually added are not lost. Earlier
+// builds also auto-seeded curated catalog defaults (USDC/... on every chain)
+// here; those are purged on load now (curated == true), so no token is ever
+// "built in". `EthereumTokenCatalog.reputable` is only a discovery trust
+// anchor (to name a discovered contract), never auto-installed.
 
 import Foundation
 import Observation
@@ -201,6 +196,12 @@ final class EthereumTokenStore: @unchecked Sendable {
                 }
             }
         }
+        // ADR-0060: a wallet starts with NO ERC-20 tokens. Drop any curated
+        // defaults auto-seeded by an earlier build (e.g. USDC on every chain);
+        // tokens now come only from auto-discovery or manual add, both scoped
+        // per (wallet, chain). Legacy user-added chain-wide tokens
+        // (curated == false) are preserved.
+        tokensByNetwork = tokensByNetwork.mapValues { $0.filter { !$0.curated } }
         persist()
     }
 

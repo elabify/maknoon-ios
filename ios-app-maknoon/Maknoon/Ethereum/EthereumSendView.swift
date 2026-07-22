@@ -987,7 +987,8 @@ struct EthereumSendView: View {
                     sandwich: sandwich,
                     account: account,
                     plan: plan,
-                    biometricReason: "Authorize \(network.displayName) \(promptVerb)"
+                    biometricReason: "Authorize \(network.displayName) \(promptVerb)",
+                    expectedAddress: descriptor.address
                 )
                 // Software path: broadcast inline. The biometric
                 // prompt + the existing review section have already

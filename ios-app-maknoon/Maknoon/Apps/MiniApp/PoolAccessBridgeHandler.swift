@@ -27,16 +27,22 @@ final class PoolAccessBridgeHandler: MiniAppNamespaceHandler {
     private let store: HolderStore
     private let appTitle: String
     private let coordinator: MiniAppIdentityCoordinator
+    /// Presents the pre-sign "Prepare Device" sheet for a hardware wallet, so a
+    /// Trezor hidden wallet can supply its passphrase before the WalletControl
+    /// signature; nil BLE prompt is what made a hidden wallet hang/throw.
+    private let hardwareSignCoordinator: MiniAppHardwareSignCoordinator
 
     // The passport schema + sanctions claim the pool gate requires (personhood +
     // not-sanctioned; matches PASSPORT_SCHEMA_URI in the verifier's pool-access.ts).
     private static let passportSchema = "elabify://schema/global/passport/v1"
     private static let sdnClaim = "sdnScreen"
 
-    init(store: HolderStore, appTitle: String, coordinator: MiniAppIdentityCoordinator) {
+    init(store: HolderStore, appTitle: String, coordinator: MiniAppIdentityCoordinator,
+         hardwareSignCoordinator: MiniAppHardwareSignCoordinator) {
         self.store = store
         self.appTitle = appTitle
         self.coordinator = coordinator
+        self.hardwareSignCoordinator = hardwareSignCoordinator
     }
 
     func handle(method: String, params: Any?) async throws -> Any? {
@@ -79,13 +85,25 @@ final class PoolAccessBridgeHandler: MiniAppNamespaceHandler {
             return ["granted": false, "reason": "no_passport_credential"]
         }
 
-        // 2. Consent: pick the credential + Face ID.
+        // 2. Resolve the active EVM wallet up front, so the consent sheet can show
+        //    the exact address being shared and its permanent KYC association.
+        guard let desc = store.ethereumWalletStore.activeWallet,
+              let walletAddress = desc.address, !walletAddress.isEmpty else {
+            throw MiniAppBridgeError.unauthorized("no active Ethereum wallet in this app")
+        }
+
+        // 3. Consent: the sheet shows the recipient host, the disclosed values
+        //    (expanded), the wallet being shared + its permanence warning, the
+        //    holder 0x per credential, then a credential pick + Face ID.
         let chosen = try await coordinator.present(
             appTitle: appTitle,
             purpose: "Verify to access the pool",
             requiredClaims: requiredClaims,
             maxAgeSec: nil,
-            matches: matches
+            matches: matches,
+            recipientHost: issuerURL.host,
+            walletAddress: walletAddress,
+            showsDisclosedValues: true
         )
 
         // 3. Server challenge -> signed presentation (we keep the raw presentation
@@ -104,12 +122,10 @@ final class PoolAccessBridgeHandler: MiniAppNamespaceHandler {
         )
 
         // 4. EVM wallet-control proof (EIP-712), bound to this holder + presentation.
-        guard let desc = store.ethereumWalletStore.activeWallet,
-              let walletAddress = desc.address, !walletAddress.isEmpty else {
-            throw MiniAppBridgeError.unauthorized("no active Ethereum wallet in this app")
-        }
+        //    (desc + walletAddress were resolved in step 2 for the consent sheet.)
         let typedDataJSON = Self.walletControlTypedData(
-            holderDid: presentation.header.sub, verifierDid: issuerDid, nonce: presentation.challenge)
+            holderDid: presentation.header.sub, verifierDid: issuerDid, nonce: presentation.challenge,
+            walletAddress: walletAddress)
         // The proof is signed by the active wallet, software or hardware; the
         // Access Issuer verifies it identically (recover signer == wallet address).
         let signature: String
@@ -123,8 +139,15 @@ final class PoolAccessBridgeHandler: MiniAppNamespaceHandler {
                 guard let device = store.devices.find(id: deviceId) else {
                     throw MiniAppBridgeError.unauthorized("the paired device for this wallet was not found")
                 }
+                // Prepare the device (and collect the hidden-wallet passphrase)
+                // before opening BLE, then sign the WalletControl proof with it.
+                let hostPass = try await hardwareSignCoordinator.present(
+                    device: device, purpose: .ethereumSign,
+                    requiresPassphrase: desc.hidden?.needsHostPassphrase == true)
+                defer { hardwareSignCoordinator.finish() }
                 signature = try await EthereumMessageSigning.signTypedDataOverBLE(
-                    device: device, account: account, typedDataJSON: typedDataJSON, hidden: desc.hidden)
+                    device: device, account: account, typedDataJSON: typedDataJSON,
+                    hidden: desc.hidden, hostEntered: hostPass)
             }
         } catch let e as MiniAppBridgeError {
             throw e
@@ -176,22 +199,26 @@ final class PoolAccessBridgeHandler: MiniAppNamespaceHandler {
 
     /// The exact eth_signTypedData_v4 JSON the verifier's verifyWalletControl
     /// re-derives: domain {name, version} only, WalletControl(holderDid, verifierDid, nonce).
-    private static func walletControlTypedData(holderDid: String, verifierDid: String, nonce: String) -> String {
+    private static func walletControlTypedData(holderDid: String, verifierDid: String, nonce: String, walletAddress: String) -> String {
         let obj: [String: Any] = [
             "types": [
                 "EIP712Domain": [
                     ["name": "name", "type": "string"],
                     ["name": "version", "type": "string"],
                 ],
+                // walletAddress binds the signed intent to the exact address being
+                // registered (defense-in-depth). The issuer also accepts the legacy
+                // 3-field struct during rollout (ADR-0065 hardening).
                 "WalletControl": [
                     ["name": "holderDid", "type": "string"],
                     ["name": "verifierDid", "type": "string"],
                     ["name": "nonce", "type": "string"],
+                    ["name": "walletAddress", "type": "string"],
                 ],
             ],
             "primaryType": "WalletControl",
             "domain": ["name": "MaknoonPoolAccess", "version": "1"],
-            "message": ["holderDid": holderDid, "verifierDid": verifierDid, "nonce": nonce],
+            "message": ["holderDid": holderDid, "verifierDid": verifierDid, "nonce": nonce, "walletAddress": walletAddress],
         ]
         let data = (try? JSONSerialization.data(withJSONObject: obj)) ?? Data()
         return String(data: data, encoding: .utf8) ?? "{}"

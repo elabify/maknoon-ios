@@ -43,6 +43,9 @@ final class Web3BridgeHandler: MiniAppNamespaceHandler {
     private let store: HolderStore
     private let coordinator: MiniAppWeb3Coordinator
     private let appTitle: String
+    /// Presents the pre-sign "Prepare Device" sheet for a hardware wallet so a
+    /// Trezor hidden wallet can supply its passphrase before any BLE sign/send.
+    private let hardwareSignCoordinator: MiniAppHardwareSignCoordinator
 
     // The active EVM network for this session. Starts on Sepolia and can move
     // across the app's known EVM networks via wallet_switchEthereumChain.
@@ -53,10 +56,12 @@ final class Web3BridgeHandler: MiniAppNamespaceHandler {
     /// the page (window.__maknoonEmit) after a successful chain switch.
     var onChainChanged: ((String) -> Void)?
 
-    init(store: HolderStore, coordinator: MiniAppWeb3Coordinator, appTitle: String) {
+    init(store: HolderStore, coordinator: MiniAppWeb3Coordinator, appTitle: String,
+         hardwareSignCoordinator: MiniAppHardwareSignCoordinator) {
         self.store = store
         self.coordinator = coordinator
         self.appTitle = appTitle
+        self.hardwareSignCoordinator = hardwareSignCoordinator
     }
 
     private var rpcURL: String { store.ethereumSettings.rpcURL(for: network) }
@@ -172,9 +177,14 @@ final class Web3BridgeHandler: MiniAppNamespaceHandler {
                     sandwich: sandwich, account: account, message: message,
                     biometricReason: "Sign a message for \(appTitle)")
             case .hardware(let deviceId, _, _):
+                let device = try hardwareDevice(for: deviceId)
+                let hostPass = try await hardwareSignCoordinator.present(
+                    device: device, purpose: .ethereumSign,
+                    requiresPassphrase: desc.hidden?.needsHostPassphrase == true)
+                defer { hardwareSignCoordinator.finish() }
                 return try await EthereumMessageSigning.signOverBLE(
-                    device: try hardwareDevice(for: deviceId), account: account,
-                    message: message, hidden: desc.hidden)
+                    device: device, account: account,
+                    message: message, hidden: desc.hidden, hostEntered: hostPass)
             }
         } catch let e as MiniAppBridgeError {
             throw e
@@ -235,13 +245,19 @@ final class Web3BridgeHandler: MiniAppNamespaceHandler {
                 guard let sandwich = store.sandwich else { throw MiniAppBridgeError.unauthorized("wallet is locked") }
                 signed = try EthereumDescriptors.signTransactionFromSandwich(
                     sandwich: sandwich, account: account, plan: plan,
-                    biometricReason: "Authorize sending from your wallet")
+                    biometricReason: "Authorize sending from your wallet",
+                    expectedAddress: desc.address)
             case .hardware(let deviceId, _, _):
                 // Arbitrary contract calls (approve, swap) are blind-signed on the
                 // device: the raw calldata shows on-screen, not a decoded amount.
+                let device = try hardwareDevice(for: deviceId)
+                let hostPass = try await hardwareSignCoordinator.present(
+                    device: device, purpose: .ethereumSign,
+                    requiresPassphrase: desc.hidden?.needsHostPassphrase == true)
+                defer { hardwareSignCoordinator.finish() }
                 signed = try await EthereumHardwareTx.sign(
-                    plan: plan, device: try hardwareDevice(for: deviceId), account: account,
-                    hidden: desc.hidden, derivationPath: desc.derivationPath)
+                    plan: plan, device: device, account: account,
+                    hidden: desc.hidden, derivationPath: desc.derivationPath, hostEntered: hostPass)
             }
         } catch let e as MiniAppBridgeError {
             throw e
@@ -318,9 +334,14 @@ final class Web3BridgeHandler: MiniAppNamespaceHandler {
                     sandwich: sandwich, account: account, typedDataJSON: json,
                     biometricReason: "Sign typed data for \(appTitle)")
             case .hardware(let deviceId, _, _):
+                let device = try hardwareDevice(for: deviceId)
+                let hostPass = try await hardwareSignCoordinator.present(
+                    device: device, purpose: .ethereumSign,
+                    requiresPassphrase: desc.hidden?.needsHostPassphrase == true)
+                defer { hardwareSignCoordinator.finish() }
                 return try await EthereumMessageSigning.signTypedDataOverBLE(
-                    device: try hardwareDevice(for: deviceId), account: account,
-                    typedDataJSON: json, hidden: desc.hidden)
+                    device: device, account: account,
+                    typedDataJSON: json, hidden: desc.hidden, hostEntered: hostPass)
             }
         } catch let e as MiniAppBridgeError {
             throw e
