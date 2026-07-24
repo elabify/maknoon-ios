@@ -2701,6 +2701,38 @@
         }
       }
     },
+    "Automatic checks did not finish (%@). A reviewer will look at your submission shortly.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "لم تكتمل الفحوصات التلقائية (%@). سيطّلع مُراجِع على طلبك قريبًا."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "自动核查未完成(%@)。审核人员将很快查看您的提交。"
+          }
+        }
+      }
+    },
+    "Automatic checks did not finish (%@). A reviewer will look at your submission shortly; you can close this screen.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "لم تكتمل الفحوصات التلقائية (%@). سيطّلع مُراجِع على طلبك قريبًا؛ يمكنك إغلاق هذه الشاشة."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "自动核查未完成(%@)。审核人员将很快查看您的提交;您可以关闭此界面。"
+          }
+        }
+      }
+    },
     "Available": {
       "extractionState": "manual",
       "localizations": {
@@ -4116,6 +4148,22 @@
         }
       }
     },
+    "Checking chip…": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "جارٍ فحص الشريحة…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "正在核验芯片…"
+          }
+        }
+      }
+    },
     "Checking…": {
       "extractionState": "manual",
       "localizations": {
@@ -4149,6 +4197,38 @@
         }
       }
     },
+    "Chip check failed": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "فشل فحص الشريحة"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "芯片核验失败"
+          }
+        }
+      }
+    },
+    "Chip genuine": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "الشريحة أصلية"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "芯片真实"
+          }
+        }
+      }
+    },
     "Chip intact": {
       "extractionState": "manual",
       "localizations": {
@@ -4162,6 +4242,70 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "芯片完好"
+          }
+        }
+      }
+    },
+    "Chip not checked": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "لم يتم فحص الشريحة"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "芯片未核验"
+          }
+        }
+      }
+    },
+    "Chip signature valid": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "توقيع الشريحة صالح"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "芯片签名有效"
+          }
+        }
+      }
+    },
+    "Chip verified": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "تم التحقق من الشريحة"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "芯片已验证"
+          }
+        }
+      }
+    },
+    "Chip verified and saved on this phone": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "تم التحقق من الشريحة وحفظها على هذا الهاتف"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "芯片已验证并保存在此手机上"
           }
         }
       }
@@ -6002,6 +6146,22 @@
         }
       }
     },
+    "Data traces to a national passport authority": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "تعود البيانات إلى جهة إصدار جوازات وطنية"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "数据可追溯至国家护照机构"
+          }
+        }
+      }
+    },
     "Dataset": {
       "extractionState": "manual",
       "localizations": {
@@ -6266,6 +6426,22 @@
         }
       }
     },
+    "Delete credential?": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "حذف بيانات الاعتماد؟"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "删除凭证?"
+          }
+        }
+      }
+    },
     "Delete document": {
       "extractionState": "manual",
       "localizations": {
@@ -6285,6 +6461,22 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "删除证件"
+          }
+        }
+      }
+    },
+    "Delete document?": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "حذف الوثيقة؟"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "删除文件?"
           }
         }
       }
@@ -7566,6 +7758,22 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "Elabify"
+          }
+        }
+      }
+    },
+    "Elabify issuers do not keep, track, or share your identity information beyond processing your verification.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "لا تحتفظ جهات إصدار Elabify بمعلومات هويتك ولا تتعقبها ولا تشاركها بعد إتمام عملية التحقق."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Elabify 签发方不会在处理您的验证之外保留、追踪或分享您的身份信息。"
           }
         }
       }
@@ -9590,6 +9798,22 @@
         }
       }
     },
+    "Hold assets in a secure hardware wallet": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "احتفظ بأصولك في محفظة أجهزة آمنة"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "将资产保存在安全的硬件钱包中"
+          }
+        }
+      }
+    },
     "Hold steady, let the rotating QR cycle once.": {
       "extractionState": "manual",
       "localizations": {
@@ -9848,6 +10072,22 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "配对方法"
+          }
+        }
+      }
+    },
+    "How verification works": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "كيف يتم التحقق"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "验证如何进行"
           }
         }
       }
@@ -12461,6 +12701,22 @@
         }
       }
     },
+    "Maknoon reads your passport's chip on this phone and creates a digital identity that you control.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "يقرأ مكنون شريحة جواز سفرك على هذا الهاتف وينشئ هوية رقمية تتحكم بها أنت."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Maknoon 在此手机上读取您护照的芯片,并创建一个由您掌控的数字身份。"
+          }
+        }
+      }
+    },
     "Maknoon stores only the xpub and the fingerprint. The private keys never leave your SeedSigner.": {
       "extractionState": "manual",
       "localizations": {
@@ -13214,6 +13470,54 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "Musnad 注册表"
+          }
+        }
+      }
+    },
+    "Musnad accepted your passport's chip-signed data and confirmed it traces to a recognized national passport authority. A reviewer will approve it shortly.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "قبِل Musnad بيانات جواز سفرك الموقّعة بالشريحة وأكّد أنها تعود إلى جهة إصدار جوازات وطنية معترف بها. سيوافق عليها مُراجِع قريبًا."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Musnad 已接受您护照的芯片签名数据,并确认其可追溯至受认可的国家护照机构。审核人员将很快批准。"
+          }
+        }
+      }
+    },
+    "Musnad accepted your passport's chip-signed data and confirmed it traces to a recognized national passport authority. It is now pending review; a reviewer will approve it shortly.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "قبِل Musnad بيانات جواز سفرك الموقّعة بالشريحة وأكّد أنها تعود إلى جهة إصدار جوازات وطنية معترف بها. وهي الآن قيد المراجعة؛ وسيوافق عليها مُراجِع قريبًا."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Musnad 已接受您护照的芯片签名数据,并确认其可追溯至受认可的国家护照机构。现正在审核中;审核人员将很快批准。"
+          }
+        }
+      }
+    },
+    "Musnad by Elabify checks your passport chip and screens your name against sanctions lists, then issues a credential your wallet can present. Your passport details are never written on-chain. Only a private anchor, a code with no personal data, is recorded so apps can confirm the credential is valid.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "يفحص Musnad by Elabify شريحة جواز سفرك ويطابق اسمك مع قوائم العقوبات، ثم يُصدر بيانات اعتماد يمكن لمحفظتك تقديمها. لا تُكتب بيانات جواز سفرك على السلسلة أبدًا. يُسجَّل فقط مرساة خاصة، وهي رمز لا يحتوي على أي بيانات شخصية، لتتمكن التطبيقات من تأكيد صلاحية بيانات الاعتماد."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Musnad by Elabify 会检查您的护照芯片,并将您的姓名与制裁名单进行比对,然后签发一份可由您的钱包出示的凭证。您的护照信息绝不会写入链上。仅记录一个私密锚点(一个不含个人数据的代码),以便应用确认凭证有效。"
           }
         }
       }
@@ -17152,6 +17456,22 @@
         }
       }
     },
+    "Privacy Policy": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "سياسة الخصوصية"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "隐私政策"
+          }
+        }
+      }
+    },
     "Privacy QR": {
       "extractionState": "manual",
       "localizations": {
@@ -17250,6 +17570,22 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "用途：%@"
+          }
+        }
+      }
+    },
+    "Purpose: to verify your passport and issue your credential.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "الغرض: التحقق من جواز سفرك وإصدار بيانات اعتمادك."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "用途:验证您的护照并签发您的凭证。"
           }
         }
       }
@@ -17362,6 +17698,22 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "请重新输入此隐藏钱包的密码短语以签名。它永远不会被保存。"
+          }
+        }
+      }
+    },
+    "Read here: your passport chip is read on this phone.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "تُقرأ هنا: تُقرأ شريحة جواز سفرك على هذا الهاتف."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "在此读取:您的护照芯片在此手机上读取。"
           }
         }
       }
@@ -18099,6 +18451,70 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "将此设备从 Maknoon 中移除。该设备在任意网络上创建的钱包仍保留在钱包列表中（您仍可在仅观察模式下查看），但在重新注册该设备之前，这些钱包无法签名。"
+          }
+        }
+      }
+    },
+    "Removes the local copy from this phone. Elabify issuers do not keep, track, or share your identity information beyond processing your verification.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "يزيل هذا النسخة المحلية من هذا الهاتف. ولا تحتفظ جهات إصدار Elabify بمعلومات هويتك ولا تتعقبها ولا تشاركها بعد إتمام عملية التحقق."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "这会从此手机中移除本地副本。Elabify 签发方不会在处理您的验证之外保留、追踪或分享您的身份信息。"
+          }
+        }
+      }
+    },
+    "Removes the local copy from this phone. Your physical passport is not affected. Elabify issuers do not keep, track, or share your identity information beyond processing your verification.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "يزيل هذا النسخة المحلية من هذا الهاتف. لا يتأثر جواز سفرك المادي. ولا تحتفظ جهات إصدار Elabify بمعلومات هويتك ولا تتعقبها ولا تشاركها بعد إتمام عملية التحقق."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "这会从此手机中移除本地副本。您的实体护照不受影响。Elabify 签发方不会在处理您的验证之外保留、追踪或分享您的身份信息。"
+          }
+        }
+      }
+    },
+    "Removes the passport from Maknoon on this phone. Your physical passport is not affected. Elabify issuers do not keep, track, or share your identity information beyond processing your verification.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "يزيل هذا جواز السفر من مكنون على هذا الهاتف. لا يتأثر جواز سفرك المادي. ولا تحتفظ جهات إصدار Elabify بمعلومات هويتك ولا تتعقبها ولا تشاركها بعد إتمام عملية التحقق."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "这会从此手机上的 Maknoon 中移除该护照。您的实体护照不受影响。Elabify 签发方不会在处理您的验证之外保留、追踪或分享您的身份信息。"
+          }
+        }
+      }
+    },
+    "Removes this credential from this phone. Elabify issuers do not keep, track, or share your identity information beyond processing your verification.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "يزيل هذا بيانات الاعتماد من هذا الهاتف. ولا تحتفظ جهات إصدار Elabify بمعلومات هويتك ولا تتعقبها ولا تشاركها بعد إتمام عملية التحقق."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "这会从此手机中移除该凭证。Elabify 签发方不会在处理您的验证之外保留、追踪或分享您的身份信息。"
           }
         }
       }
@@ -20568,6 +20984,38 @@
         }
       }
     },
+    "Send your passport details to Musnad by Elabify for verification and a sanctions check. You get back a verified credential that any compatible app can check. Your passport details are never written on-chain.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "أرسِل بيانات جواز سفرك إلى Musnad by Elabify للتحقق وفحص العقوبات. ستحصل على بيانات اعتماد موثّقة يمكن لأي تطبيق متوافق التحقق منها. لا تُكتب بيانات جواز سفرك على السلسلة أبدًا."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "将您的护照信息发送给 Musnad by Elabify 进行验证和制裁核查。您将获得任何兼容应用都可核验的已验证凭证。您的护照信息绝不会写入链上。"
+          }
+        }
+      }
+    },
+    "Send your passport's chip-signed details to Musnad by Elabify for verification and a sanctions check. You get back a verified credential in your wallet that you can share with any compatible app. Your passport details are never written on-chain; only a private anchor (a code with no personal data) is.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "أرسِل بيانات جواز سفرك الموقّعة بالشريحة إلى Musnad by Elabify للتحقق وفحص العقوبات. ستحصل على بيانات اعتماد موثّقة في محفظتك يمكنك مشاركتها مع أي تطبيق متوافق. لا تُكتب بيانات جواز سفرك على السلسلة أبدًا؛ يُكتب فقط مرساة خاصة (رمز لا يحتوي على أي بيانات شخصية)."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "将您护照的芯片签名信息发送给 Musnad by Elabify 进行验证和制裁核查。您的钱包中将获得一份可与任何兼容应用分享的已验证凭证。您的护照信息绝不会写入链上;仅写入一个私密锚点(一个不含个人数据的代码)。"
+          }
+        }
+      }
+    },
     "Sending identity, then payment…": {
       "localizations": {
         "ar": {
@@ -20580,6 +21028,22 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "正在发送身份，然后发送付款…"
+          }
+        }
+      }
+    },
+    "Sends only your name and date of birth to Musnad by Elabify for a sanctions check. Your photo and chip data stay on this phone.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "يرسل اسمك وتاريخ ميلادك فقط إلى Musnad by Elabify لإجراء فحص العقوبات. تبقى صورتك وبيانات الشريحة على هذا الهاتف."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "仅将您的姓名和出生日期发送给 Musnad by Elabify 进行制裁核查。您的照片和芯片数据保留在此手机上。"
           }
         }
       }
@@ -20597,6 +21061,22 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "已发送"
+          }
+        }
+      }
+    },
+    "Sent only if you choose: nothing is shared unless you ask for a verified credential later.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "تُرسل فقط إذا اخترت ذلك: لا تتم مشاركة أي شيء ما لم تطلب لاحقًا بيانات اعتماد موثّقة."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "仅在您选择时发送:除非您稍后申请已验证的凭证,否则不会分享任何内容。"
           }
         }
       }
@@ -20961,6 +21441,22 @@
         }
       }
     },
+    "Share only what you choose, with people you trust": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "شارك ما تختاره فقط، ومع من تثق بهم"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "只与您信任的人分享您选择的内容"
+          }
+        }
+      }
+    },
     "Shared with %@": {
       "localizations": {
         "ar": {
@@ -20973,6 +21469,22 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "已与 %@ 共享"
+          }
+        }
+      }
+    },
+    "Shared with Musnad: your name, document number, dates, nationality, and sex. Not shared: your passport photo and chip data stay on this phone.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "يُشارَك مع Musnad: اسمك ورقم الوثيقة والتواريخ والجنسية والجنس. لا يُشارَك: تبقى صورة جواز سفرك وبيانات الشريحة على هذا الهاتف."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "与 Musnad 分享:您的姓名、证件号码、日期、国籍和性别。不分享:您的护照照片和芯片数据保留在此手机上。"
           }
         }
       }
@@ -20996,6 +21508,22 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "分享记录"
+          }
+        }
+      }
+    },
+    "Sharing with a verifier": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "المشاركة مع جهة تحقق"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "与验证方分享"
           }
         }
       }
@@ -21262,6 +21790,22 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "在每个金额旁显示以您所选货币计的近似价值。关闭以阻止 Maknoon 联系任何价格服务。"
+          }
+        }
+      }
+    },
+    "Shows what the chip check confirmed": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "يوضح ما أكده فحص الشريحة"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "显示芯片核验所确认的内容"
           }
         }
       }
@@ -21953,6 +22497,22 @@
         }
       }
     },
+    "Stays here: the photo and chip data never leave this device.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "تبقى هنا: لا تغادر الصورة وبيانات الشريحة هذا الجهاز أبدًا."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "留在本机:照片和芯片数据绝不离开此设备。"
+          }
+        }
+      }
+    },
     "Steps": {
       "extractionState": "manual",
       "localizations": {
@@ -22103,6 +22663,22 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "将您的姓名和出生日期提交给所选发行方进行 OpenSanctions 检查。您的照片和芯片数据保留在此设备上。"
+          }
+        }
+      }
+    },
+    "Submitted. Finishing up.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "تم الإرسال. جارٍ الإنهاء."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "已提交,正在完成。"
           }
         }
       }
@@ -22750,6 +23326,54 @@
         }
       }
     },
+    "That looks like a %@ address. This is a Bitcoin wallet.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "يبدو أن هذا عنوان %@. هذه محفظة Bitcoin."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "这看起来是 %@ 地址。这是一个 Bitcoin 钱包。"
+          }
+        }
+      }
+    },
+    "That looks like a %@ address. This is a Solana wallet.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "يبدو أن هذا عنوان %@. هذه محفظة Solana."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "这看起来是 %@ 地址。这是一个 Solana 钱包。"
+          }
+        }
+      }
+    },
+    "That looks like a %@ address. This is a Tron wallet.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "يبدو أن هذا عنوان %@. هذه محفظة Tron."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "这看起来是 %@ 地址。这是一个 Tron 钱包。"
+          }
+        }
+      }
+    },
     "The Apps catalog already lives on the Apps tab. Settings for individual catalog entries land here once any of them require user-configurable knobs.": {
       "extractionState": "manual",
       "localizations": {
@@ -22992,6 +23616,22 @@
         }
       }
     },
+    "The chip's signed data wasn't captured. Re-tap your passport so Maknoon can store it; the issuer needs it to verify.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "لم يتم التقاط بيانات الشريحة الموقّعة. أعِد لمس جواز سفرك ليتمكن مكنون من تخزينها؛ فجهة الإصدار تحتاجها للتحقق."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "未能获取芯片的签名数据。请重新贴靠您的护照,以便 Maknoon 存储;签发方需要它来验证。"
+          }
+        }
+      }
+    },
     "The credential failed cryptographic verification.": {
       "extractionState": "manual",
       "localizations": {
@@ -23005,6 +23645,22 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "该凭证未通过加密验证。"
+          }
+        }
+      }
+    },
+    "The credential is signed by your key and can be checked by another Maknoon user offline, with no server.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "يتم توقيع بيانات الاعتماد بمفتاحك ويمكن لمستخدم مكنون آخر التحقق منها دون اتصال ودون خادم."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "凭证由您的密钥签名,另一位 Maknoon 用户可离线核验,无需服务器。"
           }
         }
       }
@@ -23983,6 +24639,22 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "这是最后一次显示该密码。在继续之前，请将其添加到经过审核的密码管理器中。"
+          }
+        }
+      }
+    },
+    "This is your own address. Sending to yourself just moves funds within this wallet and still costs a fee.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "هذا عنوانك الخاص. الإرسال إلى نفسك ينقل الأموال داخل هذه المحفظة فقط ولا يزال يكلّف رسومًا."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "这是您自己的地址。转给自己只是在此钱包内移动资金，仍会产生手续费。"
           }
         }
       }
@@ -25510,6 +26182,22 @@
         }
       }
     },
+    "Use applications with your identity and assets in your wallets together.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "استخدم التطبيقات مع هويتك وأصولك في محافظك معًا."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "将您的身份与钱包中的资产一起用于各类应用。"
+          }
+        }
+      }
+    },
     "Use credential": {
       "extractionState": "manual",
       "localizations": {
@@ -25949,6 +26637,22 @@
         }
       }
     },
+    "Verified by": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "موثّق من"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "验证方"
+          }
+        }
+      }
+    },
     "Verified credential": {
       "extractionState": "manual",
       "localizations": {
@@ -26182,6 +26886,22 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "验证并支付"
+          }
+        }
+      }
+    },
+    "Verify and carry your passport as a digital identity": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "وثّق جواز سفرك واحمله كهوية رقمية"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "验证并随身携带您的护照作为数字身份"
           }
         }
       }
@@ -26928,6 +27648,22 @@
         }
       }
     },
+    "What was checked": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ما الذي تم فحصه"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "已核验的内容"
+          }
+        }
+      }
+    },
     "When on, Maknoon shows fiat-equivalent captions next to native amounts and queries CoinGecko (https://api.coingecko.com) for live spot prices. When off, no reference prices are displayed anywhere and Maknoon never contacts the price oracle. There is no self-hosted spot-price source today.": {
       "extractionState": "manual",
       "localizations": {
@@ -27487,6 +28223,22 @@
         }
       }
     },
+    "Your credential has been created and is being finalized. You can close this screen and keep using the app. It will appear on the Identity tab shortly; the pending item at the top of the tab has a cancel option. Your passport details are never written on-chain.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "تم إنشاء بيانات اعتمادك ويجري إنهاؤها. يمكنك إغلاق هذه الشاشة ومتابعة استخدام التطبيق. ستظهر في علامة تبويب الهوية قريبًا؛ ويحتوي العنصر المعلّق أعلى علامة التبويب على خيار للإلغاء. لا تُكتب بيانات جواز سفرك على السلسلة أبدًا."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "您的凭证已创建并正在完成。您可以关闭此界面并继续使用应用。它稍后会出现在“身份”标签页中;标签页顶部的待处理项带有取消选项。您的护照信息绝不会写入链上。"
+          }
+        }
+      }
+    },
     "Your credential has been minted server-side and is being anchored. You can close this screen and continue using the app, the credential will appear on the Identity tab as soon as the issuer's batch flushes. The pending pickup also shows at the top of the Identity tab with a cancel option.": {
       "extractionState": "manual",
       "localizations": {
@@ -27523,6 +28275,38 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "您的凭证已在服务器端铸造，正在锚定中。您可以关闭此屏幕并继续使用应用。一旦发行方的批次刷新，凭证就会出现在身份标签页中。待处理的领取也会显示在身份标签页顶部，并附带取消选项。"
+          }
+        }
+      }
+    },
+    "Your credential is being finalized in the background. Your passport details are never written on-chain. Only a private anchor (a code with no personal data) is recorded so apps can confirm the credential is valid.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "يجري إنهاء بيانات اعتمادك في الخلفية. لا تُكتب بيانات جواز سفرك على السلسلة أبدًا. يُسجَّل فقط مرساة خاصة (رمز لا يحتوي على أي بيانات شخصية) لتتمكن التطبيقات من تأكيد صلاحية بيانات الاعتماد."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "您的凭证正在后台完成。您的护照信息绝不会写入链上。仅记录一个私密锚点(一个不含个人数据的代码),以便应用确认凭证有效。"
+          }
+        }
+      }
+    },
+    "Your data lives on this phone. No account, no tracking.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "بياناتك تبقى على هذا الهاتف. بدون حساب وبدون تتبّع."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "您的数据保存在此手机上。无需账户,不做追踪。"
           }
         }
       }

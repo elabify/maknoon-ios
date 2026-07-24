@@ -440,9 +440,10 @@ struct TapIDDocumentSheet: View {
         switch issuance {
         case .idle:
             Section {
-                Text("Send the document to an issuer for verification, sanctions screening, and anchoring on ledger that any compatible verifier can check.")
+                Text("Send your passport details to Musnad by Elabify for verification and a sanctions check. You get back a verified credential that any compatible app can check. Your passport details are never written on-chain.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
+                IssuanceConsentDisclosure()
                 IssuerPickerField(
                     knownIssuers: store.knownIssuers,
                     selectedEntry: $selectedIssuerEntry,
@@ -470,15 +471,15 @@ struct TapIDDocumentSheet: View {
             Section {
                 HStack {
                     ProgressView().controlSize(.small)
-                    Text("Submitting to \(submittingHost)…").font(.callout)
+                    Text("Submitting to \(IssuerSelection.displayName(forHost: submittingHost))…").font(.callout)
                 }
             }
         case .submittedForAnchor:
             Section {
-                Label("Submitted; anchoring in background", systemImage: "checkmark.seal")
+                Label("Submitted. Finishing up.", systemImage: "checkmark.seal")
                     .font(.callout.weight(.semibold))
                     .foregroundStyle(.green)
-                Text("Your verified credential is being anchored.")
+                Text("Your credential is being finalized in the background. Your passport details are never written on-chain. Only a private anchor (a code with no personal data) is recorded so apps can confirm the credential is valid.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 doneButton
@@ -492,10 +493,10 @@ struct TapIDDocumentSheet: View {
                 .font(.callout.weight(.semibold))
                 .foregroundStyle(preVerified ? .green : .orange)
                 if preVerified {
-                    Text("The issuer accepted your passport's chip-signed bytes and confirmed they chain to a recognised national CSCA. An operator will approve it shortly.")
+                    Text("Musnad accepted your passport's chip-signed data and confirmed it traces to a recognized national passport authority. A reviewer will approve it shortly.")
                         .font(.caption).foregroundStyle(.secondary)
                 } else {
-                    Text("Pre-verification did not complete automatically (\(reason)). An operator will review your packet shortly.")
+                    Text("Automatic checks did not finish (\(reason)). A reviewer will look at your submission shortly.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Text("Pending ID: \(pendingId)")
@@ -538,7 +539,7 @@ struct TapIDDocumentSheet: View {
     private var localCredentialIcon: String { "checkmark.seal.fill" }
 
     private var localCredentialStatus: String {
-        "Document verified and saved locally"
+        "Chip verified and saved on this phone"
     }
 
     // MARK: -- minted-step issuance helpers

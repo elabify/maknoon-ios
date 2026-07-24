@@ -135,13 +135,16 @@ struct OnboardingView: View {
                             Text("Own your Identity, Assets, and Privacy")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
+                            Text("Your data lives on this phone. No account, no tracking.")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
                         }
                         .multilineTextAlignment(.center)
                     }
                     VStack(alignment: .leading, spacing: 12) {
-                        bullet("Verify and share your passport as a digital identity")
-                        bullet("Manage digital assets with a secure hardware wallet")
-                        bullet("Privately use your identity and assets with those you verify and trust")
+                        bullet("Verify and carry your passport as a digital identity")
+                        bullet("Hold assets in a secure hardware wallet")
+                        bullet("Share only what you choose, with people you trust")
                     }
                     .padding(.horizontal, 8)
                     Spacer(minLength: 0)
@@ -502,7 +505,7 @@ struct OnboardingView: View {
             VStack(alignment: .leading, spacing: 16) {
                 Label("Tap your Passport", systemImage: "person.text.rectangle")
                     .font(.title3.weight(.semibold))
-                Text("Tap your passport and Maknoon reads its chip on-device and mints an identity credential that you can present from your phone.")
+                Text("Maknoon reads your passport's chip on this phone and creates a digital identity that you control.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
 
@@ -518,8 +521,10 @@ struct OnboardingView: View {
                 .buttonStyle(.bordered)
 
                 VStack(alignment: .leading, spacing: 6) {
-                    bulletRow("The credential is signed by your key and verifiable by another Maknoon user offline, with no server.")
-                    bulletRow("You can also submit it to an issuer for a sanctions-checked, authority-issued credential, right after the scan or later from the Identity tab.")
+                    bulletRow("Read here: your passport chip is read on this phone.")
+                    bulletRow("Stays here: the photo and chip data never leave this device.")
+                    bulletRow("Sent only if you choose: nothing is shared unless you ask for a verified credential later.")
+                    bulletRow("The credential is signed by your key and can be checked by another Maknoon user offline, with no server.")
                 }
             }
         }
@@ -560,6 +565,10 @@ struct OnboardingView: View {
                 Button(action: { completeOnboarding() }) {
                     Text("Skip for now").frame(maxWidth: .infinity)
                 }
+
+                Text("Use applications with your identity and assets in your wallets together.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
         }
         .sheet(isPresented: $showHardwarePicker) {

@@ -311,9 +311,15 @@ struct SolanaSendView: View {
                 .accessibilityLabel("Pick from contacts")
             }
             if !recipient.isEmpty, SolanaDescriptors.parseAddress(recipient) == nil {
-                Text("Not a valid Solana base58 address.")
-                    .font(.caption)
-                    .foregroundStyle(.red)
+                if let fam = AddressNetworkGuard.detect(recipient) {
+                    Text("That looks like a \(fam.displayName) address. This is a Solana wallet.")
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                } else {
+                    Text("Not a valid Solana base58 address.")
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
             }
         }
     }
@@ -657,10 +663,27 @@ struct SolanaSendView: View {
         return parsedNativeUnits
     }
 
+    /// Native SOL amount in lamports, computed exactly from the typed decimal
+    /// string (no binary Double) on the native-denomination path so the
+    /// transaction carries precisely what the user typed. The fiat path still
+    /// goes through the spot price (inherently approximate) but is then scaled
+    /// exactly. See TokenAmount / amount-scaling-kat.json.
+    private var parsedLamports: UInt64? {
+        guard selectedToken == nil else { return nil }
+        if !isFiatDenomination {
+            return TokenAmount.baseUnitsUInt64(amount, decimals: 9)
+        }
+        guard let sol = parsedNativeUnits, sol > 0 else { return nil }
+        return TokenAmount.baseUnitsUInt64(String(format: "%.9f", sol), decimals: 9)
+    }
+
     private func parsedTokenRawAmount(_ token: SolanaSPLToken) -> UInt64? {
+        let dp = Int(token.decimals)
+        if !isFiatDenomination {
+            return TokenAmount.baseUnitsUInt64(amount, decimals: dp)
+        }
         guard let native = parsedNativeUnits, native > 0 else { return nil }
-        let scale = pow(10.0, Double(token.decimals))
-        return UInt64((native * scale).rounded())
+        return TokenAmount.baseUnitsUInt64(String(format: "%.\(dp)f", native), decimals: dp)
     }
 
     private var canSubmit: Bool {
@@ -668,7 +691,7 @@ struct SolanaSendView: View {
         if let token = selectedToken {
             return parsedTokenRawAmount(token) != nil
         }
-        return parsedSOLAmount != nil
+        return parsedLamports != nil
     }
 
     private func shortAddress(_ s: String) -> String {
@@ -676,14 +699,7 @@ struct SolanaSendView: View {
         return "\(s.prefix(6))…\(s.suffix(4))"
     }
 
-    private func stripSolanaPrefix(_ s: String) -> String {
-        var out = s.trimmingCharacters(in: .whitespacesAndNewlines)
-        if out.lowercased().hasPrefix("solana:") {
-            out = String(out.dropFirst("solana:".count))
-        }
-        if let q = out.firstIndex(of: "?") { out = String(out[..<q]) }
-        return out
-    }
+    private func stripSolanaPrefix(_ s: String) -> String { PaymentURIStrip.solana(s) }
 
     private func explorerURL(for signature: String) -> URL? {
         let base = store.solanaSettings.explorerURL(for: activeNetwork)
@@ -779,10 +795,9 @@ struct SolanaSendView: View {
                 return
             }
 
-            guard let sol = parsedSOLAmount, sol > 0 else {
+            guard let lamports = parsedLamports, lamports > 0 else {
                 throw SolanaDescriptorError.signingFailed("Enter a positive amount.")
             }
-            let lamports = UInt64((sol * 1_000_000_000).rounded())
 
             // Block a sub-rent-exempt transfer to a brand-new account
             // before we touch the device, so the user gets a clear
@@ -866,10 +881,7 @@ struct SolanaSendView: View {
                 if case .hardware(_, _, let pub) = descriptor.kind { return pub }
                 return nil
             }()
-            let lamports: Int64 = {
-                guard let sol = parsedSOLAmount else { return 0 }
-                return Int64((sol * 1_000_000_000).rounded())
-            }()
+            let lamports = Int64(parsedLamports ?? 0)
             if let token = selectedToken, let raw = parsedTokenRawAmount(token) {
                 await markPendingAndPollForConfirmation(
                     signature: sig,

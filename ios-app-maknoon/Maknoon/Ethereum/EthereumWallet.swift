@@ -149,6 +149,14 @@ actor EthereumWallet {
         }
     }
 
+    /// True when `address` has deployed bytecode (a contract). Best-effort:
+    /// returns false if the code read fails (never blocks a send on an RPC blip).
+    func isContract(address: String, rpcURL: String) async -> Bool {
+        guard let client = EthereumRPCClient(urlString: rpcURL) else { return false }
+        let code = (try? await client.getCode(address)) ?? "0x"
+        return code.count > 2 && code != "0x0"
+    }
+
     /// Broadcast a signed transaction. Returns the tx hash.
     func broadcast(rawTx: String, rpcURL: String) async throws -> String {
         guard let client = EthereumRPCClient(urlString: rpcURL) else {

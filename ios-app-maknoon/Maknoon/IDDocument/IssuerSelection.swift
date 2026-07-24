@@ -15,6 +15,20 @@ enum IssuerSelection {
     /// tunnel, or a LAN dev server not yet added to Known Issuers).
     static let customSentinel = "__custom__"
 
+    /// Elabify's canonical Privacy Policy, linked wherever we name the issuer
+    /// or explain what leaves the device.
+    static let privacyPolicyURL = URL(string: "https://elabify.com/support/compliance/privacy-policy/")!
+
+    /// Friendly, human name for an issuer/verifier host. The default Elabify
+    /// issuer and verifier both surface as "Musnad by Elabify" instead of a
+    /// bare hostname; anything else (a custom or LAN issuer) shows its host so
+    /// the user still sees exactly where their data is going.
+    static func displayName(forHost host: String) -> String {
+        let h = host.lowercased()
+        if h.contains("musnad"), h.hasSuffix("elabify.com") { return "Musnad by Elabify" }
+        return host
+    }
+
     /// The base URL the issuance / sanctions calls should target.
     /// Returns nil when the user picked Custom and hasn't typed a
     /// parseable URL yet, callers use that nil to disable the submit
@@ -46,6 +60,23 @@ enum IssuerSelection {
     }
 }
 
+/// The plain-language "what leaves your phone" disclosure shown before a
+/// passport is submitted to an issuer. Shared by the post-scan minted step
+/// (TapIDDocumentSheet) and the document detail screen (IDDocumentDetailView)
+/// so the two consent surfaces never drift apart. ADR-0069.
+struct IssuanceConsentDisclosure: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Shared with Musnad: your name, document number, dates, nationality, and sex. Not shared: your passport photo and chip data stay on this phone.")
+            Text("Purpose: to verify your passport and issue your credential.")
+            Text("Elabify issuers do not keep, track, or share your identity information beyond processing your verification.")
+            Link("Privacy Policy", destination: IssuerSelection.privacyPolicyURL)
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+    }
+}
+
 /// Dropdown of known issuers (host / host:port entries from Settings →
 /// Identity → Known Issuers) plus a "Custom URL…" sentinel that reveals
 /// a free-form URL field. The selected entry is resolved to a base URL
@@ -57,7 +88,7 @@ struct IssuerPickerField: View {
 
     var body: some View {
         let entries = knownIssuers.hosts
-        Picker("Issuer", selection: $selectedEntry) {
+        Picker("Verified by", selection: $selectedEntry) {
             if entries.isEmpty {
                 // The default-seeded store always ships with at least
                 // the production issuers; this branch only hits if the
@@ -66,7 +97,9 @@ struct IssuerPickerField: View {
                 Text("Custom URL").tag(IssuerSelection.customSentinel)
             } else {
                 ForEach(entries, id: \.self) { entry in
-                    Text(entry).tag(entry)
+                    // Show the friendly name (e.g. "Musnad by Elabify"); the
+                    // tag stays the raw host so resolution is unchanged.
+                    Text(IssuerSelection.displayName(forHost: entry)).tag(entry)
                 }
                 Text("Custom URL…").tag(IssuerSelection.customSentinel)
             }

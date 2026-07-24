@@ -99,7 +99,7 @@ final class IDDocumentReader {
         )
         let passport: NFCPassportModel
         do {
-            passport = try await reader.readPassport(mrzKey: mrzKey)
+            passport = try await reader.readPassport(mrzKey: mrzKey, customDisplayMessage: Self.nfcDisplayMessage(for:))
         } catch let nfcError as NFCPassportReaderError {
             throw IDDocumentReaderError.readFailed(humanMessage(for: nfcError))
         } catch {
@@ -286,6 +286,30 @@ final class IDDocumentReader {
     }
 
     #if MAKNOON_NFC
+    /// Plain-language NFC sheet copy. Overrides the library defaults
+    /// ("Authenticating with passport.....") with words a non-technical user
+    /// understands; returns nil to keep the library default (errors, success).
+    /// ADR-0069.
+    static func nfcDisplayMessage(for message: NFCViewDisplayMessage) -> String? {
+        switch message {
+        case .requestPresentPassport:
+            return "Hold your iPhone near your passport."
+        case .authenticatingWithPassport(let progress):
+            return "Reading and checking the passport chip on this phone.\n\n" + nfcProgressBar(progress)
+        case .readingDataGroupProgress(_, let progress):
+            return "Reading passport data on this phone.\n\n" + nfcProgressBar(progress)
+        default:
+            return nil
+        }
+    }
+
+    /// Mirrors the library's 5-dot progress bar so our custom messages keep
+    /// the same visual progress indicator.
+    private static func nfcProgressBar(_ percent: Int) -> String {
+        let p = max(0, min(5, percent / 20))
+        return String(repeating: "🟢 ", count: p) + String(repeating: "⚪️ ", count: 5 - p)
+    }
+
     private func humanMessage(for error: NFCPassportReaderError) -> String {
         switch error {
         case .NFCNotSupported:

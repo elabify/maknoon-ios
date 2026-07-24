@@ -49,6 +49,12 @@ struct RevealableSecureField: View {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .stroke(Color(.separator), lineWidth: 1)
         )
+        // Freeze the current orientation while a secret is on screen: rotating
+        // re-hosts the backing SecureField and iOS wipes its buffer, which would
+        // erase what the user typed. Reference-counted in AppOrientation so
+        // multiple fields / nested sheets compose. Released on disappear.
+        .onAppear { AppOrientation.beginSecureEntry() }
+        .onDisappear { AppOrientation.endSecureEntry() }
     }
 }
 

@@ -377,6 +377,10 @@ struct BitcoinSendView: View {
                 .buttonStyle(.borderless)
                 .accessibilityLabel("Pick from contacts")
             }
+            if !address.isEmpty, let fam = AddressNetworkGuard.detect(address), fam != .bitcoin {
+                Text("That looks like a \(fam.displayName) address. This is a Bitcoin wallet.")
+                    .font(.caption).foregroundStyle(.red)
+            }
             TextField("Label (optional)", text: $label)
         }
     }
@@ -793,6 +797,10 @@ struct BitcoinSendView: View {
 
     private var canSubmit: Bool {
         !address.isEmpty
+            // Hard-block an address that clearly belongs to another network
+            // (e.g. a pasted Ethereum/Tron address) at the UI, instead of only
+            // failing later when BDK rejects it at build time.
+            && AddressNetworkGuard.crossNetworkMismatch(address, current: .bitcoin) == nil
             && amountSats > 0
             && effectiveSatsPerVb > 0
     }
@@ -1018,17 +1026,7 @@ struct BitcoinSendView: View {
         }
     }
 
-    private func stripBitcoinPrefix(_ s: String) -> String {
-        var out = s.trimmingCharacters(in: .whitespacesAndNewlines)
-        if out.lowercased().hasPrefix("bitcoin:") {
-            out = String(out.dropFirst("bitcoin:".count))
-        }
-        // Strip query params if a bitcoin: URI was pasted
-        if let q = out.firstIndex(of: "?") {
-            out = String(out[..<q])
-        }
-        return out
-    }
+    private func stripBitcoinPrefix(_ s: String) -> String { PaymentURIStrip.bitcoin(s) }
 }
 
 // Minimal QR scanner wrapper for the Send view. Reuses the existing
@@ -1039,8 +1037,16 @@ private struct ScanAddressSheet: View {
 
     var body: some View {
         NavigationStack {
-            QRScannerView(onCode: onScan)
-                .ignoresSafeArea()
+            ZStack {
+                QRScannerView(onCode: onScan)
+                    .ignoresSafeArea()
+                // Always offer importing a QR from a photo, not just live camera.
+                VStack {
+                    Spacer()
+                    QRPhotoPickerButton(onCode: onScan)
+                        .padding(.bottom, 28)
+                }
+            }
             .navigationTitle("Scan address")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

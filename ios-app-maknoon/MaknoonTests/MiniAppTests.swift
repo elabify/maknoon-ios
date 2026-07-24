@@ -36,8 +36,11 @@ final class MiniAppTests: XCTestCase {
         """.data(using: .utf8)!
         let entry = try JSONDecoder().decode(AppStoreEntry.self, from: json)
         XCTAssertTrue(entry.isMiniApp)
-        // grantedPermissions is lowercased, so a mixed-case "EVM" still grants.
-        XCTAssertEqual(entry.grantedPermissions, ["identity", "evm"])
+        // grantedPermissions is lowercased, and the coarse "EVM" alias expands to
+        // the granular per-network wallet permissions (ADR-0057).
+        XCTAssertEqual(
+            Set(entry.grantedPermissions),
+            ["identity", "wallet.ethereum.read", "wallet.ethereum.write", "wallet.ethereum.sign"])
         XCTAssertEqual(entry.manifestURL?.lastPathComponent, "manifest.json")
     }
 
@@ -56,7 +59,9 @@ final class MiniAppTests: XCTestCase {
         let back = try JSONDecoder().decode(AppStoreCatalog.self, from: data)
         XCTAssertEqual(back.apps.count, 1)
         XCTAssertTrue(back.apps[0].isMiniApp)
-        XCTAssertEqual(back.apps[0].grantedPermissions, ["identity", "evm"])
+        XCTAssertEqual(
+            Set(back.apps[0].grantedPermissions),
+            ["identity", "wallet.ethereum.read", "wallet.ethereum.write", "wallet.ethereum.sign"])
     }
 
     // MARK: -- bundle integrity

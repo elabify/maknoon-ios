@@ -122,12 +122,10 @@ struct IDDocumentDetailView: View {
         Section {
             switch issuanceState {
             case .idle:
-                Text("Upload the document's chip-signed fields to an issuer service for verification and sanctions screening, then issue a post-quantum credential anchored privately on ledger. You will receive an identity verified credential in your wallet that can be shared with any Elabify-compatible verifier.")
+                Text("Send your passport's chip-signed details to Musnad by Elabify for verification and a sanctions check. You get back a verified credential in your wallet that you can share with any compatible app. Your passport details are never written on-chain; only a private anchor (a code with no personal data) is.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
-                Text("Uploaded: name, document number, dates, nationality, sex. NOT uploaded: chip photo (stays on this device).")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
+                IssuanceConsentDisclosure()
                 IssuerPickerField(
                     knownIssuers: store.knownIssuers,
                     selectedEntry: $selectedIssuerEntry,
@@ -148,7 +146,7 @@ struct IDDocumentDetailView: View {
             case .submitting:
                 HStack {
                     ProgressView().controlSize(.small)
-                    Text("Submitting to \(submittingHost)…")
+                    Text("Submitting to \(IssuerSelection.displayName(forHost: submittingHost))…")
                         .font(.callout)
                 }
             case .pendingReview(let pendingId, let preVerified, let reason):
@@ -159,11 +157,11 @@ struct IDDocumentDetailView: View {
                 .font(.callout.weight(.semibold))
                 .foregroundStyle(preVerified ? .green : .orange)
                 if preVerified {
-                    Text("The issuer accepted your passport's chip-signed bytes and confirmed they chain to a recognised national CSCA. It's now pending review; an operator will approve it shortly.")
+                    Text("Musnad accepted your passport's chip-signed data and confirmed it traces to a recognized national passport authority. It is now pending review; a reviewer will approve it shortly.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 } else {
-                    Text("Pre-verification did not complete automatically (\(reason)). An operator will review your packet shortly; you can close this screen.")
+                    Text("Automatic checks did not finish (\(reason)). A reviewer will look at your submission shortly; you can close this screen.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -177,7 +175,7 @@ struct IDDocumentDetailView: View {
                 Label("Submitted; anchoring in background", systemImage: "checkmark.seal")
                     .foregroundStyle(.green)
                     .font(.callout.weight(.semibold))
-                Text("Your credential has been minted server-side and is being anchored. You can close this screen and continue using the app. The credential will appear on the Identity tab as soon as the issuer's batch flushes. The pending pickup also shows at the top of the Identity tab with a cancel option.")
+                Text("Your credential has been created and is being finalized. You can close this screen and keep using the app. It will appear on the Identity tab shortly; the pending item at the top of the tab has a cancel option. Your passport details are never written on-chain.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Text("Credential: \(credentialId)")
@@ -198,7 +196,7 @@ struct IDDocumentDetailView: View {
                 .buttonStyle(.bordered)
             }
             if doc.sodFilename == nil {
-                Text("Chip-signed material isn't captured. Re-tap the document so Maknoon can store the SOD bytes; the issuer needs them to validate.")
+                Text("The chip's signed data wasn't captured. Re-tap your passport so Maknoon can store it; the issuer needs it to verify.")
                     .font(.caption)
                     .foregroundStyle(.orange)
             }
@@ -209,7 +207,14 @@ struct IDDocumentDetailView: View {
             sanctionsCheckButton(doc)
             sanctionsResultView(doc)
         } header: {
-            Text("Identity Verified Credential")
+            HStack(spacing: 6) {
+                Text("Identity Verified Credential")
+                HelpChip(
+                    "How verification works",
+                    accessibilityTitle: "How verification works",
+                    message: "Musnad by Elabify checks your passport chip and screens your name against sanctions lists, then issues a credential your wallet can present. Your passport details are never written on-chain. Only a private anchor, a code with no personal data, is recorded so apps can confirm the credential is valid."
+                )
+            }
         }
     }
 
@@ -273,7 +278,7 @@ struct IDDocumentDetailView: View {
             .padding(.vertical, 2)
         }
 
-        Text("Submits your name and date of birth to the selected issuer for an OpenSanctions check. Your photo and chip data stay on this device.")
+        Text("Sends only your name and date of birth to Musnad by Elabify for a sanctions check. Your photo and chip data stay on this phone.")
             .font(.caption)
             .foregroundStyle(.tertiary)
     }
@@ -590,7 +595,7 @@ struct IDDocumentDetailView: View {
                     .frame(maxWidth: .infinity)
             }
         } footer: {
-            Text("This only removes the document from Maknoon on this phone. Your physical document is unaffected.")
+            Text("Removes the passport from Maknoon on this phone. Your physical passport is not affected. Elabify issuers do not keep, track, or share your identity information beyond processing your verification.")
                 .font(.caption)
         }
     }

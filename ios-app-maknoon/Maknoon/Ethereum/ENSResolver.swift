@@ -174,6 +174,23 @@ enum EIP55 {
         }
         return out
     }
+
+    /// EIP-55 validation of a user-supplied address. An address that is all
+    /// lowercase or all uppercase carries no checksum, so it cannot be
+    /// validated and is accepted. A MIXED-case address must match the checksum
+    /// exactly; if it does not, a character was mistyped and the address is
+    /// rejected (a wrong-case digit would otherwise be sent as a valid-looking
+    /// but different address). Non-hex / wrong-length input returns false.
+    static func passesChecksum(_ address: String) -> Bool {
+        let body = (address.hasPrefix("0x") || address.hasPrefix("0X"))
+            ? String(address.dropFirst(2)) : address
+        guard body.count == 40, body.allSatisfy({ $0.isHexDigit }) else { return false }
+        let letters = body.filter { $0.isLetter }
+        let allLower = letters.allSatisfy { $0.isLowercase }
+        let allUpper = letters.allSatisfy { $0.isUppercase }
+        if allLower || allUpper { return true }
+        return checksum("0x" + body) == "0x" + body
+    }
 }
 
 private extension Data {

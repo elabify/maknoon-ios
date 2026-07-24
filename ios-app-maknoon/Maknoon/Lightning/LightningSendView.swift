@@ -129,11 +129,20 @@ struct LightningSendView: View {
             }
             .sheet(isPresented: $showScanner) {
                 NavigationStack {
-                    QRScannerView(onCode: { code in
+                    let handleCode: (String) -> Void = { code in
                         inputText = code.trimmingCharacters(in: .whitespacesAndNewlines)
                         showScanner = false
-                    })
-                    .ignoresSafeArea()
+                    }
+                    ZStack {
+                        QRScannerView(onCode: handleCode)
+                            .ignoresSafeArea()
+                        // Always offer importing a QR from a photo, not just live camera.
+                        VStack {
+                            Spacer()
+                            QRPhotoPickerButton(onCode: handleCode)
+                                .padding(.bottom, 28)
+                        }
+                    }
                     .navigationTitle("Scan invoice or LNURL")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {

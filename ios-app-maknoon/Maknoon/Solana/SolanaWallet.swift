@@ -265,10 +265,20 @@ actor SolanaWallet {
     /// "send a bit more" instead of a raw RPC code. No-op once the
     /// recipient exists (any amount is then valid), and fail-open if
     /// the existence probe itself errors (let the real send surface it).
+    /// Pure rent-exempt decision, split out so the branches are unit-testable
+    /// without an RPC. Blocks only when the recipient is a brand-new account
+    /// (does not yet exist) AND the amount is below the rent-exempt minimum.
+    /// `recipientExists` is supplied with a fail-open default (true) so an RPC
+    /// error never blocks a legitimate send. Mirrors Android
+    /// rentExemptBlocksNativeTransfer.
+    static func rentExemptBlocksNativeTransfer(lamports: UInt64, recipientExists: Bool) -> Bool {
+        lamports < rentExemptMinimumLamports && !recipientExists
+    }
+
     func assertRentExemptForNativeTransfer(recipient: String, lamports: UInt64) async throws {
         guard lamports < Self.rentExemptMinimumLamports else { return }
         let exists = (try? await rpc.accountExists(address: recipient)) ?? true
-        guard !exists else { return }
+        guard Self.rentExemptBlocksNativeTransfer(lamports: lamports, recipientExists: exists) else { return }
         throw SolanaDescriptorError.signingFailed(
             "\(recipient.prefix(6))… is a brand-new account. Solana requires at least "
             + "0.00089088 SOL to create it (rent exemption). Send at least that much, "

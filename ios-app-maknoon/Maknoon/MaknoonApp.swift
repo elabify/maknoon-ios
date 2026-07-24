@@ -16,17 +16,67 @@ enum AppOrientation {
     /// orientation. Toggled by OnboardingView on appear / disappear.
     static var lockPortrait = false
 
+    /// Secure-entry orientation freeze. While a secret is being typed we lock
+    /// the orientation the user is ALREADY in, so a rotation cannot re-host the
+    /// backing SecureField and wipe the typed text (iOS secure text entry zeroes
+    /// its buffer when its field is recreated). Reference-counted because several
+    /// RevealableSecureFields (or nested sheets) can be on screen at once, and it
+    /// preserves the current orientation rather than forcing portrait.
+    private static var secureEntryDepth = 0
+    private static var secureLockMask: UIInterfaceOrientationMask?
+
+    /// The mask the AppDelegate reports: a secure-entry freeze wins, then the
+    /// onboarding portrait lock, else free rotation.
+    static var effectiveMask: UIInterfaceOrientationMask {
+        secureLockMask ?? (lockPortrait ? .portrait : .allButUpsideDown)
+    }
+
+    /// Freeze the current orientation for the duration of a secret entry.
+    @MainActor
+    static func beginSecureEntry() {
+        secureEntryDepth += 1
+        guard secureEntryDepth == 1 else { return }
+        secureLockMask = currentInterfaceMask()
+        // We are already in that orientation, so no geometry request (which
+        // would risk a flip); just narrow the supported set going forward.
+        foregroundScene()?.keyWindow?.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
+    }
+
+    /// Release the freeze once the last secret entry goes away.
+    @MainActor
+    static func endSecureEntry() {
+        guard secureEntryDepth > 0 else { return }
+        secureEntryDepth -= 1
+        guard secureEntryDepth == 0 else { return }
+        secureLockMask = nil
+        apply()
+    }
+
     /// Ask UIKit to re-evaluate the supported orientations now (iOS 16+),
     /// so a device already held in landscape snaps back to portrait when the
     /// lock turns on (and is freed when it turns off).
     @MainActor
     static func apply() {
-        guard let scene = UIApplication.shared.connectedScenes
-            .first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene
-            ?? UIApplication.shared.connectedScenes.first as? UIWindowScene else { return }
-        let mask: UIInterfaceOrientationMask = lockPortrait ? .portrait : .allButUpsideDown
-        scene.requestGeometryUpdate(.iOS(interfaceOrientations: mask))
+        guard let scene = foregroundScene() else { return }
+        scene.requestGeometryUpdate(.iOS(interfaceOrientations: effectiveMask))
         scene.keyWindow?.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
+    }
+
+    private static func foregroundScene() -> UIWindowScene? {
+        UIApplication.shared.connectedScenes
+            .first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene
+            ?? UIApplication.shared.connectedScenes.first as? UIWindowScene
+    }
+
+    /// A single-orientation mask matching how the app is currently displayed,
+    /// so freezing keeps the user where they are (upside-down maps to portrait).
+    @MainActor
+    private static func currentInterfaceMask() -> UIInterfaceOrientationMask {
+        switch foregroundScene()?.interfaceOrientation {
+        case .landscapeLeft:  return .landscapeLeft
+        case .landscapeRight: return .landscapeRight
+        default:              return .portrait
+        }
     }
 }
 
@@ -37,7 +87,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         _ application: UIApplication,
         supportedInterfaceOrientationsFor window: UIWindow?
     ) -> UIInterfaceOrientationMask {
-        AppOrientation.lockPortrait ? .portrait : .allButUpsideDown
+        AppOrientation.effectiveMask
     }
 }
 
@@ -263,6 +313,11 @@ struct MaknoonApp: App {
             maxFee = std.maxFeePerGas; maxPriority = std.maxPriorityFeePerGas
         }
 
+        // Refuse a transfer/transferFrom whose token recipient is the call target
+        // (the token contract) - it would send the tokens to the contract itself.
+        if EthereumCallDataDecoder.transferTargetsCallee(to: to, data: data) {
+            throw NSError(domain: "WalletConnect", code: 0, userInfo: [NSLocalizedDescriptionKey: "This transaction would send tokens to the token contract itself. Refused to prevent loss."])
+        }
         let payload: EthereumTxPlan.Payload = data.isEmpty ? .native : .contractCall(data: data)
         let plan = EthereumTxPlan(
             chainId: chainId, nonce: nonce, toAddress: to, value: value,

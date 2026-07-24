@@ -34,6 +34,33 @@ enum EthereumCallDataDecoder {
         }
     }
 
+    /// True when `data` is an ERC-20 transfer/transferFrom whose token recipient
+    /// equals `to` (the call target): the tokens would be sent to the contract
+    /// they are called on, which almost always loses them. Used to gate a
+    /// blind-signed eth_sendTransaction from a mini-app / WalletConnect dApp.
+    /// Pure + unit-tested.
+    static func transferTargetsCallee(to: String, data: Data) -> Bool {
+        guard data.count >= 4 else { return false }
+        let selector = data.prefix(4).map { String(format: "%02x", $0) }.joined()
+        let a = Array(data.dropFirst(4))
+        let target = normalizeAddress(to)
+        switch selector {
+        case "a9059cbb": // transfer(address,uint256): recipient is word 0
+            guard a.count >= 32 else { return false }
+            return normalizeAddress("0x" + a[12..<32].map { String(format: "%02x", $0) }.joined()) == target
+        case "23b872dd": // transferFrom(address,address,uint256): recipient is word 1
+            guard a.count >= 64 else { return false }
+            return normalizeAddress("0x" + a[44..<64].map { String(format: "%02x", $0) }.joined()) == target
+        default:
+            return false
+        }
+    }
+
+    private static func normalizeAddress(_ s: String) -> String {
+        let l = s.lowercased()
+        return l.hasPrefix("0x") ? l : "0x" + l
+    }
+
     /// (address in first word, uint256 in second word as a decimal string).
     private static func addressAndUint(_ args: Data) -> (String, String)? {
         guard args.count >= 64 else { return nil }

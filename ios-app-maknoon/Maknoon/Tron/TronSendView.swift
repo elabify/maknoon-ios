@@ -304,8 +304,13 @@ struct TronSendView: View {
                 .accessibilityLabel("Pick from contacts")
             }
             if !recipient.isEmpty, TronDescriptors.parseAddress(recipient) == nil {
-                Text("Not a valid Tron base58check address.")
-                    .font(.caption).foregroundStyle(.red)
+                if let fam = AddressNetworkGuard.detect(recipient), fam != .tron {
+                    Text("That looks like a \(fam.displayName) address. This is a Tron wallet.")
+                        .font(.caption).foregroundStyle(.red)
+                } else {
+                    Text("Not a valid Tron base58check address.")
+                        .font(.caption).foregroundStyle(.red)
+                }
             }
         }
     }
@@ -639,11 +644,32 @@ struct TronSendView: View {
         return parsedNativeUnits
     }
 
-    /// TRC-20 send: amount in token units; convert to raw via decimals.
+    /// Native TRX amount in sun, computed exactly from the typed decimal string
+    /// (no binary Double) on the native-denomination path so the transaction
+    /// carries precisely what the user typed. The fiat path still goes through
+    /// the spot price (inherently approximate) but is then scaled exactly. See
+    /// TokenAmount / amount-scaling-kat.json.
+    private var parsedSun: Int64? {
+        guard selectedToken == nil else { return nil }
+        let raw: String?
+        if !isFiatDenomination {
+            raw = TokenAmount.baseUnits(amount, decimals: 6)
+        } else {
+            guard let trx = parsedNativeUnits, trx > 0 else { return nil }
+            raw = TokenAmount.baseUnits(String(format: "%.6f", trx), decimals: 6)
+        }
+        guard let r = raw, let v = Int64(r) else { return nil }
+        return v
+    }
+
+    /// TRC-20 send: amount in token units; convert to exact raw base units.
     private func parsedTokenRawAmount(_ token: TronTRC20Token) -> String? {
+        let dp = Int(token.decimals)
+        if !isFiatDenomination {
+            return TokenAmount.baseUnits(amount, decimals: dp)
+        }
         guard let native = parsedNativeUnits, native > 0 else { return nil }
-        let scaled = native * pow(10.0, Double(token.decimals))
-        return String(format: "%.0f", scaled.rounded())
+        return TokenAmount.baseUnits(String(format: "%.\(dp)f", native), decimals: dp)
     }
 
     private var canSubmit: Bool {
@@ -651,7 +677,7 @@ struct TronSendView: View {
         if let token = selectedToken {
             return parsedTokenRawAmount(token) != nil
         }
-        return parsedTRXAmount != nil
+        return parsedSun != nil
     }
 
     private func shortAddress(_ s: String) -> String {
@@ -659,14 +685,7 @@ struct TronSendView: View {
         return "\(s.prefix(6))…\(s.suffix(4))"
     }
 
-    private func stripTronPrefix(_ s: String) -> String {
-        var out = s.trimmingCharacters(in: .whitespacesAndNewlines)
-        if out.lowercased().hasPrefix("tron:") {
-            out = String(out.dropFirst("tron:".count))
-        }
-        if let q = out.firstIndex(of: "?") { out = String(out[..<q]) }
-        return out
-    }
+    private func stripTronPrefix(_ s: String) -> String { PaymentURIStrip.tron(s) }
 
     private func explorerURL(for txid: String) -> URL? {
         let base = store.tronSettings.explorerURL(for: activeNetwork)
@@ -701,6 +720,16 @@ struct TronSendView: View {
             rpcURL: rpcURL,
             sandwich: store.sandwich
         )
+
+        // Tron rejects a self-transfer on-chain, so it would only burn the fee.
+        // Hard-block sending to your own address with a clear message.
+        if let sender = try? await wallet.resolvedAddress(biometricReason: "Verify recipient"),
+           SelfSendGuard.isSelfSend(recipient: recipient, ownAddresses: [sender], caseInsensitive: false) {
+            lastError = "You're sending to your own Tron address. Tron rejects a self-transfer, so this would only burn the fee. Enter the recipient's address."
+            state = .idle
+            return
+        }
+
         let feeLimitSun = Int64((Double(feeLimitTRX) ?? 1) * 1_000_000)
 
         do {
@@ -774,10 +803,9 @@ struct TronSendView: View {
                 return
             }
 
-            guard let trx = parsedTRXAmount, trx > 0 else {
+            guard let sunAmount = parsedSun, sunAmount > 0 else {
                 throw TronDescriptorError.signingFailed("Enter a positive amount.")
             }
-            let sunAmount = Int64((trx * 1_000_000).rounded())
 
             if case .hardware(let deviceId, let account, let senderBase58) = descriptor.kind {
                 guard let dev = store.devices.find(id: deviceId) else {
@@ -882,10 +910,7 @@ struct TronSendView: View {
                     token: token
                 )
             } else {
-                let sunAmount: Int64 = {
-                    guard let trx = parsedTRXAmount else { return 0 }
-                    return Int64((trx * 1_000_000).rounded())
-                }()
+                let sunAmount: Int64 = parsedSun ?? 0
                 markPending(
                     txid: txid,
                     recipient: recipient,

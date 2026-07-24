@@ -73,6 +73,13 @@ struct EthereumSendView: View {
     @State private var ensResolving: Bool = false
     @State private var ensError: String?
 
+    /// True when the resolved recipient is a contract address AND a
+    /// token is selected. Best-effort eth_getCode probe fired from
+    /// handleRecipientChanged; blocks the send (a token sent to a
+    /// contract is lost). Combined with the synchronous
+    /// recipientIsTokenContract check for the fast, offline case.
+    @State private var recipientIsContract = false
+
     /// Effective balance for the amount-vs-balance check. Tokens
     /// have their own balanceOf; native sends use the wallet's wei
     /// balance from eth_getBalance.
@@ -187,15 +194,12 @@ struct EthereumSendView: View {
             .sheet(isPresented: $showScanner) {
                 ChainScanSheet { scanned in
                     showScanner = false
-                    let stripped = stripEthereumPrefix(scanned)
-                    if isValidAddress(stripped) || ENSResolver.looksLikeName(stripped) {
-                        recipient = stripped
-                    } else if let frame = try? JSONDecoder().decode(LocalFrameEnvelope.self, from: Data(scanned.utf8)),
-                              frame.v == LocalFrameEnvelope.version {
+                    if let frame = try? JSONDecoder().decode(LocalFrameEnvelope.self, from: Data(scanned.utf8)),
+                       frame.v == LocalFrameEnvelope.version {
                         // A Verify & Pay request, not a send target.
                         ensError = "That's a Verify & Pay code. Use Wallet → Verify & Pay, not Send."
                     } else {
-                        ensError = "That QR isn't an Ethereum address."
+                        applyScannedOrPastedURI(scanned)
                     }
                 }
             }
@@ -277,7 +281,7 @@ struct EthereumSendView: View {
                     .textInputAutocapitalization(.never)
                     .lineLimit(2...4)
                 Button {
-                    if let s = UIPasteboard.general.string { recipient = stripEthereumPrefix(s) }
+                    if let s = UIPasteboard.general.string { applyScannedOrPastedURI(s) }
                 } label: {
                     Image(systemName: "doc.on.clipboard")
                 }
@@ -319,7 +323,25 @@ struct EthereumSendView: View {
                 Text("Address must be 0x followed by 40 hex characters, or an ENS name like vitalik.eth.")
                     .font(.caption).foregroundStyle(.red)
             }
+            if tokenSendToContractBlocked {
+                Text("This address is a token contract. Sending tokens here would lose them permanently. Enter the recipient's wallet address.")
+                    .font(.caption).foregroundStyle(.red)
+            }
+            if isSelfSend {
+                Text("This is your own address. Sending to yourself just moves funds within this wallet and still costs a fee.")
+                    .font(.caption).foregroundStyle(.orange)
+            }
         }
+    }
+
+    /// True when the recipient is this wallet's own address (a likely paste
+    /// mistake). Warned, not blocked: a self-transfer is legitimate.
+    private var isSelfSend: Bool {
+        guard let own = activeDescriptor?.address else { return false }
+        return SelfSendGuard.isSelfSend(
+            recipient: effectiveRecipient,
+            ownAddresses: [own],
+            caseInsensitive: true)
     }
 
     private func shortAddress(_ s: String) -> String {
@@ -333,6 +355,24 @@ struct EthereumSendView: View {
         let trimmed = recipient.trimmingCharacters(in: .whitespacesAndNewlines)
         resolvedENSAddress = nil
         ensError = nil
+        // With a token selected, probe whether the recipient is a contract
+        // (eth_getCode): an ERC-20 sent to a contract goes to the contract, not
+        // a person. Best-effort and stale-guarded like the ENS lookup below; an
+        // RPC blip leaves the flag false so a legitimate send is never blocked
+        // on a transient error.
+        if token != nil, isValidAddress(trimmed) {
+            let rpcURL = activeNetwork.rpcURL
+            let snapshot = trimmed
+            Task {
+                let contract = await wallet.isContract(address: snapshot, rpcURL: rpcURL)
+                await MainActor.run {
+                    guard recipient.trimmingCharacters(in: .whitespacesAndNewlines) == snapshot else { return }
+                    recipientIsContract = contract
+                }
+            }
+        } else {
+            recipientIsContract = false
+        }
         guard ENSResolver.looksLikeName(trimmed) else {
             ensResolving = false
             return
@@ -369,6 +409,24 @@ struct EthereumSendView: View {
     private var effectiveRecipient: String {
         if let resolved = resolvedENSAddress { return resolved }
         return recipient.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// True when a token send would land on a contract address (the selected
+    /// token's own contract, any ERC-20 this wallet added on this network, or
+    /// one eth_getCode flagged as having bytecode). Blocks submit + broadcast.
+    /// Only ever true when a token is selected: native ETH to a contract is
+    /// legitimate. Delegates to the pure, unit-tested `EthereumSendGuard`.
+    private var tokenSendToContractBlocked: Bool {
+        guard let token, isValidAddress(effectiveRecipient) else { return false }
+        return EthereumSendGuard.blocksTokenSend(
+            recipient: effectiveRecipient,
+            isTokenSend: true,
+            selectedTokenContract: token.contractAddress,
+            knownTokenContracts: store.ethereumTokenStore
+                .tokens(on: activeNetwork, walletId: wallet.descriptor.id)
+                .map { $0.contractAddress },
+            recipientHasCode: recipientIsContract
+        )
     }
 
     /// Asset dropdown: native (chain ticker) first, then the configured ERC-20s
@@ -761,6 +819,7 @@ struct EthereumSendView: View {
         guard let amt = parsedAmount, amt > .zero else { return false }
         guard isValidAddress(effectiveRecipient) else { return false }
         guard estimates[selectedTier] != nil else { return false }
+        guard !tokenSendToContractBlocked else { return false }
         return true
     }
 
@@ -768,7 +827,11 @@ struct EthereumSendView: View {
         let trimmed = s.trimmingCharacters(in: .whitespaces)
         guard trimmed.hasPrefix("0x"), trimmed.count == 42 else { return false }
         let hex = trimmed.dropFirst(2)
-        return hex.allSatisfy { $0.isHexDigit }
+        guard hex.allSatisfy({ $0.isHexDigit }) else { return false }
+        // EIP-55: a mixed-case address must match its checksum, so a mistyped
+        // character (wrong case) is caught instead of sent to a different,
+        // valid-looking address. All-lower / all-upper carry no checksum.
+        return EIP55.passesChecksum(trimmed)
     }
 
     private func maxSpendableAmount(balance: EthereumWeiValue) -> String {
@@ -831,6 +894,45 @@ struct EthereumSendView: View {
         if let q = out.firstIndex(of: "?") { out = String(out[..<q]) }
         if let at = out.firstIndex(of: "@") { out = String(out[..<at]) }
         return out
+    }
+
+    /// Apply a scanned/pasted EIP-681 URI (or bare address / ENS name)
+    /// to the form. Critically, a token-transfer request carries the
+    /// TOKEN CONTRACT as its URI target and the real recipient in the
+    /// `address=` param: we auto-select the matching token and set the
+    /// recipient to the wallet address, never the contract (which would send
+    /// the tokens to the token contract instead of the recipient).
+    private func applyScannedOrPastedURI(_ raw: String) {
+        let parsed = EthereumURIParser.parse(raw)
+        if let tc = parsed.tokenContract {
+            // Token-transfer request: auto-select the matching token in this wallet.
+            let owned = store.ethereumTokenStore.tokens(on: activeNetwork, walletId: wallet.descriptor.id)
+            if let match = owned.first(where: { $0.contractAddress.lowercased() == tc.lowercased() }) {
+                token = match
+                if let base = parsed.amountBaseUnits, let disp = Self.baseUnitsToDisplay(base, decimals: match.decimals) {
+                    amountStr = disp
+                    amountDenomination = match.symbol
+                }
+            } else {
+                ensError = "That QR requests a token this wallet does not have added on this network."
+                return
+            }
+        }
+        let r = parsed.recipient
+        guard isValidAddress(r) || ENSResolver.looksLikeName(r) else {
+            ensError = "That QR isn't an Ethereum address."
+            return
+        }
+        recipient = r
+    }
+
+    /// Convert an integer base-unit string to a human decimal string.
+    /// Returns nil on parse failure.
+    static func baseUnitsToDisplay(_ base: String, decimals: Int) -> String? {
+        let trimmed = base.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let value = Decimal(string: trimmed) else { return nil }
+        let display = value / pow(Decimal(10), decimals)
+        return "\(display)"
     }
 
     /// Hardware signing: build the unsigned EIP-1559 envelope, ship
@@ -902,6 +1004,15 @@ struct EthereumSendView: View {
     private func broadcast() async {
         guard let descriptor = activeDescriptor else { return }
         guard let amt = parsedAmount, let est = estimates[selectedTier] else { return }
+
+        // Safety backstop: never sign/broadcast a token transfer whose
+        // recipient is a contract address. canSubmit already blocks the
+        // button; this guards the programmatic path (and any state that
+        // changed between enabling the button and this call).
+        if tokenSendToContractBlocked {
+            lastError = "This address is a token contract. Sending tokens here would lose them permanently. Enter the recipient's wallet address."
+            return
+        }
 
         let network = activeNetwork
         let rpcURL = network.rpcURL

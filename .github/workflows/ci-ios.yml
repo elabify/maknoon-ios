@@ -16,9 +16,66 @@ name: ci-ios
 on:
   workflow_dispatch:
   push:
+    branches: ['**']
     tags: ['v*']
+  pull_request:
 
 jobs:
+  unit-tests:
+    name: unit tests
+    # Branch pushes + PRs (never tags: the release job runs the same tests behind
+    # its approval gate). Pure XCTest suites (EIP-681 URI parser, token-send +
+    # blind-sign guards, ERC-20 encode) on the simulator, unsigned. The app-hosted
+    # test target links WalletCore + the five Rust cores, so the xcframeworks are
+    # built first (ADR-0070/0071).
+    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - name: Select newest available Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Install Rust toolchain + iOS targets
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios
+
+      - name: Cache cargo registry + build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            ledger-btc-rs
+            ledger-eth-rs
+            ledger-sol-rs
+            ledger-tron-rs
+            trezor-core-rs
+
+      - name: Build core xcframeworks (btc, eth, sol, tron, trezor)
+        run: |
+          set -euo pipefail
+          for crate in ledger-btc-rs ledger-eth-rs ledger-sol-rs ledger-tron-rs trezor-core-rs; do
+            echo "::group::make ios ($crate)"
+            make -C "$crate" ios
+            echo "::endgroup::"
+          done
+
+      - name: Install xcodegen
+        run: brew install xcodegen
+
+      - name: Unit tests (simulator, unsigned)
+        working-directory: ios-app-maknoon
+        run: |
+          set -euo pipefail
+          xcodegen generate
+          SIM_ID="$(xcrun simctl list devices available -j | python3 -c "import sys,json; d=json.load(sys.stdin); ids=[v['udid'] for r,ds in d['devices'].items() if 'iOS' in r for v in ds if 'iPhone' in v['name']]; print(ids[0] if ids else '')")"
+          if [ -z "$SIM_ID" ]; then echo "::error::no iOS iPhone simulator available on this runner"; exit 1; fi
+          xcodebuild test -project Maknoon.xcodeproj -scheme Maknoon -destination "id=$SIM_ID"
+
   build:
     name: unsigned simulator build
     if: github.event_name == 'workflow_dispatch'
@@ -116,6 +173,19 @@ jobs:
 
       - name: Install xcodegen
         run: brew install xcodegen
+
+      - name: Unit tests (gate the release)
+        working-directory: ios-app-maknoon
+        # Pure XCTest suites (EIP-681 URI parser, token-send + blind-sign guards,
+        # ERC-20 encode) on the simulator; a failure blocks the TestFlight upload.
+        # No signing needed (simulator). Picks the first available iPhone simulator
+        # UDID so it tracks whatever iOS runtime the selected Xcode ships.
+        run: |
+          set -euo pipefail
+          xcodegen generate
+          SIM_ID="$(xcrun simctl list devices available -j | python3 -c "import sys,json; d=json.load(sys.stdin); ids=[v['udid'] for r,ds in d['devices'].items() if 'iOS' in r for v in ds if 'iPhone' in v['name']]; print(ids[0] if ids else '')")"
+          if [ -z "$SIM_ID" ]; then echo "::error::no iOS iPhone simulator available on this runner"; exit 1; fi
+          xcodebuild test -project Maknoon.xcodeproj -scheme Maknoon -destination "id=$SIM_ID"
 
       - name: Import signing certificate + provisioning profile
         env:

@@ -98,7 +98,7 @@ enum EthereumTxEncoder {
     /// the ETH value produces a transaction the Ledger Ethereum app
     /// rejects with 0x6A80 (even with blind signing on) because the
     /// value contradicts the recognized transfer calldata.
-    private static func ethValueWei(for plan: EthereumTxPlan) -> EthereumWeiValue {
+    static func ethValueWei(for plan: EthereumTxPlan) -> EthereumWeiValue {
         switch plan.payload {
         case .native:       return plan.value
         case .erc20:        return .zero
@@ -132,7 +132,7 @@ enum EthereumTxEncoder {
 
     /// Build the calldata blob for a given plan. Native sends carry
     /// no calldata; ERC-20 sends pack `transfer(to, amount)`.
-    private static func callData(for plan: EthereumTxPlan) -> Data {
+    static func callData(for plan: EthereumTxPlan) -> Data {
         switch plan.payload {
         case .native:
             return Data()

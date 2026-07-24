@@ -98,7 +98,8 @@ final class MiniAppBridge: NSObject, WKScriptMessageHandlerWithReply {
             replyHandler(Self.envelope(error: .unsupported("namespace \(namespace)")), nil)
             return
         }
-        if let needed = handler.requiredPermission(forMethod: method), !granted.contains(needed) {
+        if let needed = handler.requiredPermission(forMethod: method),
+           !Self.isAuthorized(requiredPermission: needed, granted: granted) {
             LogStore.shared.warn(Self.category, "app \(entry.id) called \(namespace).\(method) without '\(needed)' permission")
             replyHandler(Self.envelope(error: .unauthorized("app lacks '\(needed)' permission")), nil)
             return
@@ -123,6 +124,14 @@ final class MiniAppBridge: NSObject, WKScriptMessageHandlerWithReply {
     }
     private static func envelope(error: MiniAppBridgeError) -> [String: Any] {
         ["ok": false, "error": ["code": error.code, "message": error.message]]
+    }
+
+    /// The permission gate decision (ADR-0057): a method is authorized when it
+    /// needs no permission, or the app was granted the required token. Pure, so
+    /// the allow/deny logic is unit-testable without the WebView bridge.
+    nonisolated static func isAuthorized(requiredPermission needed: String?, granted: Set<String>) -> Bool {
+        guard let needed else { return true }
+        return granted.contains(needed)
     }
 }
 

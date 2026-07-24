@@ -33,6 +33,16 @@ struct IdentityView: View {
     @State private var renameFolderTarget: CredentialFolder?
     @State private var renameDraftName = ""
     @State private var pendingDeleteFolder: CredentialFolder?
+    @State private var pendingDeleteCredential: PendingCredentialDelete?
+    @State private var pendingDeleteDocumentId: UUID?
+
+    /// A credential the user asked to remove, held until they confirm. Carries
+    /// both the card id (to unassign from its folder) and the credential id.
+    private struct PendingCredentialDelete: Identifiable {
+        let cardId: String
+        let credId: String
+        var id: String { cardId }
+    }
 
     private struct SelectedDocumentId: Identifiable, Hashable {
         let id: UUID
@@ -192,6 +202,39 @@ struct IdentityView: View {
         } message: { folder in
             let count = store.credentialFolderStore.count(in: folder.id)
             Text("\(count) credential\(count == 1 ? "" : "s") will move back to All. The credentials themselves are not deleted.")
+        }
+        .confirmationDialog(
+            "Delete credential?",
+            isPresented: Binding(
+                get: { pendingDeleteCredential != nil },
+                set: { if !$0 { pendingDeleteCredential = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: pendingDeleteCredential
+        ) { pending in
+            Button("Delete credential", role: .destructive) {
+                store.credentialFolderStore.assign(cardId: pending.cardId, to: nil)
+                store.removeCredential(id: pending.credId)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { _ in
+            Text("Removes the local copy from this phone. Elabify issuers do not keep, track, or share your identity information beyond processing your verification.")
+        }
+        .confirmationDialog(
+            "Delete document?",
+            isPresented: Binding(
+                get: { pendingDeleteDocumentId != nil },
+                set: { if !$0 { pendingDeleteDocumentId = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: pendingDeleteDocumentId
+        ) { uuid in
+            Button("Delete document", role: .destructive) {
+                store.idDocuments.remove(id: uuid)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { _ in
+            Text("Removes the local copy from this phone. Your physical passport is not affected. Elabify issuers do not keep, track, or share your identity information beyond processing your verification.")
         }
     }
 
@@ -496,8 +539,7 @@ struct IdentityView: View {
                 cardContextMenu(card)
                 Divider()
                 Button(role: .destructive) {
-                    store.credentialFolderStore.assign(cardId: card.id, to: nil)
-                    store.removeCredential(id: credId)
+                    pendingDeleteCredential = PendingCredentialDelete(cardId: card.id, credId: credId)
                 } label: {
                     Label("Delete credential", systemImage: "trash")
                 }
@@ -513,7 +555,7 @@ struct IdentityView: View {
                 cardContextMenu(card)
                 Divider()
                 Button(role: .destructive) {
-                    store.idDocuments.remove(id: uuid)
+                    pendingDeleteDocumentId = uuid
                 } label: {
                     Label("Delete document", systemImage: "trash")
                 }

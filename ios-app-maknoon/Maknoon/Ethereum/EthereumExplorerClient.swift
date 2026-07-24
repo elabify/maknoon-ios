@@ -117,7 +117,14 @@ struct EthereumExplorerClient: Sendable {
         let data: Data
         let resp: URLResponse
         do {
-            (data, resp) = try await URLSession.shared.data(from: url)
+            // Explicit short timeout (default is 60s): some keyless explorers
+            // (e.g. Blockscout on busy addresses) take 40s+ to return a large
+            // token-transfer page. Fail fast instead of hanging the wallet
+            // sync; balance-based discovery of curated tokens does not depend
+            // on this call. ADR-0060.
+            var request = URLRequest(url: url)
+            request.timeoutInterval = 20
+            (data, resp) = try await URLSession.shared.data(for: request)
         } catch {
             LogStore.shared.warn("eth.explorer", "\(label) \(apiURL.host ?? "?"): \(error.localizedDescription)")
             throw error

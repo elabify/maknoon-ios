@@ -135,6 +135,13 @@ struct EthereumRPCClient: Sendable {
         )
     }
 
+    /// Deployed bytecode at `address`. Empty ("0x" / "0x0") for an
+    /// EOA; non-empty for a contract. Used to guard against sending
+    /// ERC-20 tokens to a contract address (they would go to the contract).
+    func getCode(_ address: String, block: String = "latest") async throws -> String {
+        return try await call(method: "eth_getCode", params: [.string(address), .string(block)])
+    }
+
     /// Broadcast a fully signed transaction. Returns the tx hash.
     func sendRawTransaction(_ rawHex: String) async throws -> String {
         let hex = rawHex.hasPrefix("0x") ? rawHex : "0x" + rawHex

@@ -751,6 +751,31 @@ struct EthereumWalletView: View {
         }
     }
 
+    /// Balance-based discovery for the curated ("reputable") tokens on this
+    /// chain: read each one's balance directly against the RPC and install any
+    /// the wallet holds above the dust floor. Unlike `autoDiscoverTokens`, this
+    /// does NOT depend on the explorer's transfer feed, so popular tokens
+    /// (USDC, USDT, ...) are detected even when the explorer is slow,
+    /// rate-limited, or returns nothing (ADR-0060). Fail-CLOSED: a token is
+    /// added only when its balance read SUCCEEDS and is above the dust floor,
+    /// so a flaky RPC never installs a token the wallet does not hold.
+    private func discoverCuratedByBalance(
+        network: ResolvedNetwork,
+        walletId: UUID,
+        ethereum: EthereumWallet,
+        rpcURL: String
+    ) async {
+        guard case .builtin(let builtin) = network.networkID else { return }
+        for token in EthereumTokenCatalog.reputable(for: builtin) {
+            if store.ethereumTokenStore.find(network: builtin, contract: token.contractAddress, walletId: walletId) != nil {
+                continue
+            }
+            guard let bal = try? await ethereum.tokenBalance(token: token, rpcURL: rpcURL) else { continue }
+            if Self.isDustBalance(bal, decimals: token.decimals) { continue }
+            store.ethereumTokenStore.add(token, walletId: walletId)
+        }
+    }
+
     /// Whole-token dust threshold for auto-discovery (ADR-0060): a holding below
     /// this is not auto-added.
     private static let tokenDustThreshold = Decimal(string: "0.0001")!
@@ -830,7 +855,7 @@ struct EthereumWalletView: View {
                 explorerAPIURL: explorerAPI,
                 apiKey: apiKey,
                 chainId: network.chainId,
-                perPage: 100
+                perPage: 25
             )
             recentTokenTxs = tokenTransfers
             // A contract call can confirm into the token-transfer feed only (not
@@ -845,6 +870,10 @@ struct EthereumWalletView: View {
             tokenTransfers = recentTokenTxs
         }
         await autoDiscoverTokens(from: tokenTransfers, network: network, walletId: descriptor.id, ethereum: ethereum, rpcURL: rpcURL)
+        // Balance-scan the curated list too, so popular tokens (USDC, USDT, ...)
+        // are detected from their balance alone even if the explorer's transfer
+        // feed was slow/empty. ADR-0060.
+        await discoverCuratedByBalance(network: network, walletId: descriptor.id, ethereum: ethereum, rpcURL: rpcURL)
         // Refresh token balances last: auto-discover may have just added
         // tokens, and the list only shows entries with a positive balance.
         await refreshTokenBalances(network: network, rpcURL: rpcURL, walletId: descriptor.id)

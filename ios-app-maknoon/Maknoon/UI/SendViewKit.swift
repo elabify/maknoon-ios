@@ -125,15 +125,23 @@ struct ChainScanSheet: View {
 
     var body: some View {
         NavigationStack {
-            QRScannerView(onCode: onScan)
-                .ignoresSafeArea()
-                .navigationTitle("Scan address")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button("Cancel") { dismiss() }
-                    }
+            ZStack {
+                QRScannerView(onCode: onScan)
+                    .ignoresSafeArea()
+                // Always offer importing a QR from a photo, not just live camera.
+                VStack {
+                    Spacer()
+                    QRPhotoPickerButton(onCode: onScan)
+                        .padding(.bottom, 28)
                 }
+            }
+            .navigationTitle("Scan address")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Cancel") { dismiss() }
+                }
+            }
         }
     }
 }

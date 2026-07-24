@@ -144,6 +144,9 @@ struct CredentialPresentView: View {
                     Label("Remove Verified Credential", systemImage: "trash")
                         .frame(maxWidth: .infinity)
                 }
+            } footer: {
+                Text("Removes this credential from this phone. Elabify issuers do not keep, track, or share your identity information beyond processing your verification.")
+                    .font(.caption)
             }
             }
         }

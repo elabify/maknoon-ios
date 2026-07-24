@@ -30,6 +30,14 @@ final class Web3BridgeHandler: MiniAppNamespaceHandler {
     /// sends need `wallet.ethereum.write`, signing needs `wallet.ethereum.sign`.
     /// So an app that declared only read is genuinely denied writes and signing.
     func requiredPermission(forMethod method: String) -> String? {
+        Self.requiredPermission(forMethod: method)
+    }
+
+    /// Pure method -> permission-token mapping (ADR-0057), split out so the
+    /// gate is unit-testable without constructing the handler or the WebView
+    /// bridge. This is the security-critical table: a send needs write, any
+    /// signing method needs sign, everything else needs only read.
+    nonisolated static func requiredPermission(forMethod method: String) -> String? {
         switch method {
         case "eth_sendTransaction":
             return "wallet.ethereum.write"
@@ -200,6 +208,11 @@ final class Web3BridgeHandler: MiniAppNamespaceHandler {
         // Contract calldata is allowed but never blind-signed: it is decoded for
         // the approval sheet when recognized, and shown verbatim otherwise.
         let data = dataFromHex(tx["data"] as? String) ?? Data()
+        // Refuse a transfer/transferFrom whose token recipient is the call target
+        // (the token contract) - it would send the tokens to the contract itself.
+        if EthereumCallDataDecoder.transferTargetsCallee(to: to, data: data) {
+            throw MiniAppBridgeError.invalidParams("This transaction would send tokens to the token contract itself. Refused to prevent loss.")
+        }
         let value = (try? EthereumWeiValue(hex: (tx["value"] as? String) ?? "0x0")) ?? .zero
         let (desc, account) = try activeWalletInfo()
 

@@ -36,6 +36,11 @@ struct PassportCardDetailView: View {
     @State private var revealed = false
     /// Blur strength for the masked state.
     private let maskBlur: CGFloat = 9
+    /// Tap-to-expand "what was checked" facts behind the chip seal.
+    @State private var showChipFacts = false
+    /// True while a screen recording or mirror is active. Forces the mask on
+    /// (overriding the reveal) so passport values don't leak into a capture.
+    @State private var screenCaptured = false
 
     private var doc: IDDocument? { store.idDocuments.documents.first { $0.id == documentId } }
 
@@ -70,6 +75,7 @@ struct PassportCardDetailView: View {
                 }
                 .navigationTitle("Passport")
                 .navigationBarTitleDisplayMode(.inline)
+                .trackingScreenCapture($screenCaptured)
                 .sheet(item: $presentCredential) { cred in
                     NavigationStack {
                         CredentialPresentView(credential: cred, passportMode: true).environment(store)
@@ -100,8 +106,10 @@ struct PassportCardDetailView: View {
         let palette = SchemaPalette.forSchema(passportSchemaURI)
         let fg = palette.foreground
         // Masked on-screen unless the holder revealed it; never masked in the
-        // shareable render (forSharing), so Share / QR are unaffected.
-        let masked = !forSharing && !revealed
+        // shareable render (forSharing), so Share / QR are unaffected. A live
+        // screen capture (recording / mirror) forces the mask back on even if
+        // the holder had revealed the values.
+        let masked = !forSharing && (!revealed || screenCaptured)
         VStack(alignment: .leading, spacing: 0) {
             // header: icon + Passport + version, eyeball + logo
             HStack(alignment: .center, spacing: 9) {
@@ -183,9 +191,31 @@ struct PassportCardDetailView: View {
 
             Rectangle().fill(fg.opacity(0.16)).frame(height: 1).padding(.vertical, 9)
 
-            // genuine seal (expiry now lives with the other attributes above)
+            // genuine seal (expiry now lives with the other attributes above).
+            // On screen the seal is tappable and reveals exactly what was
+            // checked, including the honest "holder match not performed" fact.
             HStack(alignment: .center) {
-                genuineSeal(doc, fg: fg)
+                if forSharing {
+                    genuineSeal(doc, fg: fg)
+                } else {
+                    Button {
+                        showChipFacts = true
+                    } label: {
+                        HStack(spacing: 6) {
+                            genuineSeal(doc, fg: fg)
+                            Image(systemName: "info.circle")
+                                .font(.caption)
+                                .foregroundStyle(fg.opacity(0.7))
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("What was checked")
+                    .accessibilityHint("Shows what the chip check confirmed")
+                    .popover(isPresented: $showChipFacts) {
+                        chipFactsPopover(doc)
+                            .presentationCompactAdaptation(.popover)
+                    }
+                }
                 Spacer()
             }
 
@@ -241,7 +271,7 @@ struct PassportCardDetailView: View {
             // neutral "Checking…" state instead of a premature "Not verified".
             HStack(spacing: 7) {
                 ProgressView().controlSize(.small)
-                Text("Checking authenticity…").font(.callout.weight(.semibold)).foregroundStyle(fg)
+                Text("Checking chip…").font(.callout.weight(.semibold)).foregroundStyle(fg)
             }
         } else {
             let g = genuineState(doc)
@@ -597,19 +627,69 @@ struct PassportCardDetailView: View {
 
     private func genuineState(_ doc: IDDocument) -> (icon: String, color: Color, label: String) {
         if doc.passiveAuthResult?.status == .verified || doc.activeAuthVerifiedLocally == true {
-            // Full CSCA-verified chip: the same green "Verified" badge the
-            // Advanced options pill shows.
-            return ("checkmark", Color(hex: 0x34d399), "Verified")
+            // Full CSCA-verified chip. "Chip verified" is deliberately narrow:
+            // it states the chip was checked, not that the holder was matched.
+            return ("checkmark", Color(hex: 0x34d399), "Chip verified")
         }
         switch doc.passiveAuthResult?.status {
         // Chip data is intact + validly signed; the signer just isn't in the
         // on-device CSCA trust list (or is expired). Still a genuine chip, so a
-        // confident blue "Genuine" badge, not a cautionary yellow. The nuance
-        // lives in Advanced options.
-        case .integrityOnly: return ("checkmark", Color(hex: 0x3b82f6), "Genuine")
-        case .failed:        return ("xmark", Color(hex: 0xf87171), "Authenticity failed")
-        default:             return ("questionmark", Color.gray, "Not verified")
+        // confident blue "Chip genuine" badge, not a cautionary yellow. The nuance
+        // lives in Advanced options and the tap-to-expand facts.
+        case .integrityOnly: return ("checkmark", Color(hex: 0x3b82f6), "Chip genuine")
+        case .failed:        return ("xmark", Color(hex: 0xf87171), "Chip check failed")
+        default:             return ("questionmark", Color.gray, "Chip not checked")
         }
+    }
+
+    private enum ChipFactState { case ok, neutral, fail }
+
+    /// Break the single seal into the three facts it actually stands for, so
+    /// the badge never implies the holder was matched to the live person.
+    private func chipFacts(_ doc: IDDocument) -> [(label: String, state: ChipFactState)] {
+        let sigValid: ChipFactState
+        let tracesAuthority: ChipFactState
+        switch doc.passiveAuthResult?.status {
+        case .verified:
+            sigValid = .ok; tracesAuthority = .ok
+        case .integrityOnly:
+            // Validly signed, but the national signer isn't confirmed on this
+            // device (expired, or its CSCA isn't in the on-device trust list).
+            sigValid = .ok; tracesAuthority = .neutral
+        case .failed:
+            sigValid = .fail; tracesAuthority = .fail
+        default:
+            if doc.activeAuthVerifiedLocally == true { sigValid = .ok; tracesAuthority = .ok }
+            else { sigValid = .neutral; tracesAuthority = .neutral }
+        }
+        // NOTE: we intentionally do NOT surface a "holder match" fact. Maknoon
+        // does not compare the live person to the passport photo, and until it
+        // can, advertising the gap is misleading (possession is not ownership).
+        // Confirming the holder is the verifier's responsibility. ADR-0069.
+        return [
+            ("Chip signature valid", sigValid),
+            ("Data traces to a national passport authority", tracesAuthority),
+        ]
+    }
+
+    @ViewBuilder
+    private func chipFactsPopover(_ doc: IDDocument) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("What was checked").font(.subheadline.weight(.semibold))
+            ForEach(Array(chipFacts(doc).enumerated()), id: \.offset) { _, fact in
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: fact.state == .ok
+                          ? "checkmark.circle.fill"
+                          : fact.state == .fail ? "xmark.circle.fill" : "minus.circle")
+                        .foregroundStyle(fact.state == .ok ? .green : fact.state == .fail ? .red : .secondary)
+                    Text(fact.label)
+                        .font(.callout)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: 320)
     }
 }
 

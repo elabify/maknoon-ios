@@ -124,7 +124,7 @@ struct PresentAttributesView: View {
                     .foregroundStyle(.secondary)
             }
         } header: {
-            Text("Responding to verifier")
+            Text("Sharing with a verifier")
         } footer: {
             Text("The verifier's required fields are pre-selected below. Toggle others if you want to share more.")
                 .font(.caption)
