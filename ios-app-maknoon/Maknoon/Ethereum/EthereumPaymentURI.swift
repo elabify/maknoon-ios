@@ -30,6 +30,13 @@ enum EthereumURIParser {
         /// Raw integer base-unit amount (query `uint256` for tokens,
         /// `value` in wei for native), when present.
         let amountBaseUnits: String?
+        /// EIP-155 chain id from the `@<chainId>` hint, when the URI
+        /// carries one. The send screen compares this against the
+        /// wallet's active network BEFORE looking the token contract
+        /// up: the same address means different tokens on different
+        /// chains, so probing the wrong chain can match something
+        /// unrelated. nil when absent or not a plain integer.
+        let chainId: UInt64?
     }
 
     static func parse(_ raw: String) -> Parsed {
@@ -57,7 +64,9 @@ enum EthereumURIParser {
             function = String(body[body.index(after: slash)...])
             body = String(body[..<slash])
         }
+        var chainId: UInt64?
         if let at = body.firstIndex(of: "@") {
+            chainId = UInt64(body[body.index(after: at)...])
             body = String(body[..<at])
         }
         let target = body
@@ -68,7 +77,8 @@ enum EthereumURIParser {
             return Parsed(
                 recipient: query["address"] ?? "",
                 tokenContract: target,
-                amountBaseUnits: query["uint256"]
+                amountBaseUnits: query["uint256"],
+                chainId: chainId
             )
         }
 
@@ -76,7 +86,8 @@ enum EthereumURIParser {
         return Parsed(
             recipient: target,
             tokenContract: nil,
-            amountBaseUnits: query["value"]
+            amountBaseUnits: query["value"],
+            chainId: chainId
         )
     }
 

@@ -80,6 +80,32 @@ struct EthereumSendView: View {
     /// recipientIsTokenContract check for the fast, offline case.
     @State private var recipientIsContract = false
 
+    /// Set when a scanned / pasted EIP-681 code names a chain other than the
+    /// one this wallet is on. Nothing from the code is applied until the user
+    /// taps through, because the same contract address is a different token on
+    /// a different chain.
+    @State private var pendingChainSwitch: PendingChainSwitch?
+
+    /// Set when a scanned code requests an ERC-20 this wallet does not have on
+    /// this chain. Drives EthereumScannedTokenSheet, which probes the contract
+    /// and offers to add it or to send a token the wallet already holds.
+    @State private var pendingTokenRequest: ScannedTokenRequest?
+
+    /// Set when the user chose to send a DIFFERENT contract than the scanned
+    /// code asked for. Shown next to the asset row until the form is submitted:
+    /// a payee may credit only the contract it named.
+    @State private var substitutedTokenNote: String?
+
+    /// A scanned code for another chain, held until the user confirms the
+    /// switch. `rawURI` is re-applied afterwards so the recipient, token and
+    /// amount all land in one step.
+    private struct PendingChainSwitch: Identifiable {
+        let id = UUID()
+        let networkID: EthereumNetworkID
+        let displayName: String
+        let rawURI: String
+    }
+
     /// Effective balance for the amount-vs-balance check. Tokens
     /// have their own balanceOf; native sends use the wallet's wei
     /// balance from eth_getBalance.
@@ -190,7 +216,10 @@ struct EthereumSendView: View {
                     Button("Cancel") { dismiss() }
                 }
             }
-            .task(id: token?.id) { await loadOnAppear() }
+            // Keyed on the chain as well as the asset: a scanned code can move
+            // the wallet to another chain, and the gas tiers and balances from
+            // the old one are meaningless there.
+            .task(id: "\(activeNetwork.networkID.stableId)|\(token?.id ?? "native")") { await loadOnAppear() }
             .sheet(isPresented: $showScanner) {
                 ChainScanSheet { scanned in
                     showScanner = false
@@ -201,6 +230,19 @@ struct EthereumSendView: View {
                     } else {
                         applyScannedOrPastedURI(scanned)
                     }
+                }
+            }
+            .sheet(item: $pendingTokenRequest) { req in
+                if case .builtin(let builtin) = activeNetwork.networkID {
+                    EthereumScannedTokenSheet(
+                        request: req,
+                        wallet: wallet,
+                        network: builtin,
+                        resolved: activeNetwork,
+                        added: store.ethereumTokenStore.tokens(on: activeNetwork, walletId: wallet.descriptor.id),
+                        onChoose: { choice in applyScannedTokenChoice(choice, request: req) }
+                    )
+                    .environment(store)
                 }
             }
             .sheet(isPresented: $showContacts) {
@@ -323,6 +365,18 @@ struct EthereumSendView: View {
                 Text("Address must be 0x followed by 40 hex characters, or an ENS name like vitalik.eth.")
                     .font(.caption).foregroundStyle(.red)
             }
+            if let pending = pendingChainSwitch {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("That code is for \(pending.displayName). This wallet is on \(activeNetwork.displayName).")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                    Button("Switch to \(pending.displayName) and continue") {
+                        applyPendingChainSwitch(pending)
+                    }
+                    .font(.caption.weight(.semibold))
+                    .buttonStyle(.borderless)
+                }
+            }
             if tokenSendToContractBlocked {
                 Text("This address is a token contract. Sending tokens here would lose them permanently. Enter the recipient's wallet address.")
                     .font(.caption).foregroundStyle(.red)
@@ -355,6 +409,9 @@ struct EthereumSendView: View {
         let trimmed = recipient.trimmingCharacters(in: .whitespacesAndNewlines)
         resolvedENSAddress = nil
         ensError = nil
+        // A pending chain switch belongs to the code that was scanned; typing a
+        // recipient by hand supersedes it.
+        pendingChainSwitch = nil
         // With a token selected, probe whether the recipient is a contract
         // (eth_getCode): an ERC-20 sent to a contract goes to the contract, not
         // a person. Best-effort and stale-guarded like the ENS lookup below; an
@@ -435,11 +492,25 @@ struct EthereumSendView: View {
     private var assetSection: some View {
         let tokens = store.ethereumTokenStore.tokens(on: activeNetwork, walletId: wallet.descriptor.id)
             .sorted { $0.symbol.lowercased() < $1.symbol.lowercased() }
-        let currentLabel = token.map { "\($0.symbol) · \($0.name)" } ?? "\(activeNetwork.ticker) (native)"
+        // Two contracts can share a symbol on one chain (native USDC and bridged
+        // USDC.e both report "USDC"), which would otherwise render as two
+        // identical rows. Add the contract tail to any symbol that repeats.
+        let collidingSymbols = Set(
+            Dictionary(grouping: tokens, by: { $0.symbol.lowercased() })
+                .filter { $0.value.count > 1 }
+                .keys
+        )
+        func label(_ t: EthereumToken) -> String {
+            let base = "\(t.symbol) · \(t.name)"
+            guard collidingSymbols.contains(t.symbol.lowercased()) else { return base }
+            return "\(base) · \(shortContract(t.contractAddress))"
+        }
+        let currentLabel = token.map { label($0) } ?? "\(activeNetwork.ticker) (native)"
         return Section("Asset") {
             Menu {
                 Button {
                     token = nil
+                    substitutedTokenNote = nil
                 } label: {
                     if token == nil {
                         Label("\(activeNetwork.ticker) (native)", systemImage: "checkmark")
@@ -450,11 +521,12 @@ struct EthereumSendView: View {
                 ForEach(tokens) { t in
                     Button {
                         token = t
+                        substitutedTokenNote = nil
                     } label: {
                         if token?.id == t.id {
-                            Label("\(t.symbol) · \(t.name)", systemImage: "checkmark")
+                            Label(label(t), systemImage: "checkmark")
                         } else {
-                            Text("\(t.symbol) · \(t.name)")
+                            Text(label(t))
                         }
                     }
                 }
@@ -469,6 +541,13 @@ struct EthereumSendView: View {
                 }
             }
             .foregroundStyle(.primary)
+            // Stays until the form is submitted: the scanned code named one
+            // contract and the user chose to send another.
+            if let substitutedTokenNote {
+                Text(substitutedTokenNote)
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
         }
     }
 
@@ -903,18 +982,58 @@ struct EthereumSendView: View {
     /// recipient to the wallet address, never the contract (which would send
     /// the tokens to the token contract instead of the recipient).
     private func applyScannedOrPastedURI(_ raw: String) {
+        ensError = nil
+        pendingChainSwitch = nil
         let parsed = EthereumURIParser.parse(raw)
+
+        // Chain first. A contract address means a different token on every
+        // chain, so matching or probing before the chain agrees can bind the
+        // send to an entirely unrelated asset. Nothing is applied until the
+        // user confirms the switch.
+        if let want = parsed.chainId, want != activeNetwork.chainId {
+            guard let targetID = EthereumChainResolver.networkID(for: want, store: store) else {
+                ensError = "That code is for chain \(want), which this wallet has no network for. Add it in Settings → Networks → Ethereum, then scan again."
+                return
+            }
+            let target = store.ethereumWalletStore.resolve(
+                targetID,
+                customs: store.ethereumCustomNetworks,
+                settings: store.ethereumSettings
+            )
+            pendingChainSwitch = PendingChainSwitch(
+                networkID: targetID,
+                displayName: target.displayName,
+                rawURI: raw
+            )
+            return
+        }
+
         if let tc = parsed.tokenContract {
-            // Token-transfer request: auto-select the matching token in this wallet.
+            // Token-transfer request: select the matching token in this wallet.
             let owned = store.ethereumTokenStore.tokens(on: activeNetwork, walletId: wallet.descriptor.id)
-            if let match = owned.first(where: { $0.contractAddress.lowercased() == tc.lowercased() }) {
+            // requestedSymbol is nil here because reading symbol() is an RPC
+            // round trip; the sheet does that and re-resolves for candidates.
+            switch EthereumScannedToken.resolve(requestedContract: tc, requestedSymbol: nil, added: owned) {
+            case .alreadyAdded(let match):
                 token = match
+                substitutedTokenNote = nil
                 if let base = parsed.amountBaseUnits, let disp = Self.baseUnitsToDisplay(base, decimals: match.decimals) {
                     amountStr = disp
                     amountDenomination = match.symbol
                 }
-            } else {
-                ensError = "That QR requests a token this wallet does not have added on this network."
+            case .sameSymbolCandidates, .unknown:
+                // Not in this wallet on this chain. Hand off to the sheet
+                // rather than dead-ending: it probes the contract and offers
+                // adding it or sending a token the wallet already holds.
+                guard case .builtin = activeNetwork.networkID else {
+                    ensError = "Token payment codes are not supported on custom networks yet. This one asks for the contract at \(tc)."
+                    return
+                }
+                pendingTokenRequest = ScannedTokenRequest(
+                    contract: tc,
+                    recipient: parsed.recipient,
+                    amountBaseUnits: parsed.amountBaseUnits
+                )
                 return
             }
         }
@@ -924,6 +1043,61 @@ struct EthereumSendView: View {
             return
         }
         recipient = r
+    }
+
+    /// Move the wallet to the chain a scanned code named, then re-apply the
+    /// code. Everything asset- and fee-shaped is dropped first: it all belonged
+    /// to the previous chain.
+    private func applyPendingChainSwitch(_ pending: PendingChainSwitch) {
+        store.ethereumWalletStore.setCurrentNetworkID(pending.networkID, for: wallet.descriptor.id)
+        token = nil
+        amountStr = ""
+        estimates = [:]
+        gasUnits = nil
+        nativeBalance = nil
+        tokenBalance = nil
+        substitutedTokenNote = nil
+        amountDenomination = activeNetwork.ticker
+        let raw = pending.rawURI
+        pendingChainSwitch = nil
+        applyScannedOrPastedURI(raw)
+    }
+
+    /// Apply what the user picked in EthereumScannedTokenSheet.
+    private func applyScannedTokenChoice(_ choice: ScannedTokenChoice, request: ScannedTokenRequest) {
+        token = choice.token
+        amountDenomination = choice.token.symbol
+        if let from = choice.substitutedFrom {
+            substitutedTokenNote = "The code asked for \(from.symbol) at \(shortContract(from.contract)). You are sending \(choice.token.symbol) at \(shortContract(choice.token.contractAddress)). Confirm the payee accepts this contract."
+        } else {
+            substitutedTokenNote = nil
+        }
+        // Carry the requested amount over only when both contracts use the same
+        // decimals; otherwise the same integer is a different quantity, so the
+        // user re-enters it.
+        if let base = request.amountBaseUnits {
+            let requestedDecimals = choice.substitutedFrom?.decimals ?? choice.token.decimals
+            if requestedDecimals == choice.token.decimals,
+               let disp = Self.baseUnitsToDisplay(base, decimals: choice.token.decimals) {
+                amountStr = disp
+            } else {
+                amountStr = ""
+                substitutedTokenNote = (substitutedTokenNote.map { $0 + " " } ?? "")
+                    + "The requested amount was not carried over: the two tokens use different decimals."
+            }
+        }
+        let r = request.recipient
+        if isValidAddress(r) || ENSResolver.looksLikeName(r) {
+            recipient = r
+        } else {
+            ensError = "That QR isn't an Ethereum address."
+        }
+    }
+
+    private func shortContract(_ contract: String) -> String {
+        let display = EIP55.checksum(contract)
+        guard display.count > 12 else { return display }
+        return "\(display.prefix(6))…\(display.suffix(4))"
     }
 
     /// Convert an integer base-unit string to a human decimal string.

@@ -371,17 +371,12 @@ struct MaknoonApp: App {
         s.hasPrefix("0x") ? String(s.dropFirst(2)) : s
     }
 
-    /// Resolve the network config (for the RPC URL) the dApp's chainId names,
+    /// Resolve the network config (for the RPC URL) the app's chainId names,
     /// across built-in and user-defined custom networks. nil if the user has not
     /// configured that chain, so we never broadcast to an unknown endpoint.
+    /// Shared with the EIP-681 scan path via `EthereumChainResolver`.
     private static func resolveNetwork(store: HolderStore, chainId: UInt64) -> ResolvedNetwork? {
-        if let builtin = EthereumNetwork.allCases.first(where: { $0.chainId == chainId }) {
-            return store.ethereumWalletStore.resolve(.builtin(builtin), customs: store.ethereumCustomNetworks, settings: store.ethereumSettings)
-        }
-        if let custom = store.ethereumCustomNetworks.networks.first(where: { $0.chainId == chainId }) {
-            return store.ethereumWalletStore.resolve(.custom(custom.id), customs: store.ethereumCustomNetworks, settings: store.ethereumSettings)
-        }
-        return nil
+        EthereumChainResolver.resolved(for: chainId, store: store)
     }
 
     /// Resolve the wallet for a WalletConnect request. Prefer the wallet the
