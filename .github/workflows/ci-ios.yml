@@ -1,13 +1,20 @@
 # Maknoon iOS CI. The app links five Rust core xcframeworks (four Ledger SDKs +
 # Trezor) that are build artifacts, so CI builds them from the crate submodules
-# with `make ios` first; elabify-core resolves as a local SwiftPM package. Two
-# jobs:
-#   build    - workflow_dispatch: unsigned simulator build (~45 min). Verifies
-#              the app compiles, holds no secrets, never uploads.
-#   release  - on a vX.Y.Z tag only, behind the `testflight` Environment
-#              (required-reviewer gate): signed device archive -> App Store IPA
-#              -> upload to TestFlight via the App Store Connect API key. You
-#              then distribute to testers / promote to the App Store manually.
+# with `make ios` first; elabify-core resolves as a local SwiftPM package.
+#
+# Three jobs, mirroring ci-android.yml step for step:
+#   leak-scan      - fast guard on every push/PR: fails if anything that must
+#                    stay private slipped into a manual edit. Shared definition
+#                    in .github/leak-scan.sh.
+#   build-and-test - builds the app for testing (~45 min, dominated by the Rust
+#                    cores), then runs the XCTest suites as a separate step, so
+#                    "it builds" and "tests pass" are distinct checks. Unsigned,
+#                    simulator, never uploads. Also covers the manual
+#                    workflow_dispatch build check.
+#   release        - on a vX.Y.Z tag only, behind the `testflight` Environment
+#                    (required-reviewer gate): signed device archive -> App Store
+#                    IPA -> upload to TestFlight via the App Store Connect API
+#                    key. You then distribute to testers / promote manually.
 #
 # The signing + ASC-key secrets and Environment setup live in the maintainer
 # release runbook.
@@ -21,8 +28,21 @@ on:
   pull_request:
 
 jobs:
-  unit-tests:
-    name: unit tests
+  leak-scan:
+    name: leak scan
+    # Branch pushes + PRs only. On a TAG nothing should auto-run before the
+    # approval gate, so the scan moves INTO the gated release job below; that
+    # way a tag surfaces only the single gated job (matches ci-android.yml).
+    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Leak scan
+        run: bash .github/leak-scan.sh
+
+  build-and-test:
+    name: build + unit tests
     # Branch pushes + PRs (never tags: the release job runs the same tests behind
     # its approval gate). Pure XCTest suites (EIP-681 URI parser, token-send +
     # blind-sign guards, ERC-20 encode) on the simulator, unsigned. The app-hosted
@@ -67,71 +87,36 @@ jobs:
       - name: Install xcodegen
         run: brew install xcodegen
 
-      - name: Unit tests (simulator, unsigned)
-        working-directory: ios-app-maknoon
+      # Resolved once and exported: the build and test steps below must target the
+      # SAME simulator, and the release job needs it too. Tracks whatever iOS
+      # runtime the selected Xcode ships.
+      - name: Select iPhone simulator
         run: |
           set -euo pipefail
-          xcodegen generate
           SIM_ID="$(xcrun simctl list devices available -j | python3 -c "import sys,json; d=json.load(sys.stdin); ids=[v['udid'] for r,ds in d['devices'].items() if 'iOS' in r for v in ds if 'iPhone' in v['name']]; print(ids[0] if ids else '')")"
           if [ -z "$SIM_ID" ]; then echo "::error::no iOS iPhone simulator available on this runner"; exit 1; fi
-          xcodebuild test -project Maknoon.xcodeproj -scheme Maknoon -destination "id=$SIM_ID"
+          echo "SIM_ID=$SIM_ID" >> "$GITHUB_ENV"
 
-  build:
-    name: unsigned simulator build
-    if: github.event_name == 'workflow_dispatch'
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          submodules: recursive
-
-      - name: Select newest available Xcode
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: latest-stable
-
-      - name: Install Rust toolchain + iOS targets
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios
-
-      - name: Cache cargo registry + build
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: |
-            ledger-btc-rs
-            ledger-eth-rs
-            ledger-sol-rs
-            ledger-tron-rs
-            trezor-core-rs
-
-      - name: Build core xcframeworks (btc, eth, sol, tron, trezor)
-        run: |
-          set -euo pipefail
-          for crate in ledger-btc-rs ledger-eth-rs ledger-sol-rs ledger-tron-rs trezor-core-rs; do
-            echo "::group::make ios ($crate)"
-            make -C "$crate" ios
-            echo "::endgroup::"
-          done
-
-      - name: Install xcodegen
-        run: brew install xcodegen
-
-      - name: Generate project + build (unsigned, simulator)
+      # Build and test are separate steps on purpose: `xcodebuild test` compiles
+      # the app AND the test target, so a green test run hid the fact that a full
+      # build had happened. build-for-testing / test-without-building splits that
+      # into "does it build" and "do the tests pass" as separately-readable
+      # checks, without compiling twice (Android parity).
+      - name: Build app
         working-directory: ios-app-maknoon
         run: |
           set -euo pipefail
           xcodegen generate
-          xcodebuild build \
-            -project Maknoon.xcodeproj \
-            -scheme Maknoon \
-            -configuration Debug \
-            -destination 'generic/platform=iOS Simulator' \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO
+          xcodebuild build-for-testing -project Maknoon.xcodeproj -scheme Maknoon -destination "id=$SIM_ID"
+
+      - name: Unit tests
+        working-directory: ios-app-maknoon
+        run: |
+          set -euo pipefail
+          xcodebuild test-without-building -project Maknoon.xcodeproj -scheme Maknoon -destination "id=$SIM_ID"
 
   release:
-    name: archive + upload to TestFlight
+    name: release to TestFlight
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: macos-latest
     # Required-reviewer gate: the upload pauses until you approve the
@@ -142,6 +127,11 @@ jobs:
         with:
           submodules: recursive
 
+      # Leak scan runs here (after the gate) on tags, since the standalone
+      # leak-scan job is skipped for tags so nothing auto-runs pre-approval.
+      - name: Leak scan (gate the release)
+        run: bash .github/leak-scan.sh
+
       - name: Select newest available Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
@@ -174,18 +164,28 @@ jobs:
       - name: Install xcodegen
         run: brew install xcodegen
 
+      - name: Select iPhone simulator
+        run: |
+          set -euo pipefail
+          SIM_ID="$(xcrun simctl list devices available -j | python3 -c "import sys,json; d=json.load(sys.stdin); ids=[v['udid'] for r,ds in d['devices'].items() if 'iOS' in r for v in ds if 'iPhone' in v['name']]; print(ids[0] if ids else '')")"
+          if [ -z "$SIM_ID" ]; then echo "::error::no iOS iPhone simulator available on this runner"; exit 1; fi
+          echo "SIM_ID=$SIM_ID" >> "$GITHUB_ENV"
+
+      - name: Build app (gate the release)
+        working-directory: ios-app-maknoon
+        run: |
+          set -euo pipefail
+          xcodegen generate
+          xcodebuild build-for-testing -project Maknoon.xcodeproj -scheme Maknoon -destination "id=$SIM_ID"
+
       - name: Unit tests (gate the release)
         working-directory: ios-app-maknoon
         # Pure XCTest suites (EIP-681 URI parser, token-send + blind-sign guards,
         # ERC-20 encode) on the simulator; a failure blocks the TestFlight upload.
-        # No signing needed (simulator). Picks the first available iPhone simulator
-        # UDID so it tracks whatever iOS runtime the selected Xcode ships.
+        # No signing needed (simulator).
         run: |
           set -euo pipefail
-          xcodegen generate
-          SIM_ID="$(xcrun simctl list devices available -j | python3 -c "import sys,json; d=json.load(sys.stdin); ids=[v['udid'] for r,ds in d['devices'].items() if 'iOS' in r for v in ds if 'iPhone' in v['name']]; print(ids[0] if ids else '')")"
-          if [ -z "$SIM_ID" ]; then echo "::error::no iOS iPhone simulator available on this runner"; exit 1; fi
-          xcodebuild test -project Maknoon.xcodeproj -scheme Maknoon -destination "id=$SIM_ID"
+          xcodebuild test-without-building -project Maknoon.xcodeproj -scheme Maknoon -destination "id=$SIM_ID"
 
       - name: Import signing certificate + provisioning profile
         env:
